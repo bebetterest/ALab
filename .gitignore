@@ -1,0 +1,20 @@
+# Local agent instructions and synchronized local notes
+AGENTS.md
+AGENTS_cn.md
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Local system files
+.DS_Store
+
+# Dependency directories
+node_modules/
+
+# Build and cache outputs
+dist/
+build/
+.cache/
+coverage/
