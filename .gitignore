@@ -1,6 +1,7 @@
 # Local agent instructions and synchronized local notes
 AGENTS.md
-AGENTS_cn.md
+*_cn.md
+CORE.md
 
 # Environment variables and secrets
 .env
