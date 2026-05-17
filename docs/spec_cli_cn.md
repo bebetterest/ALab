@@ -1,0 +1,800 @@
+# ALab V1 CLI 规格
+
+本文档是 [spec_cli.md](spec_cli.md) 的中文同步版。英文版是规范性来源；本文件保持同等决策内容。
+
+## 1. 调用模型
+
+Canonical invocation：
+
+```text
+alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] <command> [args]
+```
+
+规则：
+
+- Global options 可以放在 canonical command 或 top-level alias 前后。
+- CLI 必须先预扫描 argv 中的 global options，再执行 context detection、migration、config loading、credential lookup 或 command-specific parsing。
+- Pre-scan 在第一个 standalone `--` 处停止。`--` 后的参数交给 command-specific parsing，绝不解释为 global `--home`、`--output`、`--key` 或 `--key-stdin`。
+- 重复 global option 以 exit code `2` 失败，除非该 option 明确允许重复值。
+- Canonical nested command 是文档和测试的准绳。Alias 必须映射到同一 handler 和 result schema。
+- `--home` 在 context detection、migration、config loading、credential lookup 之前生效。
+- `--output` 只选择单次命令的 rendering。
+- `--key` 提供 root key 或 project admin key。
+- `--key-stdin` 读取全部 stdin，最多去掉一个尾随换行，然后要求 non-empty single-line value 且不含 NUL byte。空输入、embedded newline 和 NUL byte 以 `CONFIG_INVALID` 失败。它与 `--key` 冲突。
+- 只有没有 `--key` 和 `--key-stdin` 且命令需要 root/admin authorization 时才读取 `ALAB_KEY`。
+- Public 或 optionally authorized 命令必须忽略 `ALAB_KEY` 的权限提升效果。只有显式提供 `--key` 或 `--key-stdin` 时，才可以渲染 authorized details。
+
+Home 解析优先级：
+
+1. `--home <path>`
+2. `ALAB_HOME`
+3. `~/.ALab`
+
+## 2. 输出模型
+
+Command handler 返回 structured result object，由 renderer 转换为 CLI output。
+
+V1 renderer：
+
+- `text`：默认、可持久化、稳定、agent-friendly。
+- `rich`：可选 human-friendly output，只能通过 `--output rich` 为单次命令启用。
+
+V1 不暴露 `json`、`xml` 或隐藏实验性 structured output mode。Renderer boundary 可以在未来版本支持更多格式，但 V1 compatibility 只由 stable structured result object 渲染为 `text` 和单命令 `rich` 定义。
+
+Global config path：
+
+```text
+~/.ALab/config.toml
+```
+
+Valid persisted global config：
+
+```toml
+schema_version = 1
+
+[output]
+format = "text"
+preview_bytes = 4096
+
+[storage]
+busy_timeout_ms = 5000
+
+[locks]
+acquire_timeout_ms = 30000
+heartbeat_interval_ms = 5000
+stale_after_ms = 120000
+```
+
+规则：
+
+- `format = "text"` 是唯一有效的 persisted output value。
+- `format = "rich"` 以 `CONFIG_INVALID` 失败。
+- Time values 使用 integer milliseconds。
+- Invalid global config 在 home resolution 和 migration 后阻止 normal commands。`auth init` 和 `config show|set|reset|validate` 仍可用于 repair。
+- Rich output 使用与 text output 相同的 result data，不得额外暴露 secret、hidden path、hidden log 或 hidden asset content。
+- 默认禁用 Typer Rich help 和 pretty exception。
+- Text output 是严格 key-value object 格式。每个 rendered object 以 `object: <type>` 开头。
+- 每个 scalar field 渲染为 `field: value`。
+- 多对象输出为重复 object block，中间严格用一个空行分隔。
+- Nullable field 的 absent value 渲染为 `none`；用户文本中的 literal string `none` 绝不被转换为 null。
+- Boolean 渲染为 `true` 或 `false`。
+- List 一律渲染为 repeated labeled lines，每行一个 value，使用该命令 documented singular label。Empty list 不输出 repeated lines，除非 command result schema 明确包含 count 或 summary scalar。Text output 绝不使用 comma-separated list rendering。
+- 多行 text field 渲染为 `field:`，随后每个内容行前加两个空格。Nullable multiline field 的 absent value 渲染为 `field: none`；non-null 空多行字符串渲染为 `field:` 后跟 `  [empty]`。
+- 用户提供的 text fields，例如 task、goal、run message、submission summary、feedback 和 annotation body，一律使用 multiline text field 渲染。空用户文本渲染为 `field:` 后跟 `  [empty]`，从而区别于 nullable `none` 和 literal text `none`。
+- Warning 在所有 primary result object 后以 `object: warning` block 渲染；每个 warning 一个 block，按产生顺序输出。
+- Error output 也使用 object block。System/internal failure 渲染 `object: error`；saved result failure 渲染命令正常 result object，并附带 `error code`、`exit code`、`reason` 和 `next` fields。
+
+## 3. Debug Mode
+
+`ALAB_DEBUG=1` 只影响 internal/system failure。
+
+允许：
+
+- 打印正常 ALab error template。
+- 打印 exception type。
+- 打印完整 stack trace。
+
+禁止：
+
+- Locals 或 object dump。
+- Environment map。
+- Raw root key、admin key、experiment token。
+- `secret_env` name/value pair、raw secret value、verifier hash。
+- Hidden asset content。
+- Raw hidden verifier/evaluator log。
+- 会泄露 private asset 的 hidden staging path。
+
+Result failure 不因 debug mode 打印 stack trace，例如 failed run 或 saved failed baseline。
+
+## 4. Error、Warning 和 Exit Code
+
+System/internal failure template：
+
+```text
+object: error
+message: Command failed.
+error code: PROJECT_INVALID
+exit code: 4
+project id: proj-example-a1b2
+reason: project baseline validation is invalid
+next: alab project validate --project proj-example-a1b2 --key <root-or-admin-key>
+```
+
+Result-failure 规则：
+
+- 成功记录失败结果的命令 exit code 为 `1`。
+- 例子：failed run、failed baseline validation、保存 record 的 timeout、submit not accepted。
+- Result failure 输出相关 structured fields：id、status、reward parse status、log/artifact capture summary、stable error code、numeric exit code、reason、next action。
+- 除非 ALab 自身无法执行流程，否则 result failure 不使用 internal/system failure template。
+
+Warning output：
+
+```text
+object: warning
+warning code: TOKEN_FILE_PERMISSIONS
+warning reason: token file permissions are broader than 0600
+```
+
+Warning 是稳定 field，不是自由文本；一个命令可输出多个 warning。
+
+V1 warning codes 包括：
+
+- `TOKEN_FILE_PERMISSIONS`
+- `TRACKED_SENSITIVE_SOURCE_FILE`
+- `SOURCE_EMPTY_AFTER_FILTER`
+- `SOURCE_DEDUPED_NAME_IGNORED`
+- `PUBLIC_GIT_CREDENTIAL_HELPER_USED`
+- `ENV_MODE_FULL_UNREDACTED_HOST_ENV`
+- `ARTIFACT_BYTES_NOT_REDACTED`
+- `BEST_INCOMPARABLE_RUNS_EXCLUDED`
+
+Stable error codes：
+
+- `AUTH_REQUIRED`
+- `AUTH_DENIED`
+- `HOME_EXISTS`
+- `CONTEXT_NOT_FOUND`
+- `CONTEXT_CONFLICT`
+- `PROJECT_NOT_FOUND`
+- `PROJECT_INVALID`
+- `PROJECT_ARCHIVED`
+- `EXPERIMENT_NOT_FOUND`
+- `EXPERIMENT_CLOSED`
+- `EXPERIMENT_ARCHIVED`
+- `RUN_NOT_FOUND`
+- `VALIDATION_NOT_FOUND`
+- `SOURCE_NOT_FOUND`
+- `SOURCE_INVALID`
+- `SOURCE_LIMIT_EXCEEDED`
+- `ARTIFACT_NOT_FOUND`
+- `LOG_NOT_FOUND`
+- `ANNOTATION_NOT_FOUND`
+- `CREDENTIAL_NOT_FOUND`
+- `AUDIT_NOT_FOUND`
+- `CATALOG_NOT_FOUND`
+- `CACHE_NOT_FOUND`
+- `NAME_CONFLICT`
+- `SCOPE_VIOLATION`
+- `EXPERIMENT_BUSY`
+- `RESOURCE_BUSY`
+- `GIT_STATE_INVALID`
+- `GIT_ERROR`
+- `RUNNER_FAILED`
+- `RUNNER_TIMEOUT`
+- `RUNNER_ERROR`
+- `REWARD_PARSE_ERROR`
+- `CONFIG_INVALID`
+- `BASELINE_VALIDATION_FAILED`
+- `OUTPUT_EXISTS`
+- `STORAGE_ERROR`
+
+Numeric exit codes：
+
+| Exit code | Category | Examples |
+| --- | --- | --- |
+| 0 | success | command succeeded；run/validation/submit accepted |
+| 1 | result failed | run failed；final submit not accepted；baseline failed；timeout with record saved |
+| 2 | usage/config | invalid CLI arguments；schema invalid；bad TOML literal；source limit exceeded；duplicate name |
+| 3 | auth | missing/invalid root/admin key；revoked key |
+| 4 | context/scope | context conflict；scope violation；mutable violation；closed experiment |
+| 5 | system/internal | storage failure；Git subprocess failure；runner could not start；migration failure |
+
+Stable error-code exit mapping：
+
+| Error code | Exit |
+| --- | --- |
+| `AUTH_REQUIRED` | 3 |
+| `AUTH_DENIED` | 3 |
+| `HOME_EXISTS` | 2 |
+| `CONTEXT_NOT_FOUND` | 2 |
+| `CONTEXT_CONFLICT` | 4 |
+| `PROJECT_NOT_FOUND` | 2 |
+| `PROJECT_INVALID` | 4 |
+| `PROJECT_ARCHIVED` | 4 |
+| `EXPERIMENT_NOT_FOUND` | 2 |
+| `EXPERIMENT_CLOSED` | 4 |
+| `EXPERIMENT_ARCHIVED` | 4 |
+| `RUN_NOT_FOUND` | 2 |
+| `VALIDATION_NOT_FOUND` | 2 |
+| `SOURCE_NOT_FOUND` | 2 |
+| `SOURCE_INVALID` | 2 |
+| `SOURCE_LIMIT_EXCEEDED` | 2 |
+| `ARTIFACT_NOT_FOUND` | 2 |
+| `LOG_NOT_FOUND` | 2 |
+| `ANNOTATION_NOT_FOUND` | 2 |
+| `CREDENTIAL_NOT_FOUND` | 2 |
+| `AUDIT_NOT_FOUND` | 2 |
+| `CATALOG_NOT_FOUND` | 2 |
+| `CACHE_NOT_FOUND` | 2 |
+| `NAME_CONFLICT` | 2 |
+| `SCOPE_VIOLATION` | 4 |
+| `EXPERIMENT_BUSY` | 4 |
+| `RESOURCE_BUSY` | 4 |
+| `GIT_STATE_INVALID` | 4 |
+| `GIT_ERROR` | 5 |
+| `RUNNER_FAILED` | 1 |
+| `RUNNER_TIMEOUT` | 1 |
+| `RUNNER_ERROR` | 有 saved run 或 validation record 时为 1；否则适用 `STORAGE_ERROR` 或 `GIT_ERROR` exit `5` |
+| `REWARD_PARSE_ERROR` | 1 |
+| `CONFIG_INVALID` | 2 |
+| `BASELINE_VALIDATION_FAILED` | 1 |
+| `OUTPUT_EXISTS` | 2 |
+| `STORAGE_ERROR` | 5 |
+
+规则：
+
+- 每个 stable error code 都映射到上表 exit code。Command-specific matrix 可以补充常见 code 和 next action，但不得重新映射 exit。
+- 未来所有 `*_NOT_FOUND` codes 默认 exit `2`。
+- 有 saved run 或 validation record 的 result failure exit `1`，包括 runner start errors、Docker unavailable validation records、dependency installation failures，以及被捕获成最终 `error` status 的 adapter errors。
+- 如果 ALab 无法创建或 finalize intended result record，command 使用 `STORAGE_ERROR`、`GIT_ERROR` 或其他适用 exit `5` code 作为 system/internal error 失败。
+
+Input normalization 和 lookup rules：
+
+- 所有 ALab object id 参数都要求完整 id，包括 home、project、source、experiment、run、validation、artifact、log、annotation、credential、token、audit、catalog 和 cache id。
+- Git commit selector 可以使用完整 SHA；命令明确接受 commit selector 时，也可以使用无歧义的 abbreviated SHA。
+- `--created-after`、`--created-before`、`--started-after`、`--ended-before` 等时间过滤参数只接受带 `Z` 或显式 numeric offset 的 RFC3339 timestamp。ALab 接受后统一 normalizes to UTC `Z` 再查询和输出。
+- Unknown object id 优先使用最具体的 `*_NOT_FOUND` code；没有对应 code 时，invalid selector/filter 使用 `CONFIG_INVALID`。
+- Token-scoped 和 public caller 选择一个存在但对 caller 不可见的对象时，返回 `SCOPE_VIOLATION`，reason 使用非泄露表述，例如 `not visible or not found`。Public/token-scoped output 不得泄露对象是否存在于 caller visibility 之外。Root/admin caller 使用精确的 `*_NOT_FOUND` 或 scope error。
+
+Command error matrix：
+
+- 所有命令在 storage、migration、backup 或 unexpected SQLite failure 时都可以以 `STORAGE_ERROR` 和 exit code `5` 失败。
+- 所有运行 Git 的命令都可以以 `GIT_ERROR` 和 exit code `5` 失败；在 Git mutation 前验证 user worktree state 的命令使用 `GIT_STATE_INVALID` 和 exit code `4`。
+- 所有要求 root/admin credential 的命令都可以以 `AUTH_REQUIRED` 或 `AUTH_DENIED` 和 exit code `3` 失败。
+- 所有 token-scoped 命令都可以按场景以 `AUTH_REQUIRED`、`AUTH_DENIED`、`CONTEXT_NOT_FOUND`、`CONTEXT_CONFLICT` 或 `SCOPE_VIOLATION` 失败。
+- 写 lifecycle audit event 的命令成功时渲染 `audit id`，除非 command-specific secret rule 明确禁止。
+
+| Command family | Stable failure codes |
+| --- | --- |
+| `auth init` | `HOME_EXISTS` exit `2`；`STORAGE_ERROR` exit `5` |
+| `auth root regenerate` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`STORAGE_ERROR` exit `5` |
+| `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
+| `key create|list|revoke` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND`、`CREDENTIAL_NOT_FOUND` 或 `CONFIG_INVALID` exit `2` |
+| `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT`、`SCOPE_VIOLATION` exit `4`；`AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；invalid path `CONFIG_INVALID` exit `2` |
+| `project list|show|status` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT` exit `4` |
+| `project archive|unarchive` | `PROJECT_NOT_FOUND` exit `2`；`RESOURCE_BUSY` exit `4`；auth failures exit `3`；已经处于目标 archive state 时 exit `0` |
+| `project remove` | missing confirmation `CONFIG_INVALID` exit `2`；`PROJECT_NOT_FOUND` exit `2`；not archived 或 blockers `RESOURCE_BUSY` exit `4`；auth failures exit `3` |
+| `project init` | invalid config `CONFIG_INVALID` exit `2`；invalid/conflicting source `SOURCE_INVALID` exit `2`；failed baseline `BASELINE_VALIDATION_FAILED` exit `1`；auth failures exit `3` |
+| `project config/env/secret` | invalid field/value/retain marker `CONFIG_INVALID` exit `2`；missing active valid version `PROJECT_INVALID` exit `4`；baseline failure `BASELINE_VALIDATION_FAILED` exit `1`；auth failures exit `3`；export target exists 时 `OUTPUT_EXISTS` exit `2` |
+| `project validate` | failed/error/timeout validation `BASELINE_VALIDATION_FAILED` exit `1`；`PROJECT_NOT_FOUND` exit `2`；auth failures exit `3` |
+| `project validation archive|unarchive|remove` | `PROJECT_NOT_FOUND`、`VALIDATION_NOT_FOUND` 或 `CONFIG_INVALID` exit `2`；active/not archived/blockers `RESOURCE_BUSY` exit `4`；auth failures exit `3`；已经处于目标 archive state 时 exit `0` |
+| `project locks clear-stale` | `PROJECT_NOT_FOUND` exit `2`；auth failures exit `3` |
+| `backup prune` | invalid retention selector `CONFIG_INVALID` exit `2`；auth failures exit `3` |
+| `audit list|show` | invalid filters `CONFIG_INVALID` exit `2`；`AUDIT_NOT_FOUND` exit `2`；auth failures exit `3` |
+| `source import` | `SOURCE_INVALID`、`SOURCE_LIMIT_EXCEEDED`、`NAME_CONFLICT` exit `2`；`PROJECT_NOT_FOUND` exit `2`；auth failures exit `3` |
+| `source list|show` | `SOURCE_NOT_FOUND` 或 `PROJECT_NOT_FOUND` exit `2`；auth failures exit `3` |
+| `source archive|unarchive|remove` | `SOURCE_NOT_FOUND`、`CONFIG_INVALID` exit `2`；active default、not archived 或 blockers `RESOURCE_BUSY` exit `4`；auth failures exit `3`；已经处于目标 archive state 时 exit `0` |
+| `catalog skydiscover add|update|show|remove` | invalid selector、dirty catalog 或 existing catalog `CONFIG_INVALID` exit `2`；`CATALOG_NOT_FOUND` exit `2`；active references `RESOURCE_BUSY` exit `4`；auth failures exit `3` |
+| `cache prune` | invalid selector combination `CONFIG_INVALID` exit `2`；auth failures exit `3` |
+| `exp create` | invalid source/name/path `CONFIG_INVALID`、`SOURCE_INVALID` 或 `NAME_CONFLICT` exit `2`；invalid project state `PROJECT_INVALID` 或 `PROJECT_ARCHIVED` exit `4`；auth failures exit `3` |
+| `exp archive|unarchive|remove` | `EXPERIMENT_NOT_FOUND` 或 `CONFIG_INVALID` exit `2`；active lock/not archived/blockers `RESOURCE_BUSY` exit `4`；auth failures exit `3`；已经处于目标 archive state 时 exit `0` |
+| `exp checkout|checkout remove` | invalid path/commit/selector `CONFIG_INVALID` exit `2`；visibility/scope failures `SCOPE_VIOLATION` exit `4`；auth failures exit `3` |
+| `exp worktree remove|restore` | invalid path/confirmation `CONFIG_INVALID` exit `2`；cleanup failure 或 context nesting `RESOURCE_BUSY`/`CONTEXT_CONFLICT` exit `4`；auth failures exit `3` |
+| `exp token list|revoke|regenerate` | invalid selector `CONFIG_INVALID` exit `2`；`EXPERIMENT_NOT_FOUND` 或 `CREDENTIAL_NOT_FOUND` exit `2`；auth failures exit `3` |
+| `exp tag add|remove|list` | invalid tag `CONFIG_INVALID` exit `2`；scope failures `SCOPE_VIOLATION` exit `4`；auth failures exit `3` |
+| `run` | failed/error/timeout run `RUNNER_FAILED`、`RUNNER_ERROR`、`RUNNER_TIMEOUT` 或 `REWARD_PARSE_ERROR` exit `1`；mutable violations `SCOPE_VIOLATION` exit `4`；invalid Git state `GIT_STATE_INVALID` exit `4`；busy experiment `EXPERIMENT_BUSY` exit `4` |
+| `submit` | final run not accepted `RUNNER_FAILED`、`RUNNER_ERROR`、`RUNNER_TIMEOUT`、`REWARD_PARSE_ERROR` 或 missing reusable run exit `1`；invalid refs/inputs `CONFIG_INVALID` exit `2`；closed/scope failures exit `4` |
+| `observe experiments|runs|artifacts|logs|annotations` | invalid filters/sort/selector `CONFIG_INVALID` exit `2`；root/admin 下 object not found 使用 matching `EXPERIMENT_NOT_FOUND`、`RUN_NOT_FOUND`、`ARTIFACT_NOT_FOUND`、`LOG_NOT_FOUND` 或 `ANNOTATION_NOT_FOUND` exit `2`；token/public not-visible-or-not-found selector `SCOPE_VIOLATION` exit `4`；export target `OUTPUT_EXISTS` exit `2`；auth failures exit `3`；archive/unarchive 已经处于目标状态时 exit `0` |
+| `annotate add|edit|archive|unarchive|remove` | invalid target/body/confirmation `CONFIG_INVALID` exit `2`；root/admin 下 `ANNOTATION_NOT_FOUND` exit `2`；token/public not-visible-or-not-found selector 和其他 visibility/scope failures `SCOPE_VIOLATION` exit `4`；auth failures exit `3`；archive/unarchive 已经处于目标状态时 exit `0` |
+
+## 5. Context 和 Credential 术语
+
+Context：
+
+- Global：不需要 project 或 experiment context。
+- Project：project control directory 或显式 `--project`。
+- Experiment：带 `.alab/context.json` 和 `.alab/token` 的 registered experiment worktree。
+- Inspection：由 `exp checkout` 创建的 read-only ALab context。
+- Any：home resolution 后任何路径都可运行。
+
+Credential：
+
+- None：不需要 key/token。
+- Root：root key。
+- Admin：project admin key。
+- Root/admin：root key 或匹配 project admin key。
+- Token：有效 worktree 或 inspection token，取决于命令。
+- Public：project policy 允许时无需 key。
+
+## 6. Command Group 和 Alias
+
+Canonical groups：
+
+- `auth`
+- `config`
+- `key`
+- `context`
+- `project`
+- `source`
+- `catalog`
+- `cache`
+- `backup`
+- `audit`
+- `exp`
+- `observe`
+- `annotate`
+
+Top-level aliases：
+
+- `alab status` 映射到 project/experiment/inspection status。
+- `alab run` 是 experiment run 的 canonical top-level command。
+- `alab submit` 是 experiment submit 的 canonical top-level command。
+- `alab exp list|search|show|best` 映射到 `observe experiments ...`。
+- `alab runs list|show|archive|unarchive|remove` 映射到 `observe runs ...`。
+- `alab artifacts list|show|export|archive|unarchive|remove` 映射到 `observe artifacts ...`。
+- `alab logs list|show|export|archive|unarchive|remove` 映射到 `observe logs ...`。
+- `alab annotations list|show` 映射到 `observe annotations ...`。
+
+Alias policy：
+
+- V1 只支持本节列出的 aliases。
+- `alab run` 和 `alab submit` 是 canonical top-level commands；V1 不新增 `alab exp run` 或 `alab exp submit` alias。
+- 未来任何 alias 都必须映射到 existing handler 和 structured result schema，并在接受前添加 golden tests。
+
+## 7. Command Contract 总则
+
+每个命令都必须有 golden tests 覆盖 text success output、text error output、alias behavior，以及 command 前后 global option placement。
+
+以下 command contracts 是规范性的 text-output schema：
+
+- `Object type` 指 primary result block 的精确 `object: <type>` 值。
+- `Success fields` 按列出顺序渲染；renderer 不得重排字段、添加 storage-only fields，或省略非空 listed fields，除非 command-specific rule 标记为 conditional。
+- `Success fields per <type>` 表示命令渲染零个或多个 `object: <type>` blocks，每个 row 一个 block，字段顺序按列表。
+- Repeated fields 使用 command contract 命名的 singular label，每个 value 一行。Repeated object rows 渲染为独立 object blocks。
+- Dry-run remove command 使用与 actual remove 相同的 object type，并在 base success fields 后按 golden tests 定义的稳定顺序追加 blocker 和 count fields。
+- Saved result failure，例如有 saved row 的 failed run 或 validation，使用命令正常 primary object type 和 field order，然后追加 `error code`、`exit code`、`reason` 和 `next` fields。
+- System/internal failure 只使用前文定义的 `object: error`。Warning 永远在 primary result objects 后以 `object: warning` 渲染。
+
+Primary object types：
+
+| Command pattern | Object type |
+| --- | --- |
+| `auth init`, `auth root regenerate` | `auth` |
+| `config show|set|reset|validate` | `config` |
+| `config validate` 的 repeated capability rows | `capability` |
+| `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
+| `context show|repair` | `context` |
+| `project list|show|archive|unarchive|remove`, project/public mode 的 `status` | `project` |
+| `project config show|export|import|set` | `project_config` |
+| `project env set|unset|list` | `project_env` |
+| `project secret set|unset|list|gc` | `project_secret` |
+| `project validate`, `project validation archive|unarchive|remove` | `validation` |
+| `project locks clear-stale` | `lock_clear` |
+| `backup prune` | `backup_prune` |
+| `audit list|show` | `audit` |
+| `source import|list|show|archive|unarchive|remove` | `source` |
+| `catalog skydiscover add|update|show|remove` | `catalog` |
+| `cache prune` | `cache_prune` |
+| `exp create|list|search|show|best|archive|unarchive|remove`, experiment mode 的 `status` | `experiment` |
+| `exp checkout`, `exp checkout remove`, inspection mode 的 `status` | `inspection_checkout` |
+| `exp worktree remove|restore` | `worktree` |
+| `exp tag add|remove|list` | `tag` |
+| `run`, `observe runs list|show|archive|unarchive|remove` | `run` |
+| `submit` | `submission` |
+| `observe artifacts list|show|export|archive|unarchive|remove` | `artifact` |
+| `observe logs list|show|export|archive|unarchive|remove` | `log` |
+| `annotate add|edit|archive|unarchive|remove`, `observe annotations list|show` | `annotation` |
+
+Lifecycle command rules：
+
+- Archive 和 unarchive command 是幂等的。对已经处于请求状态的 object 重复操作时 exit `0`，渲染 unchanged state，并且不创建重复 audit event。
+- `remove --dry-run` 即使 target 未 archived 也 exit `0`，渲染稳定的 `target_not_archived` blocker，且绝不写 audit row 或删除数据。
+- Actual `remove` 在 target 未 archived 时仍然失败。
+
+命令契约必须包含：
+
+- required context；
+- accepted credential scope；
+- required arguments；
+- optional arguments and defaults；
+- mutually exclusive arguments；
+- result-failure exit behavior；
+- stable text output fields。
+
+## 8. Auth 和 Key Commands
+
+`alab auth init`
+
+- Context：Any。
+- Credential：None。
+- Required args：无。
+- Conflicts：home 已初始化，或目标 path 已存在且是非空、非 ALab home 的 directory。
+- Success fields：`home`、`home id`、`root key`、`created`。
+- Exit：创建成功 `0`；home 已初始化时以 `HOME_EXISTS` 和 exit code `2` 失败；storage failure `5`。
+- Secret：raw root key 只打印一次。
+
+`alab auth root regenerate`
+
+- Context：Any。
+- Credential：Root。
+- Success fields：`home`、`home id`、`root key`、`revoked key id`、`created key id`。
+- Exit：成功 `0`；auth failure `3`；storage failure `5`。
+- Secret：replacement root key 只打印一次。
+
+`alab config show|set|reset|validate ...`
+
+- Context：Any。
+- Credential：None。
+- `show` 输出 global config values 和 validity。
+- `set <field> <toml-literal>` 只允许 known global config fields：`output.format`、`output.preview_bytes`、`storage.busy_timeout_ms`、`locks.acquire_timeout_ms`、`locks.heartbeat_interval_ms` 和 `locks.stale_after_ms`。
+- `output.format` 只能设置为 TOML string `"text"`；其他值以 `CONFIG_INVALID` 失败。
+- `reset <field>|--all` 恢复单个字段或整个 global config defaults。
+- `validate [--refresh-capabilities]` 验证 global config，并可刷新 Docker availability、platform 和 resource support capability cache。
+- 当 global config invalid 时，这组命令仍可运行以修复配置。
+
+`alab key create --project <project_id> [--role admin]`
+
+- Context：Any 或 Project。
+- Credential：Root。
+- Required args：`--project`。
+- Defaults：`--role admin`。
+- Conflicts：除 `admin` 外的 role。
+- Success fields：`project id`、`key id`、`role`、`admin key`、`created`。
+- Secret：raw admin key 只打印一次。
+
+`alab key list --root` 与 `alab key list --project <project_id>`
+
+- Context：Any 或 Project。
+- Credential：`--root` 需要 Root；project list 需要 Root/admin。
+- Conflicts：`--root` 与 `--project`。
+- Success fields：key metadata，包括 id、type/role、status、created at、revoked at；不得包含 raw secret 或 verifier hash。
+
+`alab key revoke <key_id> [--project <project_id>]`
+
+- Context：Any 或 Project。
+- Credential：Root。
+- Success fields：`key id`、`status`、`revoked at`。
+- 不通过此命令 revoke 唯一 active root key。
+
+## 9. Context Commands
+
+`alab context show [--path <dir>]`
+
+- Context：Any。
+- Credential：无 credential 可显示 local marker summary；full registry details 需要 Root/admin 或匹配 token。
+- Defaults：`--path .`。
+- Success fields：`path`、`resolved path`、`home id`、`context type`、`project id`、`exp id`、`token id`、`registered`、`path status`、`next`。
+
+`alab context repair --path <dir>`
+
+- Context：Any。
+- Credential：Root/admin，或满足 strict self-repair 条件的 valid token。
+- Required args：`--path`。
+- Success fields：`path`、`resolved path`、`context type`、`project id`、`exp id`、`repair mode`、`status`。
+
+## 10. Project Commands
+
+`alab project list [--include-archived]`
+
+- Context：Any。
+- Credential：Root。
+- Success fields：每个 project 输出 `project id`、`project name`、`project status`、`created at`、`updated at`、`archived at`。
+
+`alab project show [--project <project_id>]`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- Success fields：`project id`、`home id`、`project name`、`status`、`task`、`goal`、`active config version`、`latest attempted config version`、`default source`、`runner type`、`reward type`、`visibility scope`、`mutable summary`、`public exp create`。
+- Exit：成功 `0`；auth failure exit `3`；missing context 使用 `CONTEXT_NOT_FOUND` exit `2`。
+
+`alab project archive|unarchive [--project <project_id>]`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- Success fields：`project id`、`previous status`、`project status`、timestamp。
+- Archive 遇到 active validation、source import、run、submit、worktree maintenance 或 project maintenance lock 时以 `RESOURCE_BUSY` 失败。
+
+`alab project remove [--project <project_id>] (--dry-run|--force --confirm <project_id>) --cascade [--reason <text>]`
+
+- Context：Project 或 explicit project。
+- Credential：Root。
+- Required args：`--cascade`，以及 `--dry-run` 或 `--force` 加 matching `--confirm`。
+- Success fields：`project id`、`dry run`、`removed`、`cascade`、`audit id`、deleted object counts。
+- Dry run 只输出 blocker 和 deletion count，不写 audit row，不删除数据；target 未 archived 时输出 `target_not_archived` blocker 并 exit `0`。
+- Cascade rule：project remove 是 whole-tree deletion operation，因此 project 自身 archived 且不存在 active locks 后，child project records 不需要逐个 archived。
+- Project 必须 archived；cascade blocker 以 context/scope failure 失败。
+
+`alab status [--project <project_id>]`
+
+- Context：Project、Experiment、Inspection 或 explicit project。
+- Credential：Public safe summary、project context 中 Root/admin、experiment/inspection context 中 Token。
+- Success fields 至少包含 `context type`、`project id`、`project status`、`task`、`next`。
+- Public status 不得包含 history、env values、secret names/values、full runner command、hidden assets、hidden logs、absolute catalog/staging paths。
+
+`alab project init local|git|empty|harbor|skydiscover ...`
+
+- Context：Any。
+- Credential：Root。
+- Required args：`--config` 和 mode-specific source/task fields。
+- Common options：`--name`、`--task`、`--goal`、`--config`、`--skip-baseline-test`。
+- Source conflicts：每个 init mode 只有一个 source origin，除非 adapter source precedence 明确允许同时出现。
+- Harbor 和 SkyDiscover init source rule：V1 拒绝 `--source-ref`；adapter init 的 explicit editable source 必须是 `--source-path`、`--source-git` 或 `--source-empty`，否则使用 adapter-derived source。
+- Adapter source rule：如果 adapter-derived editable source 和 explicit caller source 同时存在，canonical tree hash 相同则正常 dedupe；不同则以 `SOURCE_INVALID` 失败，不静默覆盖。
+- Config source rule：input config 如果包含 `source.default_source_ref`，必须匹配 staged canonical source ref；不匹配以 `CONFIG_INVALID` 失败。省略时由 init 注入 canonical source ref。
+- Runtime config rule：runner、reward、artifact、log、env、secret、Docker、Harbor 和 SkyDiscover fields 只从 config 读取。V1 init 不暴露 runtime flags。
+- Success fields：`project id`、`project name`、`project status`、`source id`、`source ref`、`config version`、`validation id`、`validation status`、`admin key`、`next`。
+- Secret rule：project record 写入时始终创建一个 project admin key，并只打印一次 raw admin key，包括随后 baseline failed 而保留 invalid project 的情况。
+- Exit：validation passed 或 skipped 为 `0`；project 已创建但 baseline failed 为 `1`；invalid config/source 为 `2`；auth failure 为 `3`。
+
+`alab project config show [--project <project_id>] [--version latest-attempted|active-valid|<n>]`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- 默认 `--version latest-attempted`；`active-valid` 在无 active valid config 时以 `PROJECT_INVALID` 失败。
+- Success fields：`project id`、`config version`、`version selector`、`config hash`、`project name`、`task`、`goal`、`default source`、`runner type`、`runner working directory`、`timeout seconds`、`env mode`、`reward type`、`reward direction`、`primary metric`、`artifact glob count`、`stdout limit bytes`、`stderr limit bytes`、`mutable summary`、`visibility scope`、`public exp create`、repeated `env name`、repeated `secret name`、repeated `secret fingerprint`。
+- Secret rule：绝不打印 raw secret values。
+
+`alab project config export --out <path> [--overwrite] [--project <project_id>] [--version latest-attempted|active-valid|<n>]`
+
+- 默认 `--version latest-attempted`；`active-valid` 在无 active valid config 时以 `PROJECT_INVALID` 失败。
+- 默认 target exists 时以 `OUTPUT_EXISTS` 失败；`--overwrite` 替换。
+- Success fields：`project id`、`config version`、`out`、`wrote`、`secret mode`。
+
+`alab project config import --config <path> [--project <project_id>] [--dry-run] [--skip-baseline-test]`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- `--dry-run` 与 `--skip-baseline-test` 冲突。
+- Dry-run 只 parse/canonicalize config、计算 diff、报告是否需要 baseline，并运行 runtime capability checks；不写 DB、不创建 audit row、不改文件、不执行 baseline runner。
+- Success fields：`project id`、`previous active config version`、`latest attempted config version`、`runtime affecting`、`validation status`、`project status`、`next`。
+- Runtime change 的 exit 行为跟 baseline result 一致。
+
+`alab project config set <field> <value> [--project <project_id>] [--dry-run] [--skip-baseline-test]`
+
+- 支持任意非 secret field 的 TOML literal，包括 scalar、array 和 map。
+- 设置 array 或 map 会替换完整 field；V1 不做 nested value deep merge。
+- `[secret_env]` 必须通过 `project secret` 或 config import retain markers 修改。
+- 基于 latest attempted config 编辑；metadata-only edit 不能让 invalid runtime config 变 valid。
+- Dry-run 规则与 config import 相同。
+
+`alab project env set|unset|list` 与 `alab project secret set|unset|list|gc`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- `env`/`secret` `<name>` 必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$`。
+- `secret set` 只接受 `--value-stdin` 或 `--value-file`，二者冲突。
+- Secret input rule：`--value-stdin` 和 `--value-file` 读取完整 input，最多去掉一个尾随换行，然后要求 non-empty single-line UTF-8 value 且不含 NUL byte。空值、embedded newline 和 NUL byte 以 `CONFIG_INVALID` 失败；短于 4 UTF-8 bytes 的值按 storage secret-value rule 以 `CONFIG_INVALID` 失败。
+- `project secret gc` 必须且只能使用 `--dry-run` 或 `--apply` 之一；二者冲突。
+- `gc --dry-run` 只输出 unreferenced secret value candidates，不删除数据、不写 audit row；`gc --apply` 只删除未引用的 raw secret values，并写 audit event。
+- `project secret set|unset` success fields：`project id`、`config version`、`secret name`、`action`、`secret fingerprint`、`runtime affecting`、`validation status`。
+- `project secret list` 每个 secret 的 success fields：`project id`、`secret name`、`secret fingerprint`、`referenced`、`created at`、`replaced at`。
+- `project secret gc` success fields：`project id`、`dry run`、`deleted count`、repeated `secret value id`、`audit id`。
+- Secret rule：绝不输出 raw secret values。
+
+`alab project validate`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- Success/result fields：`project id`、`validation id`、`config version`、`validation status`、`exit code`、`reward`、`reward parse status`、`project status`、`next`。
+
+`alab project validation archive|unarchive|remove <validation_id>`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- `remove` 需要 `--dry-run` 或 `--force --confirm <validation_id> [--cascade] [--reason <text>]`。
+- Success fields：`project id`、`validation id`、archive status 或 `dry run`、`removed`、`audit id`。
+- Active validation 不能 archive/remove。
+
+`alab project locks clear-stale`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- Success fields：`project id`、`cleared count` 和清理的 `lock name`。
+
+`alab backup prune (--keep <n>|--older-than <days>)`
+
+- Context：Any。
+- Credential：Root。
+- `--keep` 与 `--older-than` 二选一且冲突。
+- Success fields：`backup pruned count`、pruned paths、`audit id`。
+
+## 10A. Audit Commands
+
+`alab audit list [--project <project_id>] [filters]`
+
+- Context：Any 或 Project。
+- Credential：global audit 需要 Root；project-scoped audit 需要 Root/admin。
+- Filters：`--object-type`、`--object-id`、`--action`、`--actor`、`--created-after`、`--created-before`、`--limit`、`--offset`。
+- `--action` 使用 generic audit actions：`add`、`update`、`archive`、`unarchive`、`remove`、`restore`、`repair`、`revoke`、`regenerate`、`prune`、`gc`、`clear`。
+- Success fields：`audit id`、`project id`、`exp id`、`actor type`、`actor credential id`、`action`、`object type`、`object id`、`cascade`、`reason`、`created at`。
+
+`alab audit show <audit_id> [--project <project_id>]`
+
+- Context：Any 或 Project。
+- Credential：Root，或 event 所属 project 的 Root/admin。
+- Audit output 使用 generic `action` 加 `object type`；`catalog_remove`、`worktree_remove`、`checkout_remove` 等 special action name 不是 V1 有效 output。
+- Success fields：audit metadata、deleted ids 和 sanitized metadata；不得包含 raw secret、token、verifier hash、hidden asset content 或 raw hidden log。
+
+## 11. Source、Catalog、Experiment Commands
+
+`alab source import`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- Required args：`--source-path`、`--source-git`、`--source-empty` 三选一。
+- Conflicts：多个 source origin；`--source-subdir` 与 `--source-empty`。
+- Success fields：`project id`、`source id`、`source ref`、`source name`、`tree hash`、`deduped`、warnings。
+
+`alab source list|show|archive|unarchive|remove`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- 输出 source id/ref/name/status/tree hash/origin summary/timestamp。
+- Archive active default source 必须以 `RESOURCE_BUSY` exit `4` 失败。
+- `remove` 需要 source 已 archived，并需要 `--dry-run` 或 `--force --confirm <source_id> [--cascade] [--reason <text>]`。
+- 只要任意 project config version 引用该 source，V1 就永久阻止 hard remove。
+
+`alab catalog skydiscover add|update [--origin-url <url>] [--ref <ref>|--commit <sha>]`
+
+- Context：Any。
+- Credential：Root。
+- Options：`--origin-url`；`--ref` 和 `--commit` 两者最多提供一个。
+- Defaults：未提供 `--origin-url` 时使用 official SkyDiscover URL；未提供 `--ref` 或 `--commit` 时使用当前 upstream `main` 并 resolve/pin exact commit。
+- `--ref` resolve 到 exact commit 后持久化；`--commit` 要求 full SHA 并验证存在。
+- Success fields：`catalog`、`origin url`、`requested ref`、`pinned commit`、`local path`、`retrieved at`、`status`、`audit id`。
+- Exit：成功 `0`；add 遇到 existing catalog、update 遇到 dirty catalog、invalid origin、invalid ref 或 invalid commit 时 exit `2`；auth failure exit `3`。
+
+`alab catalog skydiscover show`
+
+- Context：Any。
+- Credential：Root。
+- Success fields：`catalog`、`origin url`、`pinned commit`、`local path`、`retrieved at`、`status`。
+- `show` 不得 fetch network。
+- Exit：成功 `0`；没有 active catalog 时 exit `2`；auth failure exit `3`。
+
+`alab catalog skydiscover remove --force --confirm skydiscover [--reason <text>]`
+
+- Context：Any。
+- Credential：Root。
+- `remove` 需要 `--force --confirm skydiscover [--reason <text>]`，且 active config 或任何 open experiment bound config 引用 catalog 时失败。
+- Success fields：`catalog`、`removed`、`audit id`。
+- Exit：成功 `0`；missing/wrong confirmation exit `2`；active references exit `4`；auth failure exit `3`。
+
+`alab cache prune [--docker-images] [--skydiscover-envs] [--trash --older-than <days>|--trash-all] [--all]`
+
+- Context：Any。
+- Credential：Root。
+- 至少一个 cache selector；top-level `--all` 与 `--docker-images`、`--skydiscover-envs`、`--trash` 或 `--trash-all` 冲突。`--trash` 要求 `--older-than <days>`；`--trash-all` 删除全部 trash entries；top-level `--all` 包含 trash cleanup。
+- Success fields：`cache pruned count`、`cache kind`、`audit id`。
+
+`alab exp create`
+
+- Context：Project 或 explicit project。
+- Credential：policy 允许时 Public，否则 Root/admin。
+- Required args：`--name`；source origin 可省略并默认 project default source。
+- Source conflicts：`--source-ref`、`--source-path`、`--source-git`、`--source-empty`、`--from-exp` 最多一个。
+- Public no-key `--from-exp` 使用 public inheritance visibility：current project public policy 与 source experiment stored visibility upper bound 的交集。
+- Public no-key `--from-exp` 允许从 visible open/closed experiment 继承，并支持 `final`、`latest`、`best` 和 source experiment branch 可达 SHA；archived source experiment 需要 Root/admin。
+- Public no-key `--source-git` 可能使用 local non-interactive Git credential helper，并渲染 `PUBLIC_GIT_CREDENTIAL_HELPER_USED` warning；所有 prompt 都禁用。
+- Experiment name slug conflict 始终以 `NAME_CONFLICT` 失败，不自动 suffix。
+- Success fields：`project id`、`exp id`、`experiment name`、`source id`、`branch`、`worktree path`、`token path`、`config version`、`next`。
+
+`alab exp archive|unarchive|remove`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin。
+- Archive 是纯状态变更，不接受 worktree 删除参数。
+- Success fields：`exp id`、`previous status`、`experiment status`、timestamp。
+- `remove` 需要 experiment 已 archived，并需要 `--dry-run` 或 `--force --confirm <exp_id> [--cascade] [--reason <text>]`。
+- Cascade rule：experiment remove 是 whole-experiment deletion operation，因此 experiment 自身 archived 且不存在 active run/submit lock 后，child run、artifact、log、annotation、tag、inspection、worktree 和 submission records 不需要逐个 archived。
+
+`alab exp checkout <exp_id> --path <dir>`
+
+- Context：Project 或 explicit project。
+- Credential：Root/admin 或 visible token。
+- Success fields：`exp id`、`inspection path`、`inspection commit`、`token path`、`token id`、`next`。
+
+`alab exp checkout remove (--token-id <token_id>|--path <dir>) [--project <project_id>] (--dry-run|--force --confirm <token_id-or-path-hash>) [--reason <text>]`
+
+- Credential：Root/admin，或 matching inspection token 移除自己的 checkout。
+- `--dry-run` 只报告将删除的 checkout path、token revocation target 和 planned trash move，不修改 DB、不写 audit、不删除文件。
+- 实际删除 inspection worktree 时使用 trash staging，revoke inspection token，并将 path registry 标记 removed。
+- Registered filesystem path 已经缺失时，actual remove 会调和 DB state、revoke inspection token、写 audit event，并 exit `0`。
+- Success fields：`exp id`、`inspection path`、`token id`、`dry run`、`removed`、`audit id`。
+
+`alab exp worktree remove <exp_id> [--project <project_id>] (--dry-run|--force --confirm <exp_id>) [--reason <text>]`
+
+- Credential：Root/admin。
+- `--dry-run` 只报告 registered path、dirty state、token revocation target 和 planned trash move，不修改 DB、不写 audit、不删除文件。
+- 实际删除 submit-capable worktree 时使用 trash staging，设置 `worktree state: removed`，revoke active worktree token。
+- Registered filesystem path 已经缺失时，actual remove 会调和 DB state、revoke active worktree token、写 audit event，并 exit `0`。
+- Success fields：`exp id`、`old worktree path`、`worktree state`、`dry run`、`removed`、`token revoked`、`audit id`。
+
+`alab exp worktree restore <exp_id> --path <dir>`
+
+- Credential：Root/admin。
+- Checkout experiment branch HEAD，revoke old token，创建新 token，写入 `.alab/token`，并写 `.alab/` worktree-local Git exclude rule；不打印 raw token。
+- Success fields：`exp id`、`branch`、`worktree path`、`worktree state`、`token path`、`revoked token id`、`new token id`。
+
+`alab exp token list|revoke|regenerate`
+
+- Credential：Root/admin。
+- Selectors：`--token-id`、`--mode worktree|inspection`、`--all`。
+- `--all` 与 `--token-id`/`--mode` 冲突。
+- 默认 target 是 worktree token。
+- `list` 每个 token 的 success fields：`project id`、`exp id`、`token id`、`token mode`、`status`、`path status`、`created at`、`revoked at`。
+- `revoke` success fields：`project id`、`exp id`、`token id`、`token mode`、`status`、`revoked at`。
+- `regenerate` success fields：`project id`、`exp id`、`revoked token id`、`new token id`、`token mode`、`token path`、`created at`。
+- Secret rule：regenerate 写 registered path，不打印 raw token。
+
+`alab exp tag add|remove|list`
+
+- Credential：owning worktree token 或 Root/admin。
+- Inspection token 不可变更 tag。
+- 输出 `exp id`、`tag`、`action`、`tags`。
+
+## 12. Run、Submit、Observe、Annotate
+
+`alab run --message <message>`
+
+- Context：Experiment。
+- Credential：valid worktree token。
+- Required args：`--message`。
+- Success/result fields：`run id`、`exp id`、`commit`、`created commit`、`run status`、`exit code`、`reward`、`reward parse status`、`stdout preview`、`stderr preview`、`artifact count`、warnings、`next`。
+- Auto commit rule：`run` 会 stage 所有 mutable-allowed 的 staged、unstaged、deleted、renamed、copied 和 untracked non-ignored changes，并创建一个 ALab auto commit；pre-existing staged set 不单独保留。
+- Passed run exit `0`；saved failed/error/timeout run exit `1`。
+- Manual commit 导致 full-diff mutable scope 失败时，ALab 记录 run `error`，返回 actionable `SCOPE_VIOLATION` details，并保持 HEAD/worktree 不变。
+
+`alab submit --message <message> --summary <text>|--summary-file <path> --feedback <text>|--feedback-file <path> --ref <exp_id|none> [--ref <exp_id> ...] [--rerun]`
+
+- Context：Experiment。
+- Credential：valid worktree token。
+- Summary/feedback direct text 与 file form 各自互斥。
+- State rule：project must not be archived，experiment must be open，且 experiment worktree state must be active。
+- Summary/feedback file 相对当前 command cwd 解析。
+- `--ref none` 与 experiment refs 互斥。
+- Refs 按 first-seen order 去重。
+- Reuse rule：未提供 `--rerun` 时，`submit` 只复用 current HEAD 且 bound config version 相同的最近 passed run；没有可复用 run 时以 result failure 退出并提示 `--rerun`。
+- Success fields：`exp id`、`submit accepted`、`final run id`、`final commit`、`experiment status`、`summary stored`、`feedback stored`、repeated `ref`。
+
+Observe commands：
+
+- `alab observe experiments list|search|show|best`
+- `alab observe runs list|show|archive|unarchive|remove`
+- `alab observe artifacts list|show|export|archive|unarchive|remove`
+- `alab observe logs list|show|export|archive|unarchive|remove`
+- `alab observe annotations list|show`
+
+Context/Credential：
+
+- Project context 用 Root/admin。
+- Experiment/Inspection context 用 token visibility。
+- Hidden logs 需要 Root/admin 且显式 `--include-hidden`。
+- `runs show` 输出固定 stdout/stderr preview，不输出完整 log。
+- `observe experiments list|search|show|best` 每个 experiment 的 success fields：`project id`、`exp id`、`experiment name`、`experiment status`、`source id`、`source ref`、repeated `tag`、`latest run id`、`latest commit`、`final run id`、`final commit`、`best run id`、`reward`、`reward parse status`、`created at`、`updated at`、`closed at`、`archived at`。
+- `observe runs list|show|archive|unarchive|remove` 每个 run 的 success fields：`run id`、`exp id`、`commit`、`run status`、`exit code`、`reward`、`reward parse status`、`config version`、`stdout preview`、`stderr preview`、`artifact count`、`log count`、`hidden log available`、`started at`、`ended at`、repeated `warning code`。
+- `observe artifacts list|show|export|archive|unarchive|remove` 每个 artifact 的 success fields：`artifact id`、`exp id`、`run id`、`validation id`、`root`、`path`、`status`、`archive status`、`size bytes`、`content hash`、`created at`、`out`。
+- `observe logs list|show|export|archive|unarchive|remove` 每个 log 的 success fields：`log id`、`exp id`、`run id`、`validation id`、`stream`、`size bytes`、`stored bytes`、`truncated`、`hidden`、`archive status`、`preview`、`out`、`audit id`。
+- `observe annotations list|show` 每个 annotation 的 success fields：`annotation id`、`target type`、`target id`、`resolved commit`、`status`、`current revision`、`visibility`、`author`、`body`、`created at`、`updated at`、repeated `revision`。
+- Artifact/log export 在 target exists 且没有 `--overwrite` 时以 `OUTPUT_EXISTS` 失败。
+- Archived artifact/log export 要求 `--include-archived`；authorized by-id show 默认可见。
+- Run/artifact/log lifecycle 遵循 [spec_lifecycle.md](spec_lifecycle.md)：own worktree token 可 archive/unarchive 自己 experiment 的 run、artifact 和 visible log；remove 需要 Root/admin，并支持 `--dry-run`。
+
+`alab annotate add|edit|archive|unarchive|remove`
+
+- Context：Experiment 或 Project。
+- Credential：visible token/creating token，或 Root/admin。
+- Body input 只接受 direct text 或 file，二者互斥；V1 不支持 stdin。
+- Project-context add/edit 在 target annotation 不能精确 resolve 到一个 experiment 时，必须在 body storage 前以 `CONFIG_INVALID` 失败。
+- Add success fields：`annotation id`、`target type`、`target id`、`resolved commit`、`revision`、`visibility`、`created at`。
+- `remove` 需要 annotation 已 archived，并需要 `--dry-run` 或 `--force --confirm <annotation_id> [--reason <text>]`。
