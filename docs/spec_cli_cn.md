@@ -7,7 +7,7 @@
 Canonical invocation：
 
 ```text
-alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] <command> [args]
+alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] [<command> [args]]
 ```
 
 规则：
@@ -17,6 +17,7 @@ alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] <comman
 - Pre-scan 在第一个 standalone `--` 处停止。`--` 后的参数交给 command-specific parsing，绝不解释为 global `--home`、`--output`、`--key` 或 `--key-stdin`。
 - 重复 global option 以 exit code `2` 失败，除非该 option 明确允许重复值。
 - Canonical nested command 是文档和测试的准绳。Alias 必须映射到同一 handler 和 result schema。
+- 无 command 运行 `alab`、`alab help`、`alab --help` 或 nested command help request 时，进入 context-aware capability help surface。
 - `--home` 在 context detection、migration、config loading、credential lookup 之前生效。
 - `--output` 只选择单次命令的 rendering。
 - `--key` 提供 root key 或 project admin key。
@@ -29,6 +30,18 @@ Home 解析优先级：
 1. `--home <path>`
 2. `ALAB_HOME`
 3. `~/.ALab`
+
+Context-aware capability surface：
+
+- ALab 保留一份 canonical command registry，但当前可见、可执行的 command surface 会按当前 context 和已验证 credential source 过滤。
+- `alab`、`alab help`、`alab --help`、nested command help requests 和 command execution preflight 使用同一个 capability resolver。同一 argv、context 和 explicit credential 下，help output 与 command preflight 必须得到相同 allow/lock decision。
+- Resolver 在 global option pre-scan、home resolution、migration、global config loading、context detection、explicit credential 或 context-token lookup 之后运行。它必须先于会读取用户 body/value files 的 command-specific parsing、Git 操作、除必要 read-only lookup 和 migration setup 以外的 SQLite 写入、runner execution 和 lifecycle audit row。
+- 默认 capability 使用当前 context token；project context 未显式提供 key 时只暴露 public project capability。在任何 context 外，只把 global public commands 以及带 explicit target 且与当前 path 不冲突的 commands 作为候选。
+- 显式 `--key` 或 `--key-stdin` 解锁匹配 credential surface：project admin key 解锁 same-project admin capability；root key 解锁 root capability。既有 context-conflict 规则仍生效，因此 root key 也不能在 cwd 位于另一个 active ALab context 时操作不同 explicit project。
+- `ALAB_KEY` 不影响 `alab`、`alab help`、`alab --help`、nested command help 或任何 dynamic capability display。执行时，只有当命令已经在当前 context surface 中可用且要求 root/admin authorization 时，`ALAB_KEY` 才能继续满足 authentication。它不得把 experiment、inspection 或 public project surface 扩展成 admin/root surface。
+- 用户直接调用当前 executable surface 外的命令时，ALab 以 `COMMAND_UNAVAILABLE` exit `4` 失败。这是 pre-handler availability failure，不替代 handler-level `AUTH_REQUIRED`、`AUTH_DENIED` 或 `SCOPE_VIOLATION`。
+- Capability preflight 不是 authentication shortcut。如果命令在当前 context surface 中有效，但要求 root/admin credential，则缺失或无效 credential 仍使用既有 `AUTH_REQUIRED` 或 `AUTH_DENIED` contract。`COMMAND_UNAVAILABLE` 用于当前 context/token/public surface 完全不暴露的命令，例如没有 explicit admin/root key 时，在 experiment token surface 中执行 project config mutation。
+- Locked commands 默认隐藏，以降低 agent 干扰。`alab help --all` 可以显示 locked commands，但 locked entries 只能使用安全的 reason 和 unlock hint；不得泄露 secret name/value、hidden log、hidden asset、absolute hidden path、不可见对象是否存在，或 private adapter staging path。
 
 ## 2. 输出模型
 
@@ -83,6 +96,7 @@ stale_after_ms = 120000
 - 用户提供的 text fields，例如 task、goal、run message、submission summary、feedback 和 annotation body，一律使用 multiline text field 渲染。空用户文本渲染为 `field:` 后跟 `  [empty]`，从而区别于 nullable `none` 和 literal text `none`。
 - Warning 在所有 primary result object 后以 `object: warning` block 渲染；每个 warning 一个 block，按产生顺序输出。
 - Error output 也使用 object block。System/internal failure 渲染 `object: error`；saved result failure 渲染命令正常 result object，并附带 `error code`、`exit code`、`reason` 和 `next` fields。
+- Help output 也从 structured capability result object 渲染。默认 help 只渲染 available commands。`--all` 可以在 available commands 后渲染 locked commands，并包含对当前 caller 安全的 locked reason 和 unlock hint fields。
 
 ## 3. Debug Mode
 
@@ -173,6 +187,7 @@ Stable error codes：
 - `AUDIT_NOT_FOUND`
 - `CATALOG_NOT_FOUND`
 - `CACHE_NOT_FOUND`
+- `COMMAND_UNAVAILABLE`
 - `NAME_CONFLICT`
 - `SCOPE_VIOLATION`
 - `EXPERIMENT_BUSY`
@@ -226,6 +241,7 @@ Stable error-code exit mapping：
 | `AUDIT_NOT_FOUND` | 2 |
 | `CATALOG_NOT_FOUND` | 2 |
 | `CACHE_NOT_FOUND` | 2 |
+| `COMMAND_UNAVAILABLE` | 4 |
 | `NAME_CONFLICT` | 2 |
 | `SCOPE_VIOLATION` | 4 |
 | `EXPERIMENT_BUSY` | 4 |
@@ -245,6 +261,7 @@ Stable error-code exit mapping：
 
 - 每个 stable error code 都映射到上表 exit code。Command-specific matrix 可以补充常见 code 和 next action，但不得重新映射 exit。
 - 未来所有 `*_NOT_FOUND` codes 默认 exit `2`。
+- `COMMAND_UNAVAILABLE` 专用于 capability preflight。它表示当前 context 和 credential surface 不提供该命令。它必须在 command-specific side effects 之前返回，并且不得泄露 hidden object 是否存在。
 - 有 saved run 或 validation record 的 result failure exit `1`，包括 runner start errors、Docker unavailable validation records、dependency installation failures，以及被捕获成最终 `error` status 的 adapter errors。
 - 如果 ALab 无法创建或 finalize intended result record，command 使用 `STORAGE_ERROR`、`GIT_ERROR` 或其他适用 exit `5` code 作为 system/internal error 失败。
 
@@ -262,10 +279,12 @@ Command error matrix：
 - 所有运行 Git 的命令都可以以 `GIT_ERROR` 和 exit code `5` 失败；在 Git mutation 前验证 user worktree state 的命令使用 `GIT_STATE_INVALID` 和 exit code `4`。
 - 所有要求 root/admin credential 的命令都可以以 `AUTH_REQUIRED` 或 `AUTH_DENIED` 和 exit code `3` 失败。
 - 所有 token-scoped 命令都可以按场景以 `AUTH_REQUIRED`、`AUTH_DENIED`、`CONTEXT_NOT_FOUND`、`CONTEXT_CONFLICT` 或 `SCOPE_VIOLATION` 失败。
+- 除 help 外的所有 command 在 context-aware capability resolver 于 handler execution 前拒绝命令时，都可以以 `COMMAND_UNAVAILABLE` exit `4` 失败。
 - 写 lifecycle audit event 的命令成功时渲染 `audit id`，除非 command-specific secret rule 明确禁止。
 
 | Command family | Stable failure codes |
 | --- | --- |
+| `help`、无 command `alab`、`--help`、nested command help | `COMMAND_UNAVAILABLE` 不适用；invalid help selector 使用 `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
 | `auth init` | `HOME_EXISTS` exit `2`；`STORAGE_ERROR` exit `5` |
 | `auth root regenerate` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
@@ -316,10 +335,32 @@ Credential：
 - Token：有效 worktree 或 inspection token，取决于命令。
 - Public：project policy 允许时无需 key。
 
+Capability surface terms：
+
+- Available：命令会出现在默认 help 中，并且可以在正常 command-specific parsing 后进入 command handler。
+- Locked：命令存在于 canonical registry，但 active context、credential source、project policy 或 token mode 当前不暴露该命令。
+- Hidden：locked commands 默认从 help 中省略。它们只在 `alab help --all` 中出现，并且只带安全的 locked reason 和 unlock hint。
+- Credential source：取值为 `none`、`public`、`context-token`、`explicit-admin`、`explicit-root` 或 `ambient-env`。`ambient-env` 绝不用于 help capability display，也绝不扩展 token 或 public context surface。
+- Capability source：使命令 available 的规则，例如 `global`、`public-project`、`worktree-token`、`inspection-token`、`project-admin` 或 `root`。
+
+Default context surfaces：
+
+- Global 且无 explicit key：显示 `help`、`auth init`、config diagnostics/repair，以及不要求 project record 的 context diagnostics commands。要求 project 的 command 只有在提供 explicit target 且不与当前 path 冲突时才可能 available。
+- Global 且带 explicit project admin key：显示匹配 project 的 admin surface，以及可通过显式传入该 project id 运行的 commands。
+- Global 且带 explicit root key：额外显示 root-level project creation、project listing、key management、catalog、cache、backup 和 audit commands。
+- Project context 且无 explicit key：显示 public safe `status`；当 project policy 允许 public experiment creation 时，显示 public `exp create` 和 source bootstrap。隐藏 project management、source management、config、validation、audit、cache、catalog、backup、key 和 lifecycle maintenance commands。
+- Project context 且带 explicit project admin key：显示同 project 的 project/source/config/validate/observe/experiment management commands，但不显示 root-only commands。
+- Project context 且带 explicit root key：显示 project admin capabilities 以及 scope 内的 root-only commands。
+- Experiment context 且使用 worktree token：显示 `status`、`run`、`submit`、visible observe commands、own-experiment tag commands、authorized annotations，以及 own-experiment run/artifact/visible-log archive 或 unarchive commands。隐藏 project/source/config/project init、experiment remove、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
+- Experiment context 且带 explicit project admin 或 root key：解锁匹配的 same-project admin 或 root surface，同时保留对不同 explicit project 的既有 context-conflict rules。
+- Inspection context 且使用 inspection token：显示 `status`、visible observe commands、artifact/log export，以及移除自己的 inspection checkout。隐藏 run、submit、tag mutation、annotation mutation、project/source/config management、experiment mutation、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
+- Inspection context 且带 explicit project admin 或 root key：解锁匹配的 same-project admin 或 root surface；没有 explicit key 时仍保持 inspection-token read-only 行为。
+
 ## 6. Command Group 和 Alias
 
 Canonical groups：
 
+- `help`
 - `auth`
 - `config`
 - `key`
@@ -336,6 +377,7 @@ Canonical groups：
 
 Top-level aliases：
 
+- 无 command 的 `alab` 和 `alab --help` 映射到 `alab help`。
 - `alab status` 映射到 project/experiment/inspection status。
 - `alab run` 是 experiment run 的 canonical top-level command。
 - `alab submit` 是 experiment submit 的 canonical top-level command。
@@ -349,6 +391,7 @@ Alias policy：
 
 - V1 只支持本节列出的 aliases。
 - `alab run` 和 `alab submit` 是 canonical top-level commands；V1 不新增 `alab exp run` 或 `alab exp submit` alias。
+- Help aliases 在 rendering 前使用 capability resolver。它们不使用 ambient `ALAB_KEY` 扩展 visible surface。
 - 未来任何 alias 都必须映射到 existing handler 和 structured result schema，并在接受前添加 golden tests。
 
 ## 7. Command Contract 总则
@@ -369,6 +412,8 @@ Primary object types：
 
 | Command pattern | Object type |
 | --- | --- |
+| `help`、无 command `alab`、`--help` 和 nested command help | `help` |
+| help output 的 repeated command rows | `help_command` |
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
 | `config validate` 的 repeated capability rows | `capability` |
@@ -411,7 +456,23 @@ Lifecycle command rules：
 - result-failure exit behavior；
 - stable text output fields。
 
-## 8. Auth 和 Key Commands
+## 8. Help、Auth 和 Key Commands
+
+`alab help [--all] [--explain]`、无 command `alab`、`alab --help` 和 nested command help requests
+
+- Context：Any。
+- Credential：None、context token 或 explicit root/admin key。
+- Options：`--all`、`--explain`。
+- Ambient env rule：忽略 `ALAB_KEY` 的 capability display 影响。
+- Availability rule：default help 只包含当前 context 和 credential source 可用的 commands。
+- Full listing rule：`--all` 在 available commands 后包含 locked commands，并带安全 locked reason 和 unlock hint。
+- Explanation safety rule：`--explain` 渲染 context 和 credential-source explanation fields，但不得渲染 raw token、raw key、secret name/value、verifier hash、hidden log content、hidden asset content、不可见对象是否存在，或 private adapter staging path。
+- Success fields：`context type`、`credential source`、`credential scope`、`project id`、`exp id`、`mode`、repeated `next`。
+- 每个 `help_command` 的 Success fields：`command`、`available`、`locked reason`、`unlock hint`、`capability source`、`summary`。
+- Default rule：只为 available commands 渲染 `help_command` object。
+- `--all` rule：额外渲染 locked `help_command` objects，字段包含 `available: false`、安全的 `locked reason` 和安全的 `unlock hint`。
+- `--explain` rule：包含 `capability source` 和任何安全 explanatory `summary`；没有 `--explain` 时，`capability source` 可以渲染为 `none`。
+- Exit：成功 `0`；invalid help options `2`；storage failure `5`。
 
 `alab auth init`
 

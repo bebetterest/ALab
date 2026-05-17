@@ -7,7 +7,7 @@ This spec defines ALab V1 command shape, global options, output, debug behavior,
 Canonical invocation:
 
 ```text
-alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] <command> [args]
+alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] [<command> [args]]
 ```
 
 Rules:
@@ -17,6 +17,7 @@ Rules:
 - Pre-scan stops at the first standalone `--`. Arguments after `--` are passed to command-specific parsing and are never interpreted as global `--home`, `--output`, `--key`, or `--key-stdin` options.
 - Duplicate global options fail with exit code `2` except where an option explicitly accepts repeated values.
 - Canonical nested commands are the documented source of truth. Aliases must map to the same handler and result schema.
+- Running `alab` with no command, `alab help`, `alab --help`, or a nested command help request invokes the context-aware capability help surface.
 - `--home` applies before context detection, migration, config loading, or credential lookup.
 - `--output` selects rendering for one command only.
 - `--key` supplies a root or project admin key.
@@ -29,6 +30,18 @@ Home resolution priority:
 1. `--home <path>`
 2. `ALAB_HOME`
 3. `~/.ALab`
+
+Context-aware capability surface:
+
+- ALab maintains one canonical command registry, but the visible and executable command surface is filtered by the current context and the verified credential source.
+- The capability resolver is used by `alab`, `alab help`, `alab --help`, nested command help requests, and command execution preflight. Help output and command preflight must use the same allow/lock decision for a given argv, context, and explicit credential.
+- The resolver runs after global option pre-scan, home resolution, migration, global config loading, context detection, and explicit credential or context-token lookup. It runs before command-specific parsing that reads user body/value files, before Git operations, before SQLite writes other than required read-only lookup and stale migration setup, before runner execution, and before lifecycle audit rows.
+- Default capability uses the current context token when the current context is an experiment or inspection checkout. Project context without an explicit key exposes only public project capabilities. Outside any context, only global public commands and commands with explicit target options that are context-compatible are candidates.
+- Explicit `--key` or `--key-stdin` unlocks the matching credential surface: a project admin key unlocks same-project admin capabilities; the root key unlocks root capabilities. Existing context-conflict rules still apply, so a root key does not allow a command to operate on a different explicit project while the cwd is inside another active ALab context.
+- `ALAB_KEY` does not affect `alab`, `alab help`, `alab --help`, nested command help, or any dynamic capability display. During execution, `ALAB_KEY` may still satisfy root/admin authentication only when the command is already available in the current context surface and requires root/admin authorization. It must not broaden an experiment, inspection, or public project surface into an admin/root surface.
+- If a user directly invokes a command that is not in the current executable surface, ALab fails with `COMMAND_UNAVAILABLE` exit `4`. This is a pre-handler availability failure, not a replacement for handler-level `AUTH_REQUIRED`, `AUTH_DENIED`, or `SCOPE_VIOLATION`.
+- Capability preflight is not an authentication shortcut. If a command is valid in the current context surface but requires root/admin credentials, missing or invalid credentials still use the existing `AUTH_REQUIRED` or `AUTH_DENIED` contract. `COMMAND_UNAVAILABLE` is for commands the current context/token/public surface does not expose at all, such as project config mutation from an experiment token surface without an explicit admin/root key.
+- Hidden commands are hidden by default to reduce agent distraction. `alab help --all` may show locked commands, but locked entries must use safe reasons and unlock hints only; they must not disclose secret names or values, hidden logs, hidden assets, absolute hidden paths, invisible object existence, or private adapter staging paths.
 
 ## 2. Output Model
 
@@ -83,6 +96,7 @@ Rules:
 - User-provided text fields such as task, goal, run messages, submission summaries, feedback, and annotation bodies always render as multiline text fields. Empty user-provided text renders as `field:` followed by `  [empty]`, so it is distinct from nullable `none` and from the literal text `none`.
 - Warnings render after all primary result objects as `object: warning` blocks, one block per warning, in production order.
 - Error output also uses object blocks. System/internal failures render `object: error`; saved result failures render the command's normal result object plus `error code`, `exit code`, `reason`, and `next` fields.
+- Help output is also rendered from structured capability result objects. Default help renders only available commands. `--all` may render locked commands after available commands, with locked reason and unlock hint fields that are safe for the current caller.
 
 ## 3. Debug Mode
 
@@ -175,6 +189,7 @@ Stable error codes:
 - `AUDIT_NOT_FOUND`
 - `CATALOG_NOT_FOUND`
 - `CACHE_NOT_FOUND`
+- `COMMAND_UNAVAILABLE`
 - `NAME_CONFLICT`
 - `SCOPE_VIOLATION`
 - `EXPERIMENT_BUSY`
@@ -228,6 +243,7 @@ Stable error-code exit mapping:
 | `AUDIT_NOT_FOUND` | 2 |
 | `CATALOG_NOT_FOUND` | 2 |
 | `CACHE_NOT_FOUND` | 2 |
+| `COMMAND_UNAVAILABLE` | 4 |
 | `NAME_CONFLICT` | 2 |
 | `SCOPE_VIOLATION` | 4 |
 | `EXPERIMENT_BUSY` | 4 |
@@ -247,6 +263,7 @@ Rules:
 
 - Each stable error code maps to the exit code above. Command-specific matrices may add likely codes and next actions, but they must not remap exits.
 - All future `*_NOT_FOUND` codes default to exit `2`.
+- `COMMAND_UNAVAILABLE` is reserved for capability preflight. It means the command is not available in the current context and credential surface. It must be returned before command-specific side effects and must not reveal whether hidden objects exist.
 - Result failures with a saved run or validation record exit `1`, including runner start errors, Docker unavailable validation records, dependency installation failures, and adapter errors that are captured into a final `error` status.
 - If ALab cannot create or finalize the intended result record, the command fails as a system/internal error using `STORAGE_ERROR`, `GIT_ERROR`, or another applicable exit `5` code.
 
@@ -264,10 +281,12 @@ Command error matrix:
 - Every command that runs Git may fail with `GIT_ERROR` exit `5`; commands that validate user worktree state before Git mutation use `GIT_STATE_INVALID` exit `4`.
 - Every command requiring root/admin credentials may fail with `AUTH_REQUIRED` or `AUTH_DENIED` exit `3`.
 - Every token-scoped command may fail with `AUTH_REQUIRED`, `AUTH_DENIED`, `CONTEXT_NOT_FOUND`, `CONTEXT_CONFLICT`, or `SCOPE_VIOLATION` as applicable.
+- Every command except help may fail with `COMMAND_UNAVAILABLE` exit `4` when the context-aware capability resolver rejects the command before handler execution.
 - Commands that write lifecycle audit events render `audit id` on success unless a command-specific secret rule forbids it.
 
 | Command family | Stable failure codes |
 | --- | --- |
+| `help`, no-command `alab`, `--help`, nested command help | `COMMAND_UNAVAILABLE` does not apply; `CONFIG_INVALID` exit `2` for invalid help selectors; `STORAGE_ERROR` exit `5` |
 | `auth init` | `HOME_EXISTS` exit `2`; `STORAGE_ERROR` exit `5` |
 | `auth root regenerate` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`; `STORAGE_ERROR` exit `5` |
@@ -318,10 +337,32 @@ Credential values:
 - Token: valid worktree or inspection token, depending on command.
 - Public: no key when project policy allows the operation.
 
+Capability surface terms:
+
+- Available: the command is shown in default help and may enter its command handler after normal command-specific parsing.
+- Locked: the command exists in the canonical registry but is not currently available because the active context, credential source, project policy, or token mode does not expose it.
+- Hidden: locked commands are omitted from default help. They appear only in `alab help --all`, with safe locked reason and unlock hint fields.
+- Credential source: one of `none`, `public`, `context-token`, `explicit-admin`, `explicit-root`, or `ambient-env`. `ambient-env` is never used for help capability display and never broadens token or public context surfaces.
+- Capability source: the rule that made a command available, such as `global`, `public-project`, `worktree-token`, `inspection-token`, `project-admin`, or `root`.
+
+Default context surfaces:
+
+- Global with no explicit key: show `help`, `auth init`, config diagnostics/repair, and context diagnostics commands that do not require a project record. Commands that require a project may be available only when they include an explicit target and do not conflict with the current path.
+- Global with explicit project admin key: show the matching project's admin surface and commands that can run with that credential by passing its project id explicitly.
+- Global with explicit root key: additionally show root-level project creation, project listing, key management, catalog, cache, backup, and audit commands.
+- Project context with no explicit key: show public safe `status`; when project policy allows public experiment creation, show public `exp create` with source bootstrap options. Hide project management, source management, config, validation, audit, cache, catalog, backup, key, and lifecycle maintenance commands.
+- Project context with explicit project admin key: show same-project project/source/config/validate/observe/experiment management commands except root-only commands.
+- Project context with explicit root key: show project admin capabilities plus root-only commands in scope.
+- Experiment context with worktree token: show `status`, `run`, `submit`, visible observe commands, own-experiment tag commands, authorized annotations, and own-experiment run/artifact/visible-log archive or unarchive commands. Hide project/source/config/project init, experiment remove, worktree maintenance, key management, audit, cache, catalog, and backup commands.
+- Experiment context with explicit project admin or root key: unlock the matching same-project admin or root surface while preserving existing context-conflict rules for different explicit projects.
+- Inspection context with inspection token: show `status`, visible observe commands, artifact/log export, and removal of its own inspection checkout. Hide run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, key management, audit, cache, catalog, and backup commands.
+- Inspection context with explicit project admin or root key: unlock the matching same-project admin or root surface while preserving inspection-token read-only behavior when no explicit key is provided.
+
 ## 7. Command Groups And Aliases
 
 Canonical groups:
 
+- `help`
 - `auth`
 - `config`
 - `key`
@@ -338,6 +379,7 @@ Canonical groups:
 
 Top-level aliases:
 
+- `alab` with no command and `alab --help` map to `alab help`.
 - `alab status` maps to project/experiment/inspection status.
 - `alab run` is canonical for experiment run.
 - `alab submit` is canonical for experiment submit.
@@ -351,6 +393,7 @@ Alias policy:
 
 - V1 supports only the aliases listed in this section.
 - `alab run` and `alab submit` are canonical top-level commands; V1 does not add `alab exp run` or `alab exp submit` aliases.
+- Help aliases use the capability resolver before rendering. They do not use ambient `ALAB_KEY` to expand the visible surface.
 - Any future alias must map to an existing handler and structured result schema and must add golden tests before it is accepted.
 
 ## 8. Command Contracts
@@ -371,6 +414,8 @@ Primary object types:
 
 | Command pattern | Object type |
 | --- | --- |
+| `help`, no-command `alab`, `--help`, and nested command help | `help` |
+| repeated command rows from help output | `help_command` |
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
 | repeated capability rows from `config validate` | `capability` |
@@ -402,6 +447,24 @@ Lifecycle command rules:
 - Archive and unarchive commands are idempotent. Repeating an operation against an object already in the requested state exits `0`, renders the unchanged state, and does not create a duplicate audit event.
 - `remove --dry-run` exits `0` even when the target is not archived, renders a stable `target_not_archived` blocker, and never writes audit rows or deletes data.
 - Actual `remove` still fails when the target is not archived.
+
+### Help
+
+`alab help [--all] [--explain]`, no-command `alab`, `alab --help`, and nested command help requests
+
+- Context: Any.
+- Credential: None, context token, or explicit root/admin key.
+- Options: `--all`, `--explain`.
+- Ambient env rule: ignores `ALAB_KEY` for capability display.
+- Availability rule: default help includes only commands available for the current context and credential source.
+- Full listing rule: `--all` includes locked commands after available commands, with safe locked reasons and unlock hints.
+- Explanation safety rule: `--explain` renders context and credential-source explanation fields, but must not render raw tokens, raw keys, secret names or values, verifier hashes, hidden log contents, hidden asset contents, invisible object existence, or private adapter staging paths.
+- Success fields: `context type`, `credential source`, `credential scope`, `project id`, `exp id`, `mode`, repeated `next`.
+- Success fields per `help_command`: `command`, `available`, `locked reason`, `unlock hint`, `capability source`, `summary`.
+- Default rule: renders one `help_command` object for each available command only.
+- `--all` rule: also renders locked `help_command` objects with `available: false`, safe `locked reason`, and safe `unlock hint`.
+- `--explain` rule: includes `capability source` and any safe explanatory `summary`; without `--explain`, `capability source` may render as `none`.
+- Exit: `0`; `2` on invalid help options; `5` on storage failure.
 
 ### Auth
 

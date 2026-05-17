@@ -8,6 +8,7 @@ ALab 是一个本地、agent-first 的 Python CLI 实验工作台。它面向这
 
 - Local-only V1：无 server、sync service、Web UI、内置 agent launcher 或 account system。
 - Agent-first CLI：默认和持久化输出都是 plain text；Rich output 只能通过 `--output rich` 对单次命令启用。
+- Context-aware command surface：`alab`、`alab help` 和 command preflight 会按当前 project、experiment、inspection context 以及 explicit key，只显示并允许当前可用 commands。
 - 协作边界，不是本地强安全隔离：root/admin key 和 experiment token 用于 CLI 权限控制，project records 是本地明文数据。
 - Secret hygiene：不存 raw key/token；`secret_env` 值是本地 plaintext，但不渲染或 export；configured secrets 会从 logs 中 redacted。Artifact export 是精确捕获的 bytes，不会自动 redacted。
 - Project/experiment model：project 定义 task、source、runner、reward、artifact、mutable scope 和 visibility；experiment 是隔离 Git branch 和 worktree。
@@ -33,11 +34,14 @@ alab project validate --project <project_id> --key <root-or-admin-key>
 alab exp create --project <project_id> --name "attempt-1"
 cd ./<project_id>_<exp_id>
 alab status
+alab help
 alab run --message "try first fix"
 alab submit --message "final" --summary "..." --feedback "..." --ref none
 ```
 
 Runner、reward、artifact、log、environment 和 secret 设置都预期来自 project config file。这些命令是设计目标，目前还不是可执行命令。Project initialization 预期会在 project record 写入后生成并只打印一次 project admin key。
+
+计划中的 CLI help 是 context-aware 的。在只有 experiment token 的 worktree 中，`alab help` 应聚焦 status、run、submit、visible observe、tag、annotation 和 own-experiment record maintenance。Project/root management commands 默认隐藏；直接尝试使用 unavailable command 会在产生 side effect 前以 `COMMAND_UNAVAILABLE` 失败。显式 `--key` 或 `--key-stdin` 会解锁匹配的 admin/root surface；ambient `ALAB_KEY` 不扩展 help 或 token/public command surface。
 
 ## Repository Structure
 

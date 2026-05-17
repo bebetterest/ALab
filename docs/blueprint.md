@@ -81,6 +81,7 @@ Supported hosts are macOS and Linux. Windows is not part of V1 acceptance testin
 Implementation architecture:
 
 - Typer is the CLI boundary only. It parses argv, pre-scans global options, resolves stdin key input, and calls service-layer handlers.
+- CLI routing owns a context-aware capability resolver used by `alab`, `alab help`, `alab --help`, nested command help, and command execution preflight. The resolver filters visible and executable commands by current context plus explicit credentials before service handlers run.
 - Service-layer handlers own business workflows, lock acquisition, validation sequencing, Git operations, runner orchestration, and lifecycle decisions.
 - Repository classes own Python `sqlite3` access through explicit transactions and typed query methods. ALab does not use an ORM in V1.
 - Pydantic models validate TOML input, canonical JSON fields, command results, runner records, and renderer input at module boundaries.
@@ -142,9 +143,13 @@ alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] <comman
 
 `--key` conflicts with `--key-stdin`; `ALAB_KEY` is used only when neither is supplied and the command requires root/admin authorization. Public or optionally authorized commands must not use `ALAB_KEY` to silently elevate output. Global option pre-scan stops at a standalone `--`.
 
+ALab uses a context-aware capability surface. Running `alab`, `alab help`, `alab --help`, or nested command help shows only commands currently available to the caller by default. `alab help --all` may show locked commands with safe reasons and unlock hints. The same resolver gates command execution before command-specific file reads, Git operations, SQLite writes, runner execution, or audit events. Directly invoking a command outside the current surface fails with `COMMAND_UNAVAILABLE` exit `4`; service handlers still perform their normal authorization checks after the preflight passes.
+
+Capability display uses the current context token or public project policy by default. Explicit `--key` or `--key-stdin` unlocks the matching project admin or root surface. `ALAB_KEY` does not affect help or broaden public/token context surfaces, though it may still satisfy root/admin authentication for a command already available in the current context surface.
+
 `text` is the default output and the only persisted output format. It is a strict key-value object format: each object block starts with `object: <type>`, fields render as `field: value`, multiline text renders as an indented block after `field:`, lists render as repeated labeled lines, and repeated objects are separated by one blank line. Warnings render after result blocks as `object: warning`. `rich` uses the same structured result data with different rendering and is available only through `--output rich` for a single command.
 
-Every stable error code maps to one numeric exit code. All `*_NOT_FOUND` codes exit `2`; `PROJECT_INVALID` exits `4`; saved runner or validation result errors exit `1`; only failures that cannot store the intended record are system/internal exit `5`.
+Every stable error code maps to one numeric exit code. All `*_NOT_FOUND` codes exit `2`; `PROJECT_INVALID` and `COMMAND_UNAVAILABLE` exit `4`; saved runner or validation result errors exit `1`; only failures that cannot store the intended record are system/internal exit `5`.
 
 `ALAB_DEBUG=1` affects internal/system errors only. It may print a full stack trace, but it must not print locals, environment maps, raw keys, raw tokens, secret values, or hidden asset contents.
 
@@ -183,11 +188,11 @@ Adapter decisions:
 Milestone 1: documentation and scaffold.
 
 - Keep this overview and all subsystem specs synchronized in English and Chinese.
-- Add README, Chinese README, license, Python project scaffold, no-op CLI skeleton, renderer boundary, and project tooling.
+- Add README, Chinese README, license, Python project scaffold, no-op CLI skeleton, context-aware help/capability resolver boundary, renderer boundary, and project tooling.
 
 Milestone 2: storage, credentials, and context.
 
-- Implement home resolution, SQLite WAL storage, migrations, backup policy, lifecycle audit events and audit commands, root/admin credentials, experiment tokens, path registry, context markers, context repair, secret values, and locks.
+- Implement home resolution, SQLite WAL storage, migrations, backup policy, lifecycle audit events and audit commands, root/admin credentials, experiment tokens, path registry, context markers, context repair, capability-context lookup inputs, secret values, and locks.
 
 Milestone 3: project/source/local runner.
 

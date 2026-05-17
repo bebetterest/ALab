@@ -79,6 +79,7 @@ V1 技术栈：
 实现架构：
 
 - Typer 只是 CLI 边界。它负责解析 argv、预扫描 global options、处理 stdin key input，然后调用 service-layer handler。
+- CLI routing 拥有 context-aware capability resolver，供 `alab`、`alab help`、`alab --help`、nested command help 和 command execution preflight 使用。Resolver 会在 service handler 运行前，按当前 context 和显式 credential 过滤可见、可执行命令。
 - Service-layer handler 负责业务 workflow、lock acquisition、validation sequencing、Git 操作、runner orchestration 和 lifecycle decision。
 - Repository class 通过显式 transaction 和 typed query method 管理 Python `sqlite3` access。V1 不使用 ORM。
 - Pydantic model 在模块边界校验 TOML input、canonical JSON field、command result、runner record 和 renderer input。
@@ -140,9 +141,13 @@ alab [--home <path>] [--output text|rich] [--key <secret>] [--key-stdin] <comman
 
 `--key` 与 `--key-stdin` 冲突；只有二者都不存在且命令需要 root/admin authorization 时才读取 `ALAB_KEY`。Public 或 optionally authorized 命令不得用 `ALAB_KEY` 静默提升输出权限。Global option pre-scan 在 standalone `--` 处停止。
 
+ALab 使用 context-aware capability surface。运行 `alab`、`alab help`、`alab --help` 或 nested command help 时，默认只显示当前 caller 可用的 commands。`alab help --all` 可以显示 locked commands，但只能带安全 reason 和 unlock hint。同一个 resolver 会在 command-specific file read、Git 操作、SQLite 写入、runner execution 或 audit event 前 gate command execution。直接调用当前 surface 外的命令，以 `COMMAND_UNAVAILABLE` exit `4` 失败；preflight 通过后，service handler 仍执行原有 authorization check。
+
+Capability display 默认使用当前 context token 或 public project policy。显式 `--key` 或 `--key-stdin` 解锁匹配的 project admin 或 root surface。`ALAB_KEY` 不影响 help，也不扩展 public/token context surface；但对于已经在当前 context surface 中可用且需要 root/admin authentication 的命令，它仍可继续满足 authentication。
+
 `text` 是默认输出，也是唯一可持久化输出格式。它是严格 key-value object 格式：每个 object block 以 `object: <type>` 开头，字段渲染为 `field: value`，多行文本在 `field:` 后使用缩进 block，list 使用 repeated labeled lines，重复 object 之间用一个空行分隔。Warning 在主结果后以 `object: warning` 渲染。`rich` 使用同一份 structured result data 进行不同渲染，只能通过 `--output rich` 对单次命令启用。
 
-每个 stable error code 都映射到唯一 numeric exit code。所有 `*_NOT_FOUND` code exit `2`；`PROJECT_INVALID` exit `4`；已保存 runner 或 validation result error 时 exit `1`；只有无法保存目标 record 的 failure 才是 system/internal exit `5`。
+每个 stable error code 都映射到唯一 numeric exit code。所有 `*_NOT_FOUND` code exit `2`；`PROJECT_INVALID` 和 `COMMAND_UNAVAILABLE` exit `4`；已保存 runner 或 validation result error 时 exit `1`；只有无法保存目标 record 的 failure 才是 system/internal exit `5`。
 
 `ALAB_DEBUG=1` 只影响 internal/system error。它可以打印完整 stack trace，但不得打印 locals、environment map、raw key、raw token、secret value 或 hidden asset content。
 
@@ -181,11 +186,11 @@ Adapter 决策：
 Milestone 1：documentation and scaffold。
 
 - 保持本总览和所有子系统 spec 的中英文同步。
-- 添加 README、中文 README、license、Python project scaffold、no-op CLI skeleton、renderer boundary 和项目工具。
+- 添加 README、中文 README、license、Python project scaffold、no-op CLI skeleton、context-aware help/capability resolver boundary、renderer boundary 和项目工具。
 
 Milestone 2：storage、credentials、context。
 
-- 实现 home resolution、SQLite WAL storage、migration、backup policy、lifecycle audit event 和 audit command、root/admin credential、experiment token、path registry、context marker、context repair、secret value 和 lock。
+- 实现 home resolution、SQLite WAL storage、migration、backup policy、lifecycle audit event 和 audit command、root/admin credential、experiment token、path registry、context marker、context repair、capability-context lookup inputs、secret value 和 lock。
 
 Milestone 3：project/source/local runner。
 

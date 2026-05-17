@@ -26,9 +26,15 @@
 - `--key` 与 `--key-stdin` mutual exclusion。
 - `--key-stdin`、secret `--value-stdin` 和 secret `--value-file` 使用严格 single-line 读取：最多去掉一个 final newline；empty、NUL 或剩余 newline 都失败。
 - `ALAB_DEBUG=1` 对 internal errors 打印 stack trace，但不打印 locals/env/secrets/hidden contents。
+- 无 command `alab`、`alab help`、`alab --help` 和 nested command help requests 的 context-aware capability help。
+- Global、project、experiment 和 inspection context 下的 dynamic help output。
+- 默认 help 隐藏 locked commands，`alab help --all --explain` 渲染安全 `help_command` rows，其中包含 locked reason、unlock hint、context type、credential source 和 capability source。
+- 显式 `--key` 和 `--key-stdin` 解锁 project-admin 或 root surface；ambient `ALAB_KEY` 不影响 help output，也不扩展 token/public command surface。
+- 直接调用当前 capability surface 外的 command 时，以 `COMMAND_UNAVAILABLE` exit `4` 失败，并且发生在读取 body/value files、写 SQLite row、创建 audit event、运行 Git 或执行 runner 之前。
 
 覆盖命令：
 
+- `help`、无 command `alab`、`alab --help` 和 nested command help。
 - `auth init`、`auth root regenerate`。
 - `config show`、`config set`、`config reset`、`config validate`。
 - `key create`、`key list`、`key revoke`。
@@ -55,6 +61,12 @@ Lifecycle golden cases：
 - Error matrix cases 确认重复 archive/unarchive 操作永远不返回 `PROJECT_ARCHIVED`、`EXPERIMENT_ARCHIVED` 或任何 already-archived failure code。
 - `HOME_EXISTS` 和 `OUTPUT_EXISTS` 渲染稳定 text errors。
 - Public 或 optionally authorized 命令忽略 ambient `ALAB_KEY` 的权限提升效果，只有显式 `--key` 或 `--key-stdin` 才渲染 authorized details。
+- Ambient `ALAB_KEY` 只能为已经在当前 context surface 可用的命令满足 authentication；它绝不扩展 default help、public project surface、experiment token surface 或 inspection token surface。
+- Global explicit project admin key help 显示可通过显式 project id 运行的 same-project admin commands；不显示 root-only cache、catalog、backup、global audit 或 project creation capabilities。
+- Experiment token help 隐藏 project config、project init、source management、experiment remove、worktree maintenance、cache、catalog、backup、audit 和 key-management commands。
+- Inspection token help 隐藏 run、submit、tag mutation、annotation mutation、project/source/config management、experiment mutation、worktree maintenance、cache、catalog、backup、audit 和 key-management commands。
+- Project no-key help 只在 project policy 允许时显示 public safe status 和 public experiment/source bootstrap。
+- Experiment 或 inspection path 中的 explicit admin/root key 会解锁匹配的 same-project capability，但指向不同 active context 的 explicit `--project` 仍以 `CONTEXT_CONFLICT` 失败。
 - Token/public caller 选择不可见对象时返回非泄露 `SCOPE_VIOLATION`，reason 为 `not visible or not found`。
 - `exp archive` 拒绝已移除的 V1 flags `--remove-worktree` 和 `--force-remove-worktree`。
 - Archived artifact/log export 在没有 `--include-archived` 时失败；authorized by-id show 成功。
@@ -103,6 +115,8 @@ Lifecycle golden cases：
 - Explicit `--project` 与当前 active ALab context 不一致时的 context conflict。
 - Active context nesting 允许同一 project 的 marker-only project context 下创建 experiment/inspection context，拒绝跨 project nesting，并拒绝 experiment/inspection context 内再嵌套任何 active context。
 - DB path registry 与 `.alab/context.json` 不一致时默认 fail closed；只有严格认证后的 explicit `context repair` 可修复。
+- Capability lookup 是 read-only，使用与 command execution 相同的 context detection result，并且在 marker/registry disagreement 时 fail closed，不做 auto-repair。
+- 同一 argv、context 和 explicit credential 下，capability resolver 对 help rendering 和 command preflight 的 decision 必须一致。
 - Case-insensitive filesystem 上 path hashing 应用 platform case normalization。
 
 ## 3. Auth、Context 和 Lifecycle Tests

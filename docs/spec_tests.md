@@ -29,9 +29,15 @@ Add golden tests for every command's:
 - Fixed stable error-code to numeric-exit mapping, including `PROJECT_INVALID` exit `4`, all `*_NOT_FOUND` exit `2`, and saved runner/validation `error` records exiting `1`.
 - Object-specific not-found codes for run, validation, artifact, log, annotation, credential, audit, catalog, and cache selectors.
 - `ALAB_DEBUG=1` stack trace behavior for internal errors without locals/env/secrets/hidden contents.
+- Context-aware capability help for no-command `alab`, `alab help`, `alab --help`, and nested command help requests.
+- Dynamic help output in global, project, experiment, and inspection contexts.
+- Default help hiding locked commands, and `alab help --all --explain` rendering safe `help_command` rows with locked reasons, unlock hints, context type, credential source, and capability source.
+- Explicit `--key` and `--key-stdin` unlocking project-admin or root surfaces, while ambient `ALAB_KEY` does not affect help output or broaden token/public command surfaces.
+- Direct invocation of commands outside the current capability surface failing with `COMMAND_UNAVAILABLE` exit `4` before reading body/value files, writing SQLite rows, creating audit events, running Git, or executing runners.
 
 Commands covered:
 
+- `help`, no-command `alab`, `alab --help`, and nested command help.
 - `auth init`, `auth root regenerate`.
 - `config show`, `config set`, `config reset`, `config validate`.
 - `key create`, `key list`, `key revoke`.
@@ -58,6 +64,12 @@ Lifecycle golden cases:
 - Error matrix cases confirm repeated archive/unarchive operations never return `PROJECT_ARCHIVED`, `EXPERIMENT_ARCHIVED`, or any already-archived failure code.
 - `HOME_EXISTS` and `OUTPUT_EXISTS` render stable text errors.
 - Public or optionally authorized commands ignore ambient `ALAB_KEY` for privilege elevation and render authorized details only with explicit `--key` or `--key-stdin`.
+- Ambient `ALAB_KEY` may satisfy authentication only for commands already available in the current context surface; it never expands default help, public project surfaces, experiment token surfaces, or inspection token surfaces.
+- Global explicit project admin key help shows same-project admin commands that can run with that project id explicitly; it does not show root-only cache, catalog, backup, global audit, or project creation capabilities.
+- Experiment token help hides project config, project init, source management, experiment remove, worktree maintenance, cache, catalog, backup, audit, and key-management commands.
+- Inspection token help hides run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, cache, catalog, backup, audit, and key-management commands.
+- Project no-key help shows public safe status and public experiment/source bootstrap only when project policy permits it.
+- Explicit admin/root keys in an experiment or inspection path unlock matching same-project capabilities, but explicit `--project` for a different active context still fails with `CONTEXT_CONFLICT`.
 - Token/public selectors for objects that exist outside the caller's visibility return non-disclosing `SCOPE_VIOLATION` rather than revealing object existence.
 - `exp archive` rejects removed V1 flags `--remove-worktree` and `--force-remove-worktree`.
 - Archived artifact/log export fails without `--include-archived`; archived artifact/log show by id succeeds when authorized.
@@ -110,6 +122,8 @@ Cover:
 - Context conflict when explicit `--project` disagrees with the current active ALab context.
 - Context path nesting allows only same-project experiment or inspection contexts under that project's marker-only project control context; cross-project nesting and any nesting under experiment/inspection contexts are rejected.
 - Marker/registry disagreement fails closed during normal command execution and can only be repaired through explicit `context repair` authorization or strict self-repair.
+- Capability lookup is read-only, uses the same context detection result as command execution, and fails closed on marker/registry disagreement without auto-repair.
+- Capability resolver decisions are identical for help rendering and command preflight for the same argv, context, and explicit credential.
 - Path hashing applies platform case normalization on case-insensitive filesystems.
 
 ## 3. Auth, Context, And Lifecycle Tests

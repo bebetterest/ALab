@@ -1059,6 +1059,14 @@ Detection rules:
 - Outside any context, only global commands and commands with explicit target options may run.
 - ALab never auto-repairs marker/registry disagreement during normal command execution. Repair requires explicit `alab context repair --path <dir>` and the credential or self-token checks below.
 
+Capability lookup rules:
+
+- Context detection produces the context input for the CLI capability resolver defined in [spec_cli.md](spec_cli.md).
+- Capability lookup is read-only. It may read registry, marker, credential, project status, public project policy, and token mode data needed to decide whether a command is available or locked, but it must not write audit events, repair context state, mutate credentials, read user body/value files, run Git, or execute runners.
+- A marker or registry conflict fails closed before capability help or command preflight can render a project or experiment command surface. `alab help --all --explain` may render the safe conflict summary and repair next action, but it must not infer hidden project data from a conflicted marker.
+- Explicit root/admin keys may unlock matching project or root command surfaces only after normal credential verification. Ambient `ALAB_KEY` is not a capability lookup input and must not broaden the help surface or token/public command surface.
+- The same capability decision must be used for dynamic help and for command preflight. If a direct command invocation is locked by this decision, it fails with `COMMAND_UNAVAILABLE` before command-specific side effects.
+
 `alab context show`:
 
 - Shows marker and registry status for the current or requested path.

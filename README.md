@@ -8,6 +8,7 @@ The project is currently in blueprint phase. No runnable CLI, package scaffold, 
 
 - Local-only V1: no server, sync service, web UI, built-in agent launcher, or account system.
 - Agent-first CLI: default and persisted output is plain text; Rich output is available only per command with `--output rich`.
+- Context-aware command surface: `alab`, `alab help`, and command preflight show and allow only commands available for the current project, experiment, inspection context, and explicit key.
 - Collaboration boundary, not strong local security: root/admin keys and experiment tokens guide CLI permissions, while project records are local plaintext data.
 - Secret hygiene: raw keys/tokens are not stored, `secret_env` values are local plaintext but not rendered or exported, and configured secrets are redacted from logs. Artifact exports are exact captured bytes and are not automatically redacted.
 - Project/experiment model: projects define task, source, runner, reward, artifacts, mutable scope, and visibility; experiments are isolated Git branches and worktrees.
@@ -33,11 +34,14 @@ alab project validate --project <project_id> --key <root-or-admin-key>
 alab exp create --project <project_id> --name "attempt-1"
 cd ./<project_id>_<exp_id>
 alab status
+alab help
 alab run --message "try first fix"
 alab submit --message "final" --summary "..." --feedback "..." --ref none
 ```
 
 All runner, reward, artifact, log, environment, and secret settings are expected to come from the project config file. These commands are design targets, not currently executable commands. Project initialization is expected to print one generated project admin key exactly once after the project record is written.
+
+The planned CLI help is context-aware. In an experiment worktree with only its token, `alab help` should focus on status, run, submit, visible observe, tags, annotations, and own-experiment record maintenance. Project and root management commands are hidden by default and direct attempts to use unavailable commands fail before side effects with `COMMAND_UNAVAILABLE`. Explicit `--key` or `--key-stdin` unlocks the matching admin/root surface; ambient `ALAB_KEY` does not expand help or token/public command surfaces.
 
 ## Repository Structure
 

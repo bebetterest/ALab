@@ -1059,6 +1059,14 @@ Detection rules：
 - 在任何 context 外，只允许 global commands 和带 explicit target options 的 commands 运行。
 - ALab 在 normal command execution 中绝不自动 repair marker/registry disagreement。Repair 必须通过 explicit `alab context repair --path <dir>`，并满足下方 credential 或 self-token checks。
 
+Capability lookup rules：
+
+- Context detection 会为 [spec_cli.md](spec_cli.md) 中定义的 CLI capability resolver 生成 context input。
+- Capability lookup 是 read-only。它可以读取 registry、marker、credential、project status、public project policy 和 token mode 等决定 command available/locked 所需的数据，但不得写 audit event、repair context state、mutate credential、读取用户 body/value files、运行 Git 或执行 runner。
+- Marker 或 registry conflict 会 fail closed，阻止 capability help 或 command preflight 渲染 project/experiment command surface。`alab help --all --explain` 可以渲染安全 conflict summary 和 repair next action，但不得从 conflicted marker 推断 hidden project data。
+- Explicit root/admin key 只有通过正常 credential verification 后，才可以解锁匹配的 project 或 root command surface。Ambient `ALAB_KEY` 不是 capability lookup input，不得扩展 help surface 或 token/public command surface。
+- Dynamic help 和 command preflight 必须使用同一个 capability decision。如果 direct command invocation 被该 decision lock，则必须在 command-specific side effects 前以 `COMMAND_UNAVAILABLE` 失败。
+
 `alab context show`：
 
 - 显示 current 或 requested path 的 marker 和 registry status。
