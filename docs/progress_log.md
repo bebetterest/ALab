@@ -7243,3 +7243,131 @@ Validation:
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
+
+## 2026-05-21 Public Git Credential-Helper Warning Proof
+
+Implemented:
+
+- Extended `tests/test_smoke.py::test_public_exp_create_inline_source_import` with an isolated no-helper Git config path for public `--source-git`.
+- The test now proves public Git inline source import renders no `PUBLIC_GIT_CREDENTIAL_HELPER_USED` warning when `GIT_CONFIG_GLOBAL` has no helper and `GIT_CONFIG_NOSYSTEM=1`, while the existing isolated helper path still renders the warning and persists it in source-origin metadata.
+- Updated the completion audit, dashboard, pipeline, and closed-gap guardrails so public `--source-git` helper-available/helper-unavailable warning behavior is no longer an active public inline source gap.
+- Marked the full default-suite gate stale because this batch changed tests and documentation after the closeout full-suite pass.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_public_exp_create_inline_source_import tests/test_smoke.py::test_public_inline_source_import_enforces_project_limits tests/test_smoke.py::test_public_inline_source_import_disabled_requires_admin -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check tests/test_smoke.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_smoke.py`
+- `git diff --check`
+
+## 2026-05-21 Context Repair Old-Path Blocker Proof
+
+Implemented:
+
+- Extended `tests/test_smoke.py::test_context_self_repair_requires_registered_branch` with a duplicate copied worktree that has a valid marker/token while the original registered worktree path still exists.
+- The test now proves self-token `context repair` fails with `CONTEXT_CONFLICT: registered path still exists` and leaves the active `path_registry` row plus repair audit count unchanged.
+- Updated the completion audit, dashboard, pipeline, and closed-gap guardrails so old registered-path-still-exists blockers are no longer an active context repair gap.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_context_self_repair_requires_registered_branch tests/test_cli_contract.py::test_context_marker_conflicts_are_strict_and_side_effect_free tests/test_cli_contract.py::test_project_context_repair_accepts_ambient_admin_key -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check tests/test_smoke.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_smoke.py`
+- `git diff --check`
+
+## 2026-05-21 Project Config Edit Semantics Proof Mapping
+
+Implemented:
+
+- Reclassified the runtime baseline trigger and config edit semantics audit row as proved for current config mutation surfaces.
+- Mapped `tests/test_smoke.py::test_project_config_validation_edges` to the exact spec rules for latest-attempted edits, runtime baseline triggers, byte-identical no-op edits, metadata-only inherited edits, monotonic revert versions, and `project config set/import --dry-run` no-write behavior.
+- Kept invalid runtime preservation and output/preflight evidence linked through the existing smoke and CLI-contract tests.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_project_config_validation_edges tests/test_smoke.py::test_invalid_runtime_config_preserves_previous_active_valid_config tests/test_cli_contract.py::test_project_config_mutation_dry_run_skip_baseline_conflicts_before_payload_reads tests/test_cli_contract.py::test_project_config_mutation_and_validate_success_fields_follow_cli_spec tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+
+## 2026-05-21 Project Init Precedence Proof Mapping
+
+Implemented:
+
+- Reclassified the project-init input precedence audit row as proved for current local/Git/empty/Harbor/SkyDiscover init paths.
+- Mapped direct evidence for mode-specific source-origin requirements, duplicate init option rejection, source-ref injection/mismatch cleanup, source-limit failures before rows/staged paths, malformed/negative source limit pre-write failures, retained invalid project baseline failures, one-time raw admin key rendering, and adapter-derived editable-source precedence/conflict/fallback paths.
+- Kept the full default-suite gate stale because this is a documentation/test batch after the closeout pass.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_project_init_requires_explicit_mode_source_origin tests/test_smoke.py::test_project_init_source_ref_mismatch_cleans_staged_paths tests/test_smoke.py::test_project_config_validation_edges tests/test_smoke.py::test_missing_runner_working_directory_is_saved_as_baseline_and_run_error tests/test_smoke.py::test_harbor_project_init_uses_declared_source_and_excludes_private_assets tests/test_smoke.py::test_adapter_init_rejects_conflicting_explicit_source tests/test_smoke.py::test_skydiscover_project_init_uses_initial_program_metadata tests/test_smoke.py::test_skydiscover_project_init_requires_initial_program_without_explicit_source tests/test_smoke.py::test_skydiscover_project_init_allows_explicit_git_and_empty_without_initial_program tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_project_init_mode_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_project_init_adapter_mode_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_one_time_raw_key_outputs_follow_cli_secret_rules tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+
+## 2026-05-21 Source Import Tree-Hash And Remote-Git Fidelity Proof
+
+Implemented:
+
+- Corrected `canonical_tree_hash` to sort manifest entries globally by repo-relative path and to include symlinked directory entries instead of skipping them during `os.walk` traversal.
+- Updated source copying so plain and Git worktree imports preserve symlinked directories as symlink entries, while still rejecting Git submodules/gitlinks.
+- Added `tests/test_smoke.py::test_canonical_tree_hash_manifest_matches_v1_spec` for the exact `alab-tree-sha256-v1` manifest entry order and regular-file/executable/symlink entry content.
+- Extended `tests/test_smoke.py::test_source_import_respects_git_and_alab_ignore_rules` to cover standalone remote `source import --source-git --source-subdir`, including filtered subdir contents, stored canonical tree hash, resolved commit metadata, sanitized origin metadata without raw source URL/path, and no admin warning.
+- Reclassified the source model/source import audit row as proved for current local/Git/empty source import/model paths and added the closed guardrail.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_canonical_tree_hash_manifest_matches_v1_spec tests/test_smoke.py::test_source_import_respects_git_and_alab_ignore_rules tests/test_smoke.py::test_source_import_dedupes_active_sources_and_ignores_archived tests/test_smoke.py::test_source_import_empty_after_filter_warns tests/test_cli_contract.py::test_source_import_origin_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_warning_success_fields_follow_cli_spec tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check src/alab/source_import.py tests/test_smoke.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src/alab/source_import.py tests/test_smoke.py`
+- `git diff --check`
+- `rg -n "[ \t]+$" src/alab/source_import.py tests/test_smoke.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-21 Experiment Create Source-Binding Proof Mapping
+
+Implemented:
+
+- Reclassified the experiment-create source-binding/default-source audit row as proved for current exp-create source-binding paths, with broader visibility still tracked in the dedicated visibility row.
+- Mapped direct evidence for default-source creation, inline local/Git/empty/subdir imports, source dedupe, public source-import policy ceilings and disabled-public behavior, admin archived-source `--source-ref` binding, `--from-exp` latest/final/best/SHA resolution, closed/archived source-experiment behavior, mutable override narrowing, token creation with raw-token non-rendering, and selector/conflict no-write failures.
+- Added a closed guardrail so future batches do not reopen `exp create` source-binding work unless a new selector, metadata field, token mode, mutable field, or visibility scope is introduced.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_public_exp_create_inline_source_import tests/test_smoke.py::test_public_inline_source_import_enforces_project_limits tests/test_smoke.py::test_public_inline_source_import_disabled_requires_admin tests/test_smoke.py::test_public_exp_create_from_exp_uses_latest_commit tests/test_smoke.py::test_public_from_exp_respects_visibility_upper_bound tests/test_smoke.py::test_admin_exp_create_can_bind_archived_source_ref tests/test_smoke.py::test_source_selector_option_scope_errors_do_not_write tests/test_smoke.py::test_run_enforces_experiment_mutable_scope tests/test_smoke.py::test_local_project_run_submit_workflow tests/test_cli_contract.py::test_experiment_create_inline_source_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_create_from_exp_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_create_source_ref_success_fields_follow_cli_spec tests/test_cli_contract.py::test_non_remove_documented_conflicts_fail_without_side_effects tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+
+## 2026-05-21 Run And Submit Lifecycle Proof Mapping
+
+Implemented:
+
+- Reclassified the run/submit lifecycle audit row as proved for current local/default run-submit paths, while keeping adapter-specific runner result failures in the runner rows.
+- Mapped direct evidence for parser preflight, byte limits, project/experiment/worktree state blockers, operation locks, stale running-record interruption, invalid Git states, running-record-before-auto-commit ordering, mutable-scope rollback and metadata, contextless runner workspaces, final-run success and failure behavior, summary/feedback/ref input rules, secret-value rejection, non-disclosing invisible/missing ref failures, and no final-submission rows on failed/timeout/error runs.
+- Added a closed guardrail so future batches do not reopen run/submit lifecycle work unless run/submit gains new Git-state checks, mutable-scope semantics, ref visibility rules, payload modes, result statuses, or operation-lock behavior.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_local_project_run_submit_workflow tests/test_smoke.py::test_submit_result_failures_and_input_preflight tests/test_smoke.py::test_run_enforces_experiment_mutable_scope tests/test_smoke.py::test_run_writes_running_record_before_auto_commit_without_long_write_tx tests/test_smoke.py::test_run_and_submit_use_experiment_operation_lock tests/test_smoke.py::test_run_rejects_invalid_git_states tests/test_smoke.py::test_runner_workspace_is_contextless_and_stdin_closed tests/test_smoke.py::test_stale_running_records_are_interrupted tests/test_cli_contract.py::test_run_result_failures_follow_cli_spec tests/test_cli_contract.py::test_run_reward_parse_failures_cover_nonfinite_and_nonzero_exit tests/test_cli_contract.py::test_submit_result_failures_follow_cli_spec tests/test_cli_contract.py::test_submit_success_fields_follow_cli_spec tests/test_cli_contract.py::test_archived_closed_and_removed_scope_errors_preserve_database_and_filesystem tests/test_runner_docker.py::test_missing_dockerfile_and_context_are_saved_baseline_and_run_errors tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+
+## 2026-05-21 Aggregate Project/Observe Visibility Proof Mapping
+
+Implemented:
+
+- Reclassified the aggregate project/source/config/experiment/observe evidence rows as proved for current default/local paths now that their detailed rows have direct evidence.
+- Reclassified the visibility model row as proved for current public, token, inspection, observe read, and annotation authorization surfaces.
+- Kept release gates and top-level completion gates separate: full default-suite verification remains stale for the current worktree, and real Docker/network/service gates remain `ENV-GATED`.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_smoke.py::test_public_from_exp_respects_visibility_upper_bound tests/test_smoke.py::test_experiment_search_best_and_same_project_visibility tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations tests/test_cli_contract.py::test_project_context_help_capability_display_uses_context_and_explicit_credentials tests/test_cli_contract.py::test_experiment_context_help_capability_display_uses_worktree_token_and_explicit_credentials tests/test_cli_contract.py::test_inspection_context_help_capability_display_uses_inspection_token_and_explicit_credentials tests/test_cli_contract.py::test_regenerated_worktree_token_keeps_private_annotation_visibility_and_edit_rights tests/test_cli_contract.py::test_admin_private_to_exp_annotation_binds_creator_exp_and_remove_audit tests/test_cli_contract.py::test_annotation_authorization_matrix_blocks_peer_and_inspection_mutations tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+
+## 2026-05-21 Current Worktree Full Default-Suite Gate
+
+Implemented:
+
+- Re-ran the default closeout gate after the source-import/tree-hash code/test changes and documentation proof-mapping batches.
+- Reclassified the full default-suite gate as proved for the current worktree.
+- Kept real Docker/network/service gates as explicit `ENV-GATED` release validation.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" src/alab/source_import.py tests/test_smoke.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+- Post-record docs sanity: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`

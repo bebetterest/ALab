@@ -174,7 +174,9 @@ def _copy_git_worktree_source(src: Path, dst: Path, git_root: Path) -> SourceCop
         if repo_rel in gitlinks:
             raise AlabError("SOURCE_INVALID", "Git submodules/gitlinks are not supported", GITLINK_NEXT_ACTION)
         source_file, rel = selected
-        if _always_excluded(rel) or _always_excluded(repo_rel) or not source_file.exists() or source_file.is_dir():
+        if _always_excluded(rel) or _always_excluded(repo_rel):
+            continue
+        if not source_file.is_symlink() and (not source_file.exists() or source_file.is_dir()):
             continue
         if _builtin_excluded(rel) or _builtin_excluded(repo_rel) or _spec_matches(alabignore, repo_rel):
             warnings.add("TRACKED_SENSITIVE_SOURCE_FILE")
@@ -185,7 +187,9 @@ def _copy_git_worktree_source(src: Path, dst: Path, git_root: Path) -> SourceCop
         if selected is None:
             continue
         source_file, rel = selected
-        if _always_excluded(rel) or _always_excluded(repo_rel) or source_file.is_dir():
+        if _always_excluded(rel) or _always_excluded(repo_rel):
+            continue
+        if not source_file.is_symlink() and source_file.is_dir():
             continue
         if _builtin_excluded(rel) or _builtin_excluded(repo_rel) or _spec_matches(alabignore, repo_rel):
             continue
@@ -212,6 +216,11 @@ def _copy_plain_source(src: Path, dst: Path) -> SourceCopyResult:
             for directory in dirs:
                 rel = (rel_root / directory).as_posix()
                 if _always_excluded(rel) or _builtin_excluded(rel) or _spec_matches(ignore_spec, rel):
+                    continue
+                source_dir = root_path / directory
+                if source_dir.is_symlink():
+                    _copy_entry(source_dir, dst, rel)
+                    imported += 1
                     continue
                 kept_dirs.append(directory)
             dirs[:] = kept_dirs
@@ -241,22 +250,34 @@ def copy_filtered_source(src: Path | None, dst: Path, *, empty: bool = False) ->
 
 
 def canonical_tree_hash(path: Path) -> str:
-    entries: list[str] = []
+    entries: list[tuple[str, str]] = []
     for root, dirs, files in os.walk(path):
         dirs.sort()
         files.sort()
         root_path = Path(root)
+        kept_dirs = []
+        for name in dirs:
+            dir_path = root_path / name
+            rel = dir_path.relative_to(path).as_posix()
+            if dir_path.is_symlink():
+                target = os.readlink(dir_path)
+                entries.append((rel, f"L {rel}\0{target}"))
+                continue
+            kept_dirs.append(name)
+        dirs[:] = kept_dirs
         for name in files:
             file_path = root_path / name
             rel = file_path.relative_to(path).as_posix()
             if file_path.is_symlink():
                 target = os.readlink(file_path)
-                entries.append(f"L {rel}\0{target}")
+                entries.append((rel, f"L {rel}\0{target}"))
             else:
                 digest = hashlib.sha256(file_path.read_bytes()).hexdigest()
                 mode = "100755" if os.access(file_path, os.X_OK) else "100644"
-                entries.append(f"F {mode} {rel}\0{digest}")
-    manifest = "\n".join(entries).encode("utf-8")
+                entries.append((rel, f"F {mode} {rel}\0{digest}"))
+    manifest = "\n".join(
+        entry for _rel, entry in sorted(entries, key=lambda item: item[0])
+    ).encode("utf-8")
     return "sha256:" + hashlib.sha256(manifest).hexdigest()
 
 

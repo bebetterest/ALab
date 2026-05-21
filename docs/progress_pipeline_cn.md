@@ -14,7 +14,7 @@
 
 ## 当前 Active Batch - 2026-05-21
 
-- Focus：security boundary negative proof、config capability-refresh evidence mapping、shared-runner cleanup、project config/schema proof mapping、project/experiment hard-remove retained-row relationships、source/validation hard-remove audit/reference relationships、maintenance object audit metadata、credential model proof mapping、credential audit metadata、token revoke/regenerate side-effect mapping、context marker conflict/alias mapping、inspection context repair pinned-commit/audit metadata、public `--from-exp` visibility-intersection proof、explicit token/inspection observe visibility joins、run/artifact/log/annotation list filter/sort matrices，以及 experiment list/search filter/sort matrices 对当前 default/fake paths 关闭后，执行 closeout validation。
+- Focus：run/submit lifecycle proof、exp-create source-binding/default-source proof、source import canonical tree-hash/remote-Git fidelity proof、project init precedence proof mapping、config edit semantics proof mapping、public `--source-git` credential-helper warning proof、context repair old-path blocker proof、security boundary negative proof、config capability-refresh evidence mapping、shared-runner cleanup、project config/schema proof mapping、project/experiment hard-remove retained-row relationships、source/validation hard-remove audit/reference relationships、maintenance object audit metadata、credential model proof mapping、credential audit metadata、token revoke/regenerate side-effect mapping、context marker conflict/alias mapping、inspection context repair pinned-commit/audit metadata、public `--from-exp` visibility-intersection proof、explicit token/inspection observe visibility joins、run/artifact/log/annotation list filter/sort matrices，以及 experiment list/search filter/sort matrices 对当前 default/fake paths 关闭后，执行 closeout validation。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 现在负责 do-not-reopen list。只有下一批像已关闭 family 时才打开。
 - 下一步 evidence：closeout 期间默认不再新增。只有 `docs/completion_audit.md` 点名具体 defect，或明确 release target 需要 opt-in environment gate 时，才重新打开 implementation work。
 
@@ -23,6 +23,7 @@
 | Priority | Batch | Why it is next | Evidence target | Suggested focused checks |
 | --- | --- | --- | --- | --- |
 | P0 | Post-closeout audit-row decomposition | 只有从 default/local runnable V1 closeout 继续进入 exhaustive release evidence 时才需要。最近的 default/fake-path proof families 已经有 direct evidence，除非有 named gap，否则不要重开。 | 任何仍点名具体缺失 edge 的 grouped `PARTIAL` row，而不是宽泛的已证明 family。 | 每次围绕一个 named audit edge 增加窄 CLI/storage tests。 |
+| P0 | Full default-suite gate | 当前 worktree 已通过 default-suite closeout gate；只有后续 implementation/test changes 后，或之后 release claim 前才重跑。 | `docs/completion_audit.md` 的 P0 gate 和 `docs/progress.md` 的 gate snapshot。 | `uv run pytest -q`、`uv run ruff check`、`python3 -m compileall -q src tests` 和 `git diff --check`。 |
 | P1 | Real-environment runner gates | Release-quality validation 依赖目标机器和服务。 | Real-environment runner validation rows。 | 使用 `ALAB_RUN_REAL_DOCKER=1` 与相关 SkyDiscover/Harbor environment flags 运行 opt-in tests。 |
 | P1 | Final docs consistency pass | Docs 应在 implementation 稳定后检查，而不是每个小 proof batch 后都全面处理。 | Documentation consistency rows。 | Markdown pair check、README tree sync、CLI spec sync，以及 README/AGENTS/specs/audit/progress manual pass。 |
 
@@ -40,7 +41,7 @@
 - Focused batch 关闭多个 audit rows，下一步要声称 completion 或 release-quality。
 - 用户明确要求 full verification pass。
 
-在此之前，只在 progress log 记录 focused verification，并保持 full-suite gate 为 stale。
+在此之前，只在 progress log 记录 focused verification。如果 implementation/test changes 发生在最近一次 full-suite pass 之后，再把 full-suite gate 标为 stale。
 
 ## 更新 Checklist
 

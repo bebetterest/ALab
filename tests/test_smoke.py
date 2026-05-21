@@ -19,6 +19,7 @@ from alab.cli import run
 from alab.home import Home
 from alab.ids import new_id, slugify
 from alab.rendering import ResultBlock, multiline_text, render_text
+from alab.source_import import canonical_tree_hash, copy_filtered_source
 
 
 def test_text_renderer_object_block() -> None:
@@ -777,6 +778,40 @@ def _source_refs(home, project_id: str) -> set[str]:
     repo = home / "projects" / project_id / "repo.git"
     output = _git(["--git-dir", str(repo), "for-each-ref", "--format=%(refname)", "refs/heads/alab/source"], home)
     return set(output.splitlines()) if output else set()
+
+
+def test_canonical_tree_hash_manifest_matches_v1_spec(tmp_path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    bin_dir = source / "bin"
+    bin_dir.mkdir()
+    alpha = source / "a.txt"
+    runner = bin_dir / "run.sh"
+    alpha.write_text("alpha\n", encoding="utf-8")
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    os.chmod(runner, 0o755)
+    try:
+        (source / "link.txt").symlink_to("a.txt")
+        (source / "dir-link").symlink_to("bin", target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+
+    expected_manifest = "\n".join(
+        [
+            f"F 100644 a.txt\0{hashlib.sha256(alpha.read_bytes()).hexdigest()}",
+            f"F 100755 bin/run.sh\0{hashlib.sha256(runner.read_bytes()).hexdigest()}",
+            "L dir-link\0bin",
+            "L link.txt\0a.txt",
+        ]
+    ).encode("utf-8")
+
+    assert canonical_tree_hash(source) == "sha256:" + hashlib.sha256(expected_manifest).hexdigest()
+    copied = tmp_path / "copied"
+    result = copy_filtered_source(source, copied)
+    assert result.imported_files == 4
+    assert (copied / "dir-link").is_symlink()
+    assert os.readlink(copied / "dir-link") == "bin"
+    assert canonical_tree_hash(copied) == canonical_tree_hash(source)
 
 
 def test_auth_init_and_config_show(tmp_path, capsys) -> None:
@@ -12420,8 +12455,10 @@ primary_metric = "reward"
 
     remote_source = tmp_path / "remote-source"
     remote_head_source = tmp_path / "remote-head-source"
+    remote_no_helper_source = tmp_path / "remote-no-helper-source"
     remote_source.mkdir()
     remote_head_source.mkdir()
+    remote_no_helper_source.mkdir()
     _git(["init"], remote_source)
     _git(["config", "user.name", "ALab Test"], remote_source)
     _git(["config", "user.email", "alab@example.test"], remote_source)
@@ -12443,6 +12480,56 @@ primary_metric = "reward"
     _git(["commit", "-m", "remote head"], remote_head_source)
     _git(["branch", "-M", "main"], remote_head_source)
     remote_head_commit = _git(["rev-parse", "HEAD"], remote_head_source)
+
+    _git(["init"], remote_no_helper_source)
+    _git(["config", "user.name", "ALab Test"], remote_no_helper_source)
+    _git(["config", "user.email", "alab@example.test"], remote_no_helper_source)
+    _git(["config", "commit.gpgsign", "false"], remote_no_helper_source)
+    (remote_no_helper_source / "main.py").write_text('print("remote no helper")\n', encoding="utf-8")
+    _git(["add", "main.py"], remote_no_helper_source)
+    _git(["commit", "-m", "remote no helper"], remote_no_helper_source)
+    _git(["branch", "-M", "main"], remote_no_helper_source)
+    remote_no_helper_commit = _git(["rev-parse", "HEAD"], remote_no_helper_source)
+
+    no_helper_home = tmp_path / "git-no-helper-home"
+    no_helper_home.mkdir()
+    monkeypatch.setenv("HOME", str(no_helper_home))
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(no_helper_home / ".gitconfig"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+    git_no_helper_worktree = tmp_path / "git-no-helper-inline-exp"
+    assert (
+        run(
+            [
+                "--home",
+                str(home),
+                "exp",
+                "create",
+                "--project",
+                project_id,
+                "--name",
+                "git-no-helper-inline",
+                "--source-git",
+                str(remote_no_helper_source),
+                "--git-ref",
+                "main",
+                "--path",
+                str(git_no_helper_worktree),
+            ]
+        )
+        == 0
+    )
+    git_no_helper_out = capsys.readouterr().out
+    assert _field_labels(git_no_helper_out) == _exp_create_field_labels()
+    git_no_helper_source_id = _field(git_no_helper_out, "source id")
+    assert "warning: PUBLIC_GIT_CREDENTIAL_HELPER_USED" not in git_no_helper_out
+    assert (git_no_helper_worktree / "main.py").read_text(encoding="utf-8") == 'print("remote no helper")\n'
+    with sqlite3.connect(home / "alab.db") as conn:
+        git_no_helper_meta = conn.execute("SELECT origin_metadata_json FROM sources WHERE source_id = ?", (git_no_helper_source_id,)).fetchone()[0]
+    git_no_helper_origin = json.loads(git_no_helper_meta)["primary_origin"]
+    assert git_no_helper_origin["origin_type"] == "git"
+    assert git_no_helper_origin["exact"] == {"git_ref": "main", "resolved_commit": remote_no_helper_commit, "source_subdir": None}
+    assert git_no_helper_origin["warnings"] == []
 
     git_home = tmp_path / "git-home"
     git_home.mkdir()
@@ -13621,10 +13708,15 @@ def test_source_import_respects_git_and_alab_ignore_rules(tmp_path, capsys) -> N
     base_source = tmp_path / "base-source"
     git_source = tmp_path / "git-source"
     gitlink_source = tmp_path / "gitlink-source"
+    remote_git_source = tmp_path / "remote-git-source"
+    expected_remote_subdir = tmp_path / "expected-remote-subdir"
     base_source.mkdir()
     git_source.mkdir()
     gitlink_source.mkdir()
+    remote_git_source.mkdir()
+    expected_remote_subdir.mkdir()
     (base_source / "main.py").write_text('print("base")\n', encoding="utf-8")
+    (expected_remote_subdir / "main.py").write_text('print("remote subdir")\n', encoding="utf-8")
     config = tmp_path / "alab.project.toml"
     config.write_text(
         f"""
@@ -13664,6 +13756,18 @@ primary_metric = "reward"
     (git_source / "hidden.txt").write_text("excluded by alabignore\n", encoding="utf-8")
     (git_source / "ignored.log").write_text("excluded by gitignore\n", encoding="utf-8")
 
+    _git(["init"], remote_git_source)
+    _git(["config", "user.name", "ALab Test"], remote_git_source)
+    _git(["config", "user.email", "alab@example.test"], remote_git_source)
+    _git(["config", "commit.gpgsign", "false"], remote_git_source)
+    (remote_git_source / "app").mkdir()
+    (remote_git_source / "app" / "main.py").write_text('print("remote subdir")\n', encoding="utf-8")
+    (remote_git_source / "outside.py").write_text('print("outside")\n', encoding="utf-8")
+    _git(["add", "app/main.py", "outside.py"], remote_git_source)
+    _git(["commit", "-m", "remote source"], remote_git_source)
+    _git(["branch", "-M", "main"], remote_git_source)
+    remote_commit = _git(["rev-parse", "HEAD"], remote_git_source)
+
     assert run(["--home", str(home), "auth", "init"]) == 0
     root_key = _field(capsys.readouterr().out, "root key")
     assert run(["--home", str(home), "--key", root_key, "project", "init", "local", "--config", str(config), "--source-path", str(base_source)]) == 0
@@ -13697,6 +13801,49 @@ primary_metric = "reward"
 
     assert "warning: TRACKED_SENSITIVE_SOURCE_FILE" in import_out
     assert _source_tree_files(home, project_id, source_ref) == {".alabignore", ".env", ".gitignore", "keep.py", "local.py"}
+
+    assert (
+        run(
+            [
+                "--home",
+                str(home),
+                "--key",
+                admin_key,
+                "source",
+                "import",
+                "--project",
+                project_id,
+                "--source-git",
+                str(remote_git_source),
+                "--git-ref",
+                "main",
+                "--source-subdir",
+                "app",
+                "--name",
+                "remote-git-subdir",
+            ]
+        )
+        == 0
+    )
+    git_import_out = capsys.readouterr().out
+    assert _field_labels(git_import_out) == _source_import_field_labels()
+    git_source_id = _field(git_import_out, "source id")
+    git_source_ref = _field(git_import_out, "source ref")
+    assert "warning:" not in git_import_out
+    assert _source_tree_files(home, project_id, git_source_ref) == {"main.py"}
+    with sqlite3.connect(home / "alab.db") as conn:
+        git_source_row = conn.execute(
+            "SELECT tree_hash, origin_metadata_json FROM sources WHERE source_id = ?",
+            (git_source_id,),
+        ).fetchone()
+    git_origin = json.loads(git_source_row[1])["primary_origin"]
+    assert git_source_row[0] == canonical_tree_hash(expected_remote_subdir)
+    assert git_origin["origin_type"] == "git"
+    assert git_origin["safe_summary"] == "git"
+    assert git_origin["exact"] == {"git_ref": "main", "resolved_commit": remote_commit, "source_subdir": "app"}
+    assert git_origin["warnings"] == []
+    assert "source_git" not in json.dumps(git_origin, sort_keys=True)
+    assert str(remote_git_source) not in json.dumps(git_origin, sort_keys=True)
 
 
 def test_source_import_empty_after_filter_warns(tmp_path, capsys) -> None:
@@ -14889,7 +15036,27 @@ primary_metric = "reward"
     repo_git = home / "projects" / project_id / "repo.git"
     with sqlite3.connect(home / "alab.db") as conn:
         branch_name = conn.execute("SELECT branch_name FROM experiments WHERE exp_id = ?", (exp_id,)).fetchone()[0]
-        old_registry_path = conn.execute("SELECT path FROM path_registry WHERE exp_id = ? AND context_type = 'experiment' AND status = 'active'", (exp_id,)).fetchone()[0]
+        old_registry_path, old_registry_hash = conn.execute(
+            "SELECT path, path_hash FROM path_registry WHERE exp_id = ? AND context_type = 'experiment' AND status = 'active'",
+            (exp_id,),
+        ).fetchone()
+
+    duplicate = tmp_path / "repair-exp-duplicate"
+    shutil.copytree(worktree, duplicate)
+    assert run(["--home", str(home), "context", "repair", "--path", str(duplicate)]) == 4
+    old_path_exists_err = capsys.readouterr().err
+    assert _field_labels(old_path_exists_err) == _error_field_labels()
+    assert "error code: CONTEXT_CONFLICT" in old_path_exists_err
+    assert "registered path still exists" in old_path_exists_err
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert (
+            conn.execute(
+                "SELECT path, path_hash FROM path_registry WHERE exp_id = ? AND context_type = 'experiment' AND status = 'active'",
+                (exp_id,),
+            ).fetchone()
+            == (old_registry_path, old_registry_hash)
+        )
+        assert conn.execute("SELECT COUNT(*) FROM audit_events WHERE object_type = 'worktree' AND object_id = ? AND action = 'repair'", (exp_id,)).fetchone()[0] == 0
 
     moved = tmp_path / "repair-exp-moved"
     subprocess.run(["git", f"--git-dir={repo_git}", "worktree", "move", str(worktree), str(moved)], capture_output=True, check=True)
