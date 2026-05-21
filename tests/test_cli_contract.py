@@ -125,6 +125,27 @@ _BANNED_RUNTIME_DEPENDENCY_ROOTS = {
     "rq",
     "schedule",
 }
+_BANNED_SECURITY_DEPENDENCY_ROOTS = {
+    "cryptography",
+    "keyring",
+    "nacl",
+    "passlib",
+    "pycryptodome",
+    "pynacl",
+}
+_BANNED_SECURITY_SOURCE_PATTERNS = (
+    r"\bencrypt(?:ed|ion|ing|or)?\b",
+    r"\bdecrypt(?:ed|ion|ing|or)?\b",
+    r"\bcipher(?:text)?\b",
+    r"\bfernet\b",
+    r"\bgrant(?:s)?\b",
+    r"\bpublic_grant(?:s)?\b",
+    r"\btoken_rewrap(?:ping)?\b",
+    r"\b(?:rewrap|rewrapped|rewrapping)\b",
+    r"\bper_record_dek\b",
+    r"\bdek\b",
+    r"\bdata_key(?:s)?\b",
+)
 _REQUIRED_GITIGNORE_PATTERNS = (
     "AGENTS.md",
     "AGENTS_cn.md",
@@ -862,6 +883,13 @@ def _runtime_import_roots() -> set[str]:
             elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 roots.add(node.module.split(".", 1)[0])
     return roots
+
+
+def _implementation_security_boundary_files() -> list[Path]:
+    return [
+        *sorted(_SRC_ROOT.glob("*.py")),
+        *sorted((_SRC_ROOT / "migrations").glob("*.sql")),
+    ]
 
 
 def _documented_primary_object_types(spec_path: Path) -> tuple[dict[tuple[str, ...], str], list[str]]:
@@ -20013,6 +20041,35 @@ def test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencie
 
     assert sorted(dependency_roots & _BANNED_RUNTIME_DEPENDENCY_ROOTS) == []
     assert sorted(import_roots & _BANNED_RUNTIME_DEPENDENCY_ROOTS) == []
+
+
+def test_v1_security_boundary_excludes_encryption_grants_and_rewrap_artifacts() -> None:
+    dependency_roots = _pyproject_dependency_roots()
+    import_roots = _runtime_import_roots()
+    implementation_violations: list[str] = []
+
+    for path in _implementation_security_boundary_files():
+        relative = path.relative_to(_REPO_ROOT)
+        text = path.read_text(encoding="utf-8").lower()
+        for pattern in _BANNED_SECURITY_SOURCE_PATTERNS:
+            if re.search(pattern, text):
+                implementation_violations.append(f"{relative}: {pattern}")
+
+    blueprint = (_REPO_ROOT / "docs" / "blueprint.md").read_text(encoding="utf-8")
+    blueprint_cn = (_REPO_ROOT / "docs" / "blueprint_cn.md").read_text(encoding="utf-8")
+    readme = _README_PATH.read_text(encoding="utf-8")
+    readme_cn = _README_CN_PATH.read_text(encoding="utf-8")
+
+    assert sorted(dependency_roots & _BANNED_SECURITY_DEPENDENCY_ROOTS) == []
+    assert sorted(import_roots & _BANNED_SECURITY_DEPENDENCY_ROOTS) == []
+    assert implementation_violations == []
+    assert "Encrypted SQLite, encrypted record/blob storage" in blueprint
+    assert "grant files, public grants, token rewrapping" in blueprint
+    assert "Project data, task text, logs" in blueprint and "plaintext" in blueprint
+    assert "Collaboration boundary, not strong local security" in readme
+    assert "Secret hygiene: raw keys/tokens are not stored" in readme
+    assert "加密 SQLite" in blueprint_cn and "token rewrap" in blueprint_cn
+    assert "协作边界，不是本地强安全隔离" in readme_cn
 
 
 def test_dry_run_force_confirm_remove_handlers_use_mixed_mode_guard() -> None:

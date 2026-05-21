@@ -7204,3 +7204,36 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src/alab/auth.py tests/test_auth.py tests/test_cli_contract.py`
 - `git diff --check`
 - `rg -n "[ \t]+$" src/alab/auth.py tests/test_auth.py tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-21 V1 Security Boundary Negative Proof Closure
+
+已实现：
+
+- 新增 `tests/test_cli_contract.py::test_v1_security_boundary_excludes_encryption_grants_and_rewrap_artifacts`。
+- 该测试证明 V1 没有 encryption/grant/rewrap dependency roots 或 runtime import roots，也没有 encrypted storage、grant files、public grants、token rewrap、DEKs、ciphertext、keyring 或 cryptography 的 implementation/schema artifacts。
+- 该测试还固定 README 和 blueprint wording：ALab V1 是 plaintext local storage 和 collaboration boundary，不是 strong local multi-user security product。
+- 更新 audit、dashboard、pipeline 和 closed-gap guardrails，使 encrypted-storage/grant/rewrap absence 以及 public/status/hidden security-boundary mapping 不再是 active V1-boundary gaps。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_v1_security_boundary_excludes_encryption_grants_and_rewrap_artifacts -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_v1_security_boundary_excludes_encryption_grants_and_rewrap_artifacts tests/test_cli_contract.py::test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencies tests/test_cli_contract.py::test_public_status_excludes_private_project_history_and_runtime_fields tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-21 Closeout Gate And Capability-Refresh Mapping
+
+已实现：
+
+- 在 completion audit 中把 `config validate --refresh-capabilities` 映射到 fake/default Docker capability cache tests、native-platform fallback test，以及 platform/resource pre-write rejection tests。
+- 将 active pipeline 切换为 closeout mode，使未来工作只从 named audit defects 或明确 release-target environment gates 开始。
+- Real Docker、Harbor、live SkyDiscover 和 network/native dependency checks 继续作为明确的 `ENV-GATED` release validation，不把它们当成 default-suite proof。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
