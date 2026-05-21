@@ -16,6 +16,7 @@ Read this file only when planned work might duplicate a closed proof family. It 
 Do not spend another batch on these families unless a spec or implementation change invalidates the recorded evidence:
 
 - Runtime and layout guardrails: local CLI-only surface, no server/web UI/ORM/scheduler/agent/LLM-provider dependency roots, canonical home/artifact/log layout, marker-only project contexts, cwd-relative experiment worktree markers, and 128-bit home-id suffix checks.
+- Runtime stack and architecture guardrails: pyproject keeps the `alab` console script, Python 3.11 floor, uv package mode, runtime dependency roots, and dev dependency separation; `src/alab/cli.py` exposes a Typer boundary that delegates arbitrary argv and `--help` to ALab pre-scan/capability logic; runtime imports cover Typer, Pydantic, and standard-library `sqlite3` while banned server/ORM/agent/LLM dependency roots remain absent.
 - Documentation consistency guardrails: README/README_cn repository trees, opt-in pytest marker commands, Markdown Chinese pairs, CLI spec English/Chinese command and field synchronization, `.env.example` references, `.gitignore` local-note/env policy, progress dashboard/pipeline/guardrail/log/audit split, and ignored local AGENTS/CORE note alignment have current focused evidence.
 - Security boundary guardrails: V1 remains plaintext local storage with verifier-only credentials and no encrypted storage, grant-file, public-grant, token-rewrap, DEK, ciphertext, keyring, or cryptography implementation artifacts; README/blueprint keep the collaboration-boundary and no-strong-local-security wording synchronized with that implementation boundary.
 - Parser, renderer, and preflight guardrails: strict text object rendering, global/command option validation, payload file preflight, generated capability preflight, output alias boundaries, export-output preflight, command-specific config-value errors, complete ALab id selectors, RFC 3339 filters, `HOME_EXISTS`, and `OUTPUT_EXISTS`.
@@ -44,6 +45,7 @@ Do not spend another batch on these families unless a spec or implementation cha
 
 ## Recently Closed
 
+- 2026-05-21: runtime stack and architecture proof for Typer entrypoint delegation, pyproject stack contracts, runtime imports, no ORM/server/agent dependency drift, and Rich non-persistence.
 - 2026-05-21: documentation consistency proof for README/README_cn, Markdown pair coverage, CLI spec synchronization, `.env.example`, `.gitignore`, progress/audit ledgers, and ignored local AGENTS/CORE notes.
 - 2026-05-21: shared-runner cleanup and adapter failure edges for current default/fake runner types.
 - 2026-05-21: project config/schema proof mapping for current schema/default source-dependent paths.

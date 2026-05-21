@@ -16,6 +16,7 @@
 除非 spec 或 implementation change 推翻已记录证据，不要再为这些 families 单独开 batch：
 
 - Runtime 和 layout guardrails：local CLI-only surface、无 server/web UI/ORM/scheduler/agent/LLM-provider dependency roots、canonical home/artifact/log layout、marker-only project contexts、cwd-relative experiment worktree markers，以及 128-bit home-id suffix checks。
+- Runtime stack and architecture guardrails：pyproject 保持 `alab` console script、Python 3.11 floor、uv package mode、runtime dependency roots 和 dev dependency separation；`src/alab/cli.py` 暴露 Typer boundary，并把 arbitrary argv 与 `--help` 委托给 ALab pre-scan/capability logic；runtime imports 覆盖 Typer、Pydantic 和 standard-library `sqlite3`，同时 banned server/ORM/agent/LLM dependency roots 保持缺失。
 - Documentation consistency guardrails：README/README_cn repository trees、opt-in pytest marker commands、Markdown Chinese pairs、CLI spec English/Chinese command and field synchronization、`.env.example` references、`.gitignore` local-note/env policy、progress dashboard/pipeline/guardrail/log/audit split，以及 ignored local AGENTS/CORE note alignment 都有当前 focused evidence。
 - Security boundary guardrails：V1 保持 plaintext local storage、verifier-only credentials，并且没有 encrypted storage、grant-file、public-grant、token-rewrap、DEK、ciphertext、keyring 或 cryptography implementation artifacts；README/blueprint 的 collaboration-boundary 和 no-strong-local-security wording 与该实现边界保持同步。
 - Parser、renderer 和 preflight guardrails：strict text object rendering、global/command option validation、payload file preflight、generated capability preflight、output alias boundaries、export-output preflight、command-specific config-value errors、complete ALab id selectors、RFC 3339 filters、`HOME_EXISTS` 和 `OUTPUT_EXISTS`。
@@ -44,6 +45,7 @@
 
 ## 最近关闭
 
+- 2026-05-21：runtime stack and architecture proof，覆盖 Typer entrypoint delegation、pyproject stack contracts、runtime imports、无 ORM/server/agent dependency drift，以及 Rich non-persistence。
 - 2026-05-21：documentation consistency proof，覆盖 README/README_cn、Markdown pair coverage、CLI spec synchronization、`.env.example`、`.gitignore`、progress/audit ledgers，以及 ignored local AGENTS/CORE notes。
 - 2026-05-21：当前 default/fake runner types 的 shared-runner cleanup 和 adapter failure edges。
 - 2026-05-21：当前 schema/default source-dependent paths 的 project config/schema proof mapping。

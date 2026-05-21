@@ -7384,3 +7384,25 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md AGENTS_cn.md` 无匹配。
+
+## 2026-05-21 Runtime Stack And Typer Boundary Proof
+
+已实现：
+
+- 在 `src/alab/cli.py` 中为真实 console entrypoint 增加 Typer app boundary，同时保留既有 `cli.run(argv)` service-facing parser 和 command semantics。
+- 禁用 Typer 自身 help interception，并配置为透传 arbitrary argv，使 ALab 的 global pre-scan、context-aware help 和 command preflight 仍是权威逻辑。
+- 新增 `tests/test_cli_contract.py::test_runtime_stack_and_entrypoint_follow_blueprint_contract`，证明 pyproject stack contract、console-script entrypoint、uv package mode、Python/Ruff targets、runtime dependency roots、Typer/`sqlite3`/Pydantic imports、dynamic `tomli-w`/`pathspec` usage、Typer app delegation，以及稳定的 console help/error behavior。
+- 将 runtime stack and architecture audit row 重新归类为当前 local/runtime stack 已证明，并加入 closed guardrail。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_runtime_stack_and_entrypoint_follow_blueprint_contract tests/test_cli_contract.py::test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencies tests/test_cli_contract.py::test_output_rich_is_single_command_and_non_persistent -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check src/alab/cli.py tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src/alab/cli.py tests/test_cli_contract.py`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run alab --help`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run alab not-a-command`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" src/alab/cli.py tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。

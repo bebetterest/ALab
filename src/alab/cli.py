@@ -4,6 +4,9 @@ import os
 import sys
 import traceback
 from dataclasses import dataclass
+from typing import Annotated
+
+import typer
 
 from .auth import read_token, token_permission_warning, verify_raw_credential
 from .configs import load_global_config, project_config_json_obj
@@ -26,6 +29,14 @@ class ParsedGlobals:
 
 
 PathTuple = tuple[str, ...]
+
+app = typer.Typer(
+    add_completion=False,
+    add_help_option=False,
+    invoke_without_command=True,
+    no_args_is_help=False,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True, "help_option_names": []},
+)
 
 
 GLOBAL_PUBLIC: set[PathTuple] = {
@@ -615,5 +626,13 @@ def run(argv: list[str]) -> int:
         return 5
 
 
+@app.callback(invoke_without_command=True)
+def _typer_entry(ctx: typer.Context, args: Annotated[list[str] | None, typer.Argument()] = None) -> None:
+    raise typer.Exit(run([*(args or []), *ctx.args]))
+
+
 def main(argv: list[str] | None = None) -> None:
-    raise SystemExit(run(list(sys.argv[1:] if argv is None else argv)))
+    if argv is None:
+        app(prog_name="alab")
+        return
+    raise SystemExit(run(list(argv)))

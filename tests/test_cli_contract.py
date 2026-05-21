@@ -13,6 +13,8 @@ import tomllib
 from collections import defaultdict
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from alab import cli, registry, services
 from alab.errors import ERROR_EXIT_CODES, AlabError, error_exit_code
 from alab.home import Home, resolve_home
@@ -20033,6 +20035,42 @@ def test_env_example_documents_setup_environment_variables() -> None:
     assert _REQUIRED_ENV_EXAMPLE_KEYS <= set(keys)
     assert readme_env == readme_cn_env
     assert readme_env <= set(keys)
+
+
+def test_runtime_stack_and_entrypoint_follow_blueprint_contract(tmp_path: Path) -> None:
+    pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
+    runtime_roots = _pyproject_dependency_roots()
+    import_roots = _runtime_import_roots()
+    required_runtime_roots = {"typer", "rich", "pydantic", "tomli_w", "pathspec"}
+
+    assert pyproject["project"]["name"] == "alab"
+    assert pyproject["project"]["requires-python"] == ">=3.11"
+    assert pyproject["project"]["scripts"] == {"alab": "alab.cli:main"}
+    assert pyproject["tool"]["uv"]["package"] is True
+    assert pyproject["tool"]["ruff"]["target-version"] == "py311"
+    assert required_runtime_roots <= runtime_roots
+    assert not {"pytest", "ruff"} & runtime_roots
+    assert {"typer", "sqlite3", "pydantic"} <= import_roots
+    assert "import tomli_w" in (_SRC_ROOT / "configs.py").read_text(encoding="utf-8")
+    assert "import pathspec" in (_SRC_ROOT / "source_import.py").read_text(encoding="utf-8")
+
+    runner = CliRunner()
+    no_args = runner.invoke(cli.app, [])
+    help_result = runner.invoke(cli.app, ["--help"])
+    config_result = runner.invoke(cli.app, ["--home", str(tmp_path / "home"), "config", "show"])
+    unknown_result = runner.invoke(cli.app, ["not-a-command"])
+
+    assert no_args.exit_code == 0
+    assert help_result.exit_code == 0
+    assert config_result.exit_code == 0
+    assert unknown_result.exit_code == 4
+    assert "object: help" in no_args.stdout
+    assert "object: help" in help_result.stdout
+    assert "object: config" in config_result.stdout
+    assert "object: error" in unknown_result.stderr
+    assert "error code: COMMAND_UNAVAILABLE" in unknown_result.stderr
+    assert "Usage:" not in no_args.stdout
+    assert "Usage:" not in help_result.stdout
 
 
 def test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencies() -> None:

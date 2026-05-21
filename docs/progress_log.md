@@ -7390,3 +7390,25 @@ Validation:
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md AGENTS_cn.md` returned no matches.
+
+## 2026-05-21 Runtime Stack And Typer Boundary Proof
+
+Implemented:
+
+- Added a Typer app boundary in `src/alab/cli.py` for the real console entrypoint while preserving the existing `cli.run(argv)` service-facing parser and command semantics.
+- Disabled Typer's own help interception and configured it to pass arbitrary argv through so ALab's global pre-scan, context-aware help, and command preflight remain authoritative.
+- Added `tests/test_cli_contract.py::test_runtime_stack_and_entrypoint_follow_blueprint_contract` to prove the pyproject stack contract, console-script entrypoint, uv package mode, Python/Ruff targets, runtime dependency roots, Typer/`sqlite3`/Pydantic imports, dynamic `tomli-w`/`pathspec` usage, Typer app delegation, and stable console help/error behavior.
+- Reclassified the runtime stack and architecture audit row as proved for the current local/runtime stack and added a closed guardrail.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_runtime_stack_and_entrypoint_follow_blueprint_contract tests/test_cli_contract.py::test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencies tests/test_cli_contract.py::test_output_rich_is_single_command_and_non_persistent -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check src/alab/cli.py tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src/alab/cli.py tests/test_cli_contract.py`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run alab --help`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run alab not-a-command`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" src/alab/cli.py tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
