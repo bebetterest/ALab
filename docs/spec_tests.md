@@ -13,6 +13,7 @@ Add golden tests for every command's:
 - Text system-error output where applicable.
 - Alias behavior.
 - Global option placement.
+- Every registered command and alias must have generated runtime coverage proving duplicate global options, missing or empty global option values, invalid `--output` values, and `--key`/`--key-stdin` conflicts fail with `CONFIG_INVALID` before home creation or command matching.
 - Stable field labels and field ordering.
 - Primary `object: <type>` values for every command and alias, including row object types for list/search results.
 - Strict text object blocks beginning with `object: <type>`, blank-line object separation, indented multiline fields, and warnings rendered after primary results as `object: warning`.
@@ -20,20 +21,55 @@ Add golden tests for every command's:
 - Nullable `none`, literal user text `none`, and empty user text are distinct in text output; user-provided text renders through multiline fields.
 - `--output rich` selecting the same result data without becoming persistent.
 - Global options accepted before and after commands and aliases.
+- Every registered command and alias must have generated runtime coverage proving trailing global `--home`, `--key`, and `--output text` are consumed by global pre-scan before handler option validation, without DB/config/marker/token/tree/worktree side effects on rejected commands.
 - Global option pre-scan stops at standalone `--`; global-looking arguments after `--` are not treated as global options.
+- Every registered non-help command and alias must have generated runtime coverage proving global-looking tokens after standalone `--` are not consumed by global pre-scan, do not read `--key-stdin`, do not switch the selected home, and leave rejected command DB/config/marker/token/tree/worktree state unchanged.
+- Command-local options reject duplicates before writes, file exports, runner execution, or lifecycle audit rows unless the option is explicitly documented as repeated.
+- Every registered command-local singleton option, including helper-backed lifecycle aliases, must have generated runtime coverage proving duplicate uses fail with `CONFIG_INVALID` before availability fallback, selector lookup, file reads, writes, runner execution, or lifecycle audit rows, with fresh DB/file/tree/export/worktree snapshots per command/option case.
+- Global options requiring values reject absent values, empty string values, and option-looking `--...` next tokens before home creation or command matching.
+- Command-local options requiring values reject absent values and option-looking `--...` next tokens before file reads, writes, runner execution, or lifecycle audit rows. Structural command-local values also reject empty string values before those side effects, while documented direct user-text fields keep empty string distinct from missing/null text when their field validators allow empty text.
+- Every registered command-local value option must have generated runtime coverage proving absent values fail with `CONFIG_INVALID` before availability fallback, mutually exclusive relationship validation, file reads, writes, runner execution, or lifecycle audit rows, with fresh DB/file/tree/export/worktree snapshots per command/option case.
+- Every registered command-local structural value option must have generated runtime coverage proving empty string values fail with `CONFIG_INVALID` before availability fallback, mutually exclusive relationship validation, file reads, writes, runner execution, or lifecycle audit rows, with fresh DB/file/tree/export/worktree snapshots per command/option case, while direct user-text empty handling remains covered by multiline/empty text rendering tests.
+- Every registered non-help command must have generated runtime coverage proving unsupported command-local options fail with `CONFIG_INVALID` before handler payload parsing, selector lookup, file reads, writes, runner execution, lifecycle audit rows, or DB/config/marker/token/tree/worktree mutations.
+- Every registered command using shared typed/structured value parsers for pagination, source limits, retention counts, object id filters, integer filters, numeric filters, boolean filters, sort fields, choice filters, or time filters must have generated runtime coverage proving malformed values fail with stable `CONFIG_INVALID` errors and no DB/config/marker/token/tree/export/worktree side effects, with fresh snapshots per command/option/value case.
+- Project config/env/secret mutation conflicts such as `--dry-run` with `--skip-baseline-test` must fail with `CONFIG_INVALID` before config or secret payload file reads, validation writes, DB mutation, marker mutation, or runner execution, with fresh DB/file/tree snapshots per command case.
+- Documented non-remove command conflicts, including source selectors, cache/backup selectors, token selectors, submit refs, and annotation body/target selectors, must have runtime coverage proving stable errors and no DB/config/marker/token/tree or payload-file side effects, with fresh DB/file/tree snapshots per conflict case.
+- Every literal value-option read in service handlers, including reads performed through shared parsing helpers, must be registered in the central value-option table used by positional parsing and missing-value validation.
+- Helper-mediated singleton value-option parsers must be included in the static duplicate-guard classification so their literal option arguments count as guarded command-local options.
+- Every literal option read in a guarded service handler, including helper-mediated reads for pagination, sorting, source selection, mutable/visibility policy, credential selectors, typed filters, and time filters, must appear in that handler's known-option allowlist.
+- Every registered command handler must validate positional arguments through the shared fixed-count or optional-selector helpers, directly or through a documented lifecycle helper.
+- Every registered zero-positional command must have generated runtime coverage proving an extra positional argument fails with `CONFIG_INVALID` before DB/config/marker/token changes, file exports, source staging, runner execution, or lifecycle audit rows, with fresh DB/file/tree snapshots per command.
+- Every registered single-selector command, including helper-backed observe and annotation lifecycle aliases, must have generated runtime coverage proving surplus positional arguments fail with `CONFIG_INVALID` before selector lookup, file exports, token/path mutation, or lifecycle audit rows, with fresh DB/file/tree snapshots per command.
+- Every registered required single-selector command must have generated runtime coverage proving missing selectors fail with the stable object-specific `*_NOT_FOUND` code before DB/config/marker/token changes, file exports, checkout creation, source staging, runner execution, or lifecycle audit rows, with fresh DB/file/tree snapshots per command.
+- Every registered fixed-count positional command must have generated runtime coverage proving surplus positional arguments fail with `CONFIG_INVALID` before config writes, project/source initialization, secret file reads, config-version writes, tag mutation, or lifecycle audit rows, with fresh DB/file/tree snapshots per command.
+- Every registered fixed-count positional command must also have generated runtime coverage proving missing required positional arguments fail with `CONFIG_INVALID` before config writes, project/source initialization, secret file reads, config-version writes, tag mutation, or lifecycle audit rows, with fresh DB/file/tree snapshots per command.
 - `--key` and `--key-stdin` mutual exclusion.
 - `--key-stdin`, `project secret set --value-stdin`, and `project secret set --value-file` reject empty values, embedded newlines, and NUL bytes after stripping at most one trailing newline.
+- Empty ambient `ALAB_KEY` behaves like an absent key and must not turn missing-credential failures into `AUTH_DENIED`.
 - Full ALab object ids required for object selectors, with only Git commit SHA selectors accepting unambiguous abbreviations.
 - RFC 3339 timestamp parsing with required `Z` or numeric offset for all time filters.
 - Command error matrix coverage for every documented command family.
 - Fixed stable error-code to numeric-exit mapping, including `PROJECT_INVALID` exit `4`, all `*_NOT_FOUND` exit `2`, and saved runner/validation `error` records exiting `1`.
 - Object-specific not-found codes for run, validation, artifact, log, annotation, credential, audit, catalog, and cache selectors.
 - `ALAB_DEBUG=1` stack trace behavior for internal errors without locals/env/secrets/hidden contents.
+- README and README_cn opt-in pytest marker commands must stay synchronized with `pyproject.toml` pytest marker declarations and actual marker use under `tests/`.
+- Every Markdown file in the repository root and `docs/` must keep a synchronized Chinese `*_cn.md` pair, and every `*_cn.md` file in those locations must have an English source file.
+- README and README_cn repository structure trees must stay synchronized and every listed path must exist.
+- `.gitignore` must keep local agent notes (`AGENTS*.md`, `CORE*.md`) and real environment files (`.env`, `.env.*`) ignored while keeping `.env.example` trackable.
+- `.env.example` must exist and cover the environment variable assignments documented by both README setup sections, plus the core ALab/uv/debug knobs used by local and opt-in validation workflows.
 - Context-aware capability help for no-command `alab`, `alab help`, `alab --help`, and nested command help requests.
 - Dynamic help output in global, project, experiment, and inspection contexts.
+- Invalid global config blocks normal command and help execution with `CONFIG_INVALID`, while `auth init` and `config show|set|reset|validate` remain available for diagnosis or repair.
+- Invalid global config takes precedence over explicit credential lookup for non-repair commands, so a bad `--key` cannot mask a broken `config.toml`.
+- Unparseable global config TOML prevents `config set` and field-level `config reset` from rewriting the file; only `config reset --all` may restore the default config.
 - Default help hiding locked commands, and `alab help --all --explain` rendering safe `help_command` rows with locked reasons, unlock hints, context type, credential source, and capability source.
 - Explicit `--key` and `--key-stdin` unlocking project-admin or root surfaces, while ambient `ALAB_KEY` does not affect help output or broaden token/public command surfaces.
+- Explicit root/admin credential surfaces must have generated runtime coverage proving registered commands outside the credential surface, including token-only commands outside experiment worktree contexts and root-only commands under admin keys, fail with `COMMAND_UNAVAILABLE` before handler option parsing, file reads, file/output writes, DB mutation, marker/token mutation, Git operations, runner execution, or filesystem staging, with fresh DB/file/tree snapshots per command/payload variant.
+- Invalid explicit credentials through `--key` and `--key-stdin` must have generated registered-command coverage proving `AUTH_DENIED` occurs before handler option parsing, unsupported-option validation, config/body/value/summary/feedback file reads, output parent creation, DB mutation, config/marker/token mutation, or project/source/tmp tree changes, with a fresh snapshot for each command variant.
 - Direct invocation of commands outside the current capability surface failing with `COMMAND_UNAVAILABLE` exit `4` before reading body/value files, writing SQLite rows, creating audit events, running Git, or executing runners.
+- Public project contexts must have generated runtime coverage proving every registered command outside the public project surface fails with `COMMAND_UNAVAILABLE` before handler option parsing, file reads, file/output writes, DB mutation, marker/token mutation, Git operations, runner execution, or filesystem staging; each unsupported option, missing file, config-file, and output-path payload must use a fresh SQLite/file/tree snapshot.
+- Experiment-token contexts must have generated runtime coverage proving every registered command outside the worktree-token surface fails with `COMMAND_UNAVAILABLE` before handler option parsing, file reads, file/output writes, DB mutation, marker/token mutation, Git operations, runner execution, or filesystem staging; each payload must use a fresh SQLite/file/tree/worktree snapshot.
+- Inspection-token contexts must have generated runtime coverage proving every registered command outside the inspection surface fails with `COMMAND_UNAVAILABLE` before handler option parsing, file reads, file/output writes, DB mutation, marker/token mutation, Git operations, runner execution, or filesystem staging; each payload must use a fresh SQLite/file/tree/checkout snapshot.
 
 Commands covered:
 
@@ -57,18 +93,20 @@ Commands covered:
 
 Lifecycle golden cases:
 
-- Every actual hard remove command rejects missing `--force`, missing `--confirm`, wrong confirm id, and unarchived targets.
-- Every hard remove command supports `--dry-run` that renders blockers and deletion counts without writing audit rows or deleting data, including a `target_not_archived` blocker with exit `0` when the target is not archived.
-- Every `--cascade` command fails with a stable blocker list when any dependent authoritative object is still active.
+- Every actual hard remove command rejects missing `--force`, missing `--confirm`, wrong confirm id, and unarchived targets without DB/file/tree/trash side effects, with fresh snapshots per command and confirmation variant.
+- Every hard remove command supports `--dry-run` that renders blockers and deletion counts without writing audit rows or deleting data, including a `target_not_archived` blocker with exit `0` when the target is not archived; dry-run coverage must prove fresh per-command DB/file/tree/trash snapshots remain unchanged.
+- Every `--cascade` command fails with a stable blocker list when any dependent authoritative object is still active, and dependency-blocker coverage must prove DB/file/tree/trash and source Git refs remain unchanged per command.
 - Archive and unarchive commands are idempotent, return success for already-matching state, and do not write duplicate audit rows.
 - Error matrix cases confirm repeated archive/unarchive operations never return `PROJECT_ARCHIVED`, `EXPERIMENT_ARCHIVED`, or any already-archived failure code.
 - `HOME_EXISTS` and `OUTPUT_EXISTS` render stable text errors.
 - Public or optionally authorized commands ignore ambient `ALAB_KEY` for privilege elevation and render authorized details only with explicit `--key` or `--key-stdin`.
 - Ambient `ALAB_KEY` may satisfy authentication only for commands already available in the current context surface; it never expands default help, public project surfaces, experiment token surfaces, or inspection token surfaces.
+- Public project status coverage proves invalid projects render the reduced public-invalid field set under no key, ambient `ALAB_KEY`, and explicit non-admin credentials that are admitted through the public surface.
 - Global explicit project admin key help shows same-project admin commands that can run with that project id explicitly; it does not show root-only cache, catalog, backup, global audit, or project creation capabilities.
 - Experiment token help hides project config, project init, source management, experiment remove, worktree maintenance, cache, catalog, backup, audit, and key-management commands.
 - Inspection token help hides run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, cache, catalog, backup, audit, and key-management commands.
 - Project no-key help shows public safe status and public experiment/source bootstrap only when project policy permits it.
+- Public experiment creation coverage proves a valid but nonmatching explicit credential follows the public surface when policy permits it, while `project.allow_public_exp_create = false` hides and preflight-blocks public `exp create` without side effects.
 - Explicit admin/root keys in an experiment or inspection path unlock matching same-project capabilities, but explicit `--project` for a different active context still fails with `CONTEXT_CONFLICT`.
 - Token/public selectors for objects that exist outside the caller's visibility return non-disclosing `SCOPE_VIOLATION` rather than revealing object existence.
 - `exp archive` rejects removed V1 flags `--remove-worktree` and `--force-remove-worktree`.
@@ -113,8 +151,8 @@ Cover:
 - Strict versioned JSON contracts for metadata, policy, record, target, visibility, origin, audit, and submission refs JSON.
 - `audit_events` columns, generic action/object_type enum constraints, JSON metadata constraints, and event creation for hard remove, cache/catalog/backup prune, lock clear, and final run deletion.
 - Migration uses an ALAB_HOME-level file lock; project and experiment operations use the SQLite `locks` table.
-- Migration file naming, checksum validation, SQLite-backup-before-migration, per-version transaction rollback, home-level migration lock behavior, and checksum mismatch rejection.
-- Global config defaults, invalid config repair-only command behavior, field-level repair, `reset --all`, and `validate --refresh-capabilities` for Docker availability/platform/resource probes.
+- Migration file naming, checksum validation, SQLite-backup-before-migration, per-version transaction rollback, home-level migration lock behavior including configured timeout to `RESOURCE_BUSY`, and checksum mismatch rejection.
+- Global config defaults, SQLite busy-timeout application, invalid config repair-only command behavior, field-level repair, `reset --all`, and `validate --refresh-capabilities` for Docker availability/platform/resource probes.
 - Audit list/show authorization and sanitized metadata rendering.
 - Path registry `status='removed'` rows do not block path reuse but remain queryable for audit.
 - `path_registry_id` is the primary key, active `path_hash` is unique, removed rows do not block path reuse, and reusing a path creates a new registry row.
@@ -278,6 +316,7 @@ Cover:
 - Temporary runner workspaces never include `.alab/token` or `.alab/context.json`.
 - Fixed internal env injection: `ALAB_PROJECT_ID`, `ALAB_EXP_ID`, `ALAB_RUN_ID`, `ALAB_CONFIG_VERSION`, `ALAB_WORKSPACE`, `ALAB_RUN_DIR`.
 - Internal env overrides user env values.
+- SkyDiscover Python evaluator-wrapper execution preserves the runner environment boundary, including host ALab credential stripping, internal env override precedence, user env and secret env injection, and hidden-output secret redaction.
 - Closed runner stdin behavior.
 - Local runner timeout terminates the process group.
 - Reward extractors for `exit_code`, `file`, `stdout_regex`, `harbor`, and `skydiscover`.
@@ -292,7 +331,7 @@ Cover:
 - Artifact glob capture uses Python glob semantics, escape checks, deduplication by resolved path, and stable sorted output.
 - Artifact symlink capture/skip behavior.
 - Oversized artifacts skipped without changing run/validation status.
-- Artifact capture errors recorded as artifact statuses and warnings without changing run/validation status.
+- Artifact capture errors recorded as artifact statuses and `ARTIFACT_CAPTURE_ERROR` warnings without changing run/validation status.
 - Failed, errored, reward-parse-error, and timed-out runs/validations still attempt best-effort log and artifact capture when runtime directories remain available.
 - Exact-byte artifact export.
 - Artifact export overwrite behavior.
@@ -301,6 +340,7 @@ Cover:
 - Shared artifact blobs and shared log files remain until no row references them.
 - Archived artifact/log export requires `--include-archived`; archived artifact/log show by id succeeds when authorized.
 - No artifact secret redaction guarantee.
+- Configurations with active `secret_env` values and artifact globs render and persist `ARTIFACT_BYTES_NOT_REDACTED` warnings while keeping logs redacted and artifact exports exact.
 - Log truncation.
 - Byte-based secret redaction before log storage.
 - Secret redaction happens before log truncation.
@@ -318,6 +358,7 @@ Docker:
 - Docker tests skip when Docker is unavailable.
 - Docker runner validates repo-relative Dockerfile/context paths.
 - Docker runner uses `/app` and `/logs/alab`.
+- Docker setup/build output renders `DOCKER_SETUP_OUTPUT_CAPTURED`, stores setup bytes as redacted hidden logs, and does not merge setup bytes into user-visible runner stdout/stderr.
 - Docker network modes `default` and `none`.
 - `runner.network = "host"` is rejected with `CONFIG_INVALID`.
 - Docker runner supports whitelisted `build_args`, `target`, `platform`, `user`, `cpus`, and `memory_mb`.
@@ -336,6 +377,7 @@ Harbor:
 - Single-step Harbor task with shared verifier.
 - Single-step Harbor task with separate verifier image.
 - Single-step Harbor task with separate verifier `tests/Dockerfile`.
+- Default fake-Docker Harbor runner tests must cover shared verifier, separate verifier image, separate `tests/Dockerfile` build/cache metadata, hidden verifier logs, secret redaction, Docker run argument shape, hostless environment behavior, internal env override precedence, Harbor task env injection, and external secret env injection.
 - Verifier workspace mount is temporary and writable.
 - Hidden verifier logs are admin-only.
 - Harbor CPU/memory/network mapping.
@@ -365,6 +407,7 @@ SkyDiscover:
 - Missing initial program fails and asks for explicit source.
 - Only initial file/directory is imported, not the whole benchmark.
 - Docker evaluator parses top-level metrics.
+- Docker evaluator fake-Docker coverage proves the hidden evaluator bundle mount, workspace/program/run-dir env values, hostless environment, internal env override precedence, secret env injection, and hidden stderr redaction.
 - Python evaluator uses wrapper subprocess and never imports evaluator code into main process.
 - SkyDiscover Python evaluator is a required full V1 adapter capability, not an experimental or V2-only feature.
 - Python evaluator renders explicit non-OS-sandbox warnings in safe root/admin summaries.
@@ -431,6 +474,11 @@ Core usable milestone is ready when:
 Full V1 is ready when:
 
 - Docker runner works where Docker is available.
+- Docker-dependent real-environment tests are opt-in with `ALAB_RUN_REAL_DOCKER=1`, skip when Docker, the daemon, or required images are unavailable, and cover Docker image runner command and shell execution, real container environment isolation/internal `ALAB_*` overrides, Dockerfile runner build context and cache reuse, Harbor shared verifier, Harbor separate verifier image, Harbor separate `tests/Dockerfile`, Harbor real-container environment isolation/internal `ALAB_*` overrides/task-env/external secret injection, SkyDiscover Docker evaluator execution, SkyDiscover Docker real-container environment isolation/internal `ALAB_*` overrides/secret injection, and real Docker image-cache reuse for Dockerfile-backed adapter images.
+- SkyDiscover Python real-environment dependency-installation tests are opt-in with `ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1`, skip when `uv` is unavailable, and use a locally generated wheel so the dependency path can be verified without network access.
+- Networked SkyDiscover Python dependency-installation tests are opt-in with `ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1`, skip by default, and install direct and transitive pure-Python dependency cases from the configured package index through the evaluator environment.
+- Native/binary SkyDiscover Python dependency-installation tests are opt-in with `ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1`, skip by default, and install a native package through the evaluator environment from the configured package index. The default package is `orjson>=3.10,<4`, with `ALAB_NATIVE_SKYDISCOVER_PYTHON_REQUIREMENT` and `ALAB_NATIVE_SKYDISCOVER_PYTHON_MODULE` overrides for platform-specific package-index validation.
+- Live SkyDiscover catalog tests are opt-in with `ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1`, skip when `git` or the official catalog remote is unavailable, and verify live clone/pin behavior, no-network `catalog show`, and resolving a real evaluator ref through project init with baseline validation skipped.
 - Harbor single-step shared/separate verifier tasks work and unsupported Harbor features fail clearly.
 - SkyDiscover catalog, Docker evaluator, and Python evaluator work.
 - Hidden validation asset rules hold for all adapters.

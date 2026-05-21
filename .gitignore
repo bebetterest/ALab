@@ -11,12 +11,22 @@ CORE_cn.md
 
 # Local system files
 .DS_Store
+.claude/
 
 # Dependency directories
 node_modules/
+.venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
 
 # Build and cache outputs
 dist/
 build/
+*.egg-info/
 .cache/
+.uv-cache/
 coverage/

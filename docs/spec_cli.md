@@ -16,6 +16,10 @@ Rules:
 - The CLI pre-scans argv for global options before context detection, migration, config loading, credential lookup, or command-specific parsing.
 - Pre-scan stops at the first standalone `--`. Arguments after `--` are passed to command-specific parsing and are never interpreted as global `--home`, `--output`, `--key`, or `--key-stdin` options.
 - Duplicate global options fail with exit code `2` except where an option explicitly accepts repeated values.
+- Command-local options also default to single-use. Duplicate command options fail with `CONFIG_INVALID` before command-specific writes, file exports, runner execution, or lifecycle audit rows, except for options explicitly documented as repeated, such as experiment `--tag`, visibility `--visible-exp`, mutable-scope pattern options, and submit `--ref`.
+- Global options that require values fail with `CONFIG_INVALID` when the value is absent, when the value is an empty string, or when the next token is another `--...` option.
+- Command-local options that require values fail with `CONFIG_INVALID` when the value is absent or when the next token is another `--...` option. Command-local structural values such as ids, selectors, paths, numeric values, choice values, and file paths also reject empty strings with `CONFIG_INVALID`. Direct user-text values such as body, summary, feedback, message, reason, author labels, goal text, and query filters may accept an empty string when the field-specific validator allows empty text. These checks run before command-specific file reads, writes, runner execution, or lifecycle audit rows.
+- Command positional arguments are exact by default. Extra or missing positional arguments fail with `CONFIG_INVALID` through the shared positional-count or single-selector validators before command-specific writes, file exports, runner execution, or lifecycle audit rows.
 - Canonical nested commands are the documented source of truth. Aliases must map to the same handler and result schema.
 - Running `alab` with no command, `alab help`, `alab --help`, or a nested command help request invokes the context-aware capability help surface.
 - `--home` applies before context detection, migration, config loading, or credential lookup.
@@ -23,6 +27,7 @@ Rules:
 - `--key` supplies a root or project admin key.
 - `--key-stdin` reads all stdin, strips at most one trailing newline, and then requires a non-empty single-line value with no NUL bytes. Empty input, embedded newlines, and NUL bytes fail with `CONFIG_INVALID`. It conflicts with `--key`.
 - `ALAB_KEY` is used only when neither `--key` nor `--key-stdin` is present and the command requires root/admin authorization.
+- Empty `ALAB_KEY` is treated as unset, so loading `.env.example` without filling a key must preserve `AUTH_REQUIRED` behavior for commands that require credentials.
 - Commands that are public or optionally authorized must ignore `ALAB_KEY` for privilege elevation. They may render authorized details only when `--key` or `--key-stdin` is supplied explicitly.
 
 Home resolution priority:
@@ -83,7 +88,9 @@ Rules:
 - `format = "text"` is the only valid persisted output value.
 - `format = "rich"` fails with `CONFIG_INVALID`.
 - Time values are integer milliseconds.
-- Invalid global config blocks normal commands after home resolution and migration. `auth init` and `config show|set|reset|validate` remain available for repair.
+- `storage.busy_timeout_ms` configures SQLite `PRAGMA busy_timeout` for ALab database connections.
+- Persisted global config accepts only `schema_version`, `[output]`, `[storage]`, and `[locks]` at the top level, and only the documented fields in each table. Unknown keys or non-table section values fail with `CONFIG_INVALID`.
+- Invalid global config blocks help and normal commands after home resolution and migration. `auth init` and `config show|set|reset|validate` remain available for repair.
 - Rich output uses the same result data as text output. It must not expose additional secrets, hidden paths, hidden logs, or hidden asset contents.
 - Typer Rich help and pretty exceptions are disabled by default.
 - Text output is a strict key-value object format. Each rendered object starts with `object: <type>`.
@@ -160,7 +167,10 @@ V1 warning codes include:
 - `PUBLIC_GIT_CREDENTIAL_HELPER_USED`
 - `ENV_MODE_FULL_UNREDACTED_HOST_ENV`
 - `ARTIFACT_BYTES_NOT_REDACTED`
+- `ARTIFACT_CAPTURE_ERROR`
+- `DOCKER_SETUP_OUTPUT_CAPTURED`
 - `BEST_INCOMPARABLE_RUNS_EXCLUDED`
+- `DOCKER_CACHE_PRUNE_FAILED`
 
 ## 5. Error Codes And Numeric Exit Codes
 
@@ -271,7 +281,9 @@ Input normalization and lookup rules:
 
 - ALab object id parameters require complete ids. This includes home, project, source, experiment, run, validation, artifact, log, annotation, credential, token, audit, catalog, and cache ids.
 - Git commit selectors may be full SHAs or unambiguous abbreviated SHAs when the command explicitly accepts a commit selector.
-- Time filter options such as `--created-after`, `--created-before`, `--started-after`, and `--ended-before` accept only RFC 3339 timestamps with `Z` or an explicit numeric offset. ALab normalizes accepted times to UTC `Z` for queries and output.
+- Time filter options such as `--created-after`, `--created-before`, `--started-after`, and `--ended-before` accept only RFC 3339 timestamps with `Z` or an explicit numeric offset. ALab normalizes accepted times to UTC `Z` for queries and output. When a matching `after` and `before` pair is supplied for the same field family, the `after` value must be less than or equal to the `before` value.
+- Export output paths that already exist as directories fail with `OUTPUT_EXISTS`, even when `--overwrite` is supplied; `--overwrite` may replace files, not directories.
+- Text input file options such as `--value-file`, `--summary-file`, `--feedback-file`, and `--body-file` fail with `CONFIG_INVALID` when the target is missing, a directory, unreadable, or not valid UTF-8; these failures occur before secret writes, submission rows, annotation rows, runner execution, or lifecycle audit rows.
 - Unknown object ids use the most specific `*_NOT_FOUND` code when one exists; otherwise they use `CONFIG_INVALID` for invalid selectors or filters.
 - Token-scoped and public callers selecting an object that exists but is not visible receive `SCOPE_VIOLATION` with a non-disclosing reason such as `not visible or not found`. Public and token-scoped output must not reveal whether the object exists outside the caller's visibility. Root/admin callers receive precise `*_NOT_FOUND` or scope errors.
 
@@ -286,7 +298,7 @@ Command error matrix:
 
 | Command family | Stable failure codes |
 | --- | --- |
-| `help`, no-command `alab`, `--help`, nested command help | `COMMAND_UNAVAILABLE` does not apply; `CONFIG_INVALID` exit `2` for invalid help selectors; `STORAGE_ERROR` exit `5` |
+| `help`, no-command `alab`, `--help`, nested command help | `COMMAND_UNAVAILABLE` does not apply; `CONFIG_INVALID` exit `2` for invalid help selectors or invalid global config; `STORAGE_ERROR` exit `5` |
 | `auth init` | `HOME_EXISTS` exit `2`; `STORAGE_ERROR` exit `5` |
 | `auth root regenerate` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`; `STORAGE_ERROR` exit `5` |
@@ -421,7 +433,7 @@ Primary object types:
 | repeated capability rows from `config validate` | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
-| `project list|show|archive|unarchive|remove`, `status` in project/public mode | `project` |
+| `project init`, `project list|show|archive|unarchive|remove`, `status` in project/public mode | `project` |
 | `project config show|export|import|set` | `project_config` |
 | `project env set|unset|list` | `project_env` |
 | `project secret set|unset|list|gc` | `project_secret` |
@@ -464,7 +476,7 @@ Lifecycle command rules:
 - Default rule: renders one `help_command` object for each available command only.
 - `--all` rule: also renders locked `help_command` objects with `available: false`, safe `locked reason`, and safe `unlock hint`.
 - `--explain` rule: includes `capability source` and any safe explanatory `summary`; without `--explain`, `capability source` may render as `none`.
-- Exit: `0`; `2` on invalid help options; `5` on storage failure.
+- Exit: `0`; `2` on invalid help options/selectors or invalid global config; `5` on storage failure.
 
 ### Auth
 
@@ -523,7 +535,8 @@ Lifecycle command rules:
 - Context: Any.
 - Credential: None.
 - Options: `--refresh-capabilities`.
-- Success fields: `config valid`, repeated `capability`, `fingerprint`, `status`, `checked at`, `next`.
+- Success fields for object `config`: `config valid`, `next`.
+- Success fields for object `capability`: `capability`, `fingerprint`, `status`, `checked at`, `next`.
 - Exit: `0` when valid; `2` with `CONFIG_INVALID` when invalid; `5` on storage failure.
 
 ### Keys
@@ -534,7 +547,7 @@ Lifecycle command rules:
 - Credential: Root.
 - Required args: `--project`.
 - Defaults: `--role admin`.
-- Conflicts: any role other than `admin`.
+- Options: `--role` accepts `admin`.
 - Success fields: `project id`, `key id`, `role`, `admin key`, `created`.
 - Exit: `0`; `3` on auth failure; `2` on unknown project or invalid role.
 - Secret rule: prints raw admin key exactly once.
@@ -597,7 +610,8 @@ Lifecycle command rules:
 
 - Context: Project or explicit project.
 - Credential: Root/admin.
-- Success fields: `project id`, `home id`, `project name`, `status`, `task`, `goal`, `active config version`, `latest attempted config version`, `default source`, `runner type`, `reward type`, `visibility scope`, `mutable summary`, `public exp create`.
+- Success fields: `project id`, `home id`, `project name`, `status`, `task`, `goal`, `active config version`, `latest attempted config version`, `default source`, `runner type`, `sandbox`, `reward type`, `visibility scope`, `mutable summary`, `public exp create`.
+- Sandbox rule: `sandbox` is `not-os-sandbox` for SkyDiscover Python runners and `not-declared` otherwise.
 - Exit: `0`; `3` on auth failure; `2` with `CONTEXT_NOT_FOUND` on missing context.
 
 `alab project archive [--project <project_id>]`
@@ -619,18 +633,24 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root.
 - Required args: `--cascade`, plus either `--dry-run` or both `--force` and `--confirm <project_id>`.
-- Success fields: `project id`, `dry run`, `removed`, `cascade`, `audit id`, repeated deleted object counts.
-- Dry run renders blockers and deletion counts without writing audit rows or deleting data.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `project id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker`, `deleted experiments`, `deleted runs`, `deleted artifacts`, `deleted logs`, `deleted sources`, `deleted filesystem paths`, dry-run repeated `filesystem path` and `planned trash move`, actual-run `trash cleanup pending`.
+- Dry run renders blockers, deletion counts, affected filesystem paths, and planned trash moves without writing audit rows or deleting data.
 - Cascade rule: because project remove is a whole-tree deletion operation, child project records do not need to be individually archived once the project itself is archived and active locks are absent.
+- Trash rule: actual remove stages the project root, project control path, and active registered worktree/inspection paths into ALab trash before DB/audit mutation. Project credentials and token rows are revoked and retained; path registry rows are marked `removed` and retained.
 - Exit: `0`; `2` on missing or wrong confirmation; `3` on auth failure; `4` when project is not archived or cascade blockers exist.
 
 `alab status [--project <project_id>]`
 
 - Context: Project, Experiment, Inspection, or explicit project.
 - Credential: Public safe summary, Root/admin in project context, Token in experiment/inspection context.
-- Success fields vary by scope, but always include `context type`, `project id`, `project status`, `task`, `next`.
+- Success fields for scope `project|public`: `context type`, `project id`, `project status`, `task`, `next`.
+- Success fields for scope `experiment|inspection`: `context type`, `project id`, `project status`, `task`, `next`, `exp id`, `experiment status`.
+- Success fields for scope `public-invalid`: `context type`, `project id`, `project status`, `next`.
+- Public-invalid output applies to no-key public/project status and to explicit credentials that are valid but do not authorize the target project and are admitted through the public status surface.
 - Public status excludes history, env values, secret names/values, full runner commands, hidden assets, hidden logs, and absolute catalog/staging paths.
-- Exit: `0`; `4` on context conflict; `3` when private project requires auth.
+- V1 has no separate project-private status switch. `project.allow_public_exp_create = false` disables public experiment creation only; it does not disable public safe status.
+- Exit: `0`; `2` on project not found; `3` on explicit credential auth failure; `4` on context conflict.
 
 `alab project init local|git|empty|harbor|skydiscover ...`
 
@@ -638,12 +658,13 @@ Lifecycle command rules:
 - Credential: Root.
 - Required args: `--config`, mode-specific source/task fields.
 - Common options: `--name`, `--task`, `--goal`, `--config`, `--skip-baseline-test`.
+- Source limit options: `--max-files`, `--max-total-bytes`, `--max-file-bytes`; values must be non-negative integers.
 - Source conflicts: exactly one source origin per init mode unless adapter source precedence explicitly says otherwise.
 - Harbor and SkyDiscover init source rule: V1 rejects `--source-ref`; explicit editable sources for adapter init must be `--source-path`, `--source-git`, or `--source-empty`, or else the adapter-derived source is used.
 - Adapter source rule: if an adapter-derived editable source and explicit caller source are both present, identical canonical tree hashes dedupe; different hashes fail with `SOURCE_INVALID`.
 - Config source rule: if input config includes `source.default_source_ref`, it must match the staged canonical source ref; mismatch fails with `CONFIG_INVALID`.
 - Runtime config rule: runner, reward, artifact, log, env, secret, Docker, Harbor, and SkyDiscover fields are read from config only. Init exposes no runtime flags in V1.
-- Success fields: `project id`, `project name`, `project status`, `source id`, `source ref`, `config version`, `validation id`, `validation status`, `admin key`, `next`.
+- Success fields: `project id`, `project name`, `project status`, `source id`, `source ref`, `config version`, `validation id`, `validation status`, `admin key`, repeated `warning code`, `next`.
 - Secret rule: always creates one project admin key when the project record is written and prints the raw admin key exactly once, including when baseline validation later fails.
 - Exit: `0` when validation passes or is skipped by request; `1` when project is created but baseline fails; `2` on invalid config/source; `3` on auth failure.
 
@@ -652,8 +673,9 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Defaults: `--version latest-attempted`.
-- Version rule: `active-valid` fails with `PROJECT_INVALID` when no active valid config exists.
-- Success fields: `project id`, `config version`, `version selector`, `config hash`, `project name`, `task`, `goal`, `default source`, `runner type`, `runner working directory`, `timeout seconds`, `env mode`, `reward type`, `reward direction`, `primary metric`, `artifact glob count`, `stdout limit bytes`, `stderr limit bytes`, `mutable summary`, `visibility scope`, `public exp create`, repeated `env name`, repeated `secret name`, repeated `secret fingerprint`.
+- Version rule: `active-valid` fails with `PROJECT_INVALID` when no active valid config exists; explicit `<n>` must be a positive retained config version number.
+- Success fields: `project id`, `config version`, `version selector`, `config hash`, `project name`, `task`, `goal`, `default source`, `runner type`, `sandbox`, `runner working directory`, `timeout seconds`, `env mode`, `reward type`, `reward direction`, `primary metric`, `artifact glob count`, `stdout limit bytes`, `stderr limit bytes`, `mutable summary`, `visibility scope`, `public exp create`, repeated `env name`, repeated `secret name`, repeated `secret fingerprint`.
+- Sandbox rule: `sandbox` is `not-os-sandbox` for SkyDiscover Python runners and `not-declared` otherwise.
 - Secret rule: never renders raw secret values.
 - Exit: `0`; `3` on auth failure.
 
@@ -665,8 +687,9 @@ Lifecycle command rules:
 - Defaults: `--version latest-attempted`.
 - Defaults: fail if target exists.
 - Conflicts: existing output path without `--overwrite`.
-- Version rule: `active-valid` fails with `PROJECT_INVALID` when no active valid config exists.
+- Version rule: `active-valid` fails with `PROJECT_INVALID` when no active valid config exists; explicit `<n>` must be a positive retained config version number.
 - Success fields: `project id`, `config version`, `out`, `wrote`, `secret mode`.
+- Secret rule: exports retain markers with secret fingerprints and never writes raw secret values.
 - Exit: `0`; `2` with `OUTPUT_EXISTS` if target exists; `3` on auth failure.
 
 `alab project config import --config <path> [--project <project_id>] [--dry-run] [--skip-baseline-test]`
@@ -676,7 +699,7 @@ Lifecycle command rules:
 - Required args: `--config`.
 - Conflicts: `--dry-run` with `--skip-baseline-test`.
 - Dry-run rule: parses and canonicalizes input, computes the config diff, reports whether baseline would be required, and runs runtime capability checks. It does not write DB rows, create audit rows, mutate files, or execute a baseline runner.
-- Success fields: `project id`, `previous active config version`, `latest attempted config version`, `runtime affecting`, `validation status`, `project status`, `next`.
+- Success fields: `project id`, `previous active config version`, `latest attempted config version`, `runtime affecting`, `validation status`, `project status`, repeated `warning code`, `next`.
 - Exit: `0` on non-runtime change or passed/skipped baseline; `1` on failed baseline with record; `2` on schema invalid.
 
 `alab project config set <field> <value> [--project <project_id>] [--dry-run] [--skip-baseline-test]`
@@ -697,7 +720,8 @@ Lifecycle command rules:
 - Credential: Root/admin.
 - Required args: `set <name> <value>`, `unset <name>`, none for `list`.
 - Rule: `<name>` must match `^[A-Za-z_][A-Za-z0-9_]*$`.
-- Success fields: `project id`, `config version`, `env name`, `action`, `runtime affecting`, `validation status`.
+- Success fields for `set|unset`: `project id`, `config version`, `env name`, `action`, `runtime affecting`, `validation status`.
+- Success fields per env for `list`: `project id`, `config version`, `env name`, `value`.
 - Exit follows config import for mutating commands; `list` exits `0`.
 
 `alab project secret set|unset|list|gc ...`
@@ -719,14 +743,15 @@ Lifecycle command rules:
 
 - Context: Project or explicit project.
 - Credential: Root/admin.
-- Success fields: `project id`, `validation id`, `config version`, `validation status`, `exit code`, `reward`, `reward parse status`, `project status`, `next`.
+- Success fields: `project id`, `validation id`, `config version`, `validation status`, `exit code`, `reward`, `reward parse status`, `project status`, repeated `warning code`, `next`.
 - Exit: `0` on pass; `1` on failed/error/timeout validation with saved record; `3` on auth failure.
 
 `alab project validation archive|unarchive <validation_id> [--project <project_id>]`
 
 - Context: Project or explicit project.
 - Credential: Root/admin.
-- Success fields: `project id`, `validation id`, `previous archive status`, `archive status`, timestamp.
+- Success fields for `archive`: `project id`, `validation id`, `previous archive status`, `archive status`, `archived at`, `audit id`.
+- Success fields for `unarchive`: `project id`, `validation id`, `previous archive status`, `archive status`, `unarchived at`, `audit id`.
 - Exit: `0`; `3` on auth failure; `4` when attempting to archive active validation.
 
 `alab project validation remove <validation_id> [--project <project_id>] (--dry-run|--force --confirm <validation_id>) [--cascade] [--reason <text>]`
@@ -734,15 +759,17 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Required args: either `--dry-run` or both `--force` and matching `--confirm`.
-- Success fields: `project id`, `validation id`, `dry run`, `removed`, `audit id`.
-- Dry run renders blockers and deletion counts without writing audit rows or deleting data.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `project id`, `validation id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker`, `deleted artifacts`, `deleted logs`, `active dependent artifacts`, `active dependent logs`, `deleted filesystem paths`, dry-run repeated `filesystem path` and `planned trash move`, and actual-run `trash cleanup pending`.
+- Dry run renders blockers, deletion counts, filesystem targets, and planned trash moves without writing audit rows or deleting data.
+- Remove cascade rule: archived validations with dependent artifact or log rows render `dependent_records_require_cascade` unless `--cascade` is supplied. With `--cascade`, active dependent artifact/log rows render `dependent_records_not_archived`; archived dependent rows are deleted in the same audited operation and their unshared files are staged through ALab trash before database mutation.
 - Exit: `0`; `2` on missing or wrong confirmation; `3` on auth failure; `4` when validation is not archived, is active, or cascade blockers exist.
 
 `alab project locks clear-stale [--project <project_id>]`
 
 - Context: Project or explicit project.
 - Credential: Root/admin.
-- Success fields: `project id`, `cleared count`, repeated `lock name` when any are cleared.
+- Success fields: `project id`, `cleared count`, repeated `lock name` when any are cleared, `audit id`.
 - Exit: `0`; `3` on auth failure.
 
 `alab backup prune (--keep <n>|--older-than <days>)`
@@ -750,6 +777,7 @@ Lifecycle command rules:
 - Context: Any.
 - Credential: Root.
 - Required args: exactly one of `--keep` or `--older-than`.
+- Bounds: `--keep` and `--older-than` must be zero or greater.
 - Success fields: `backup pruned count`, repeated `backup path` when any are pruned, `audit id`.
 - Exit: `0`; `2` on invalid retention options; `3` on auth failure.
 
@@ -760,6 +788,9 @@ Lifecycle command rules:
 - Context: Any or Project.
 - Credential: Root globally, or Root/admin when scoped to a project.
 - Defaults: `--limit 50`, `--offset 0`.
+- Bounds: `--limit` must be between `1` and `1000`; `--offset` must be zero or greater.
+- `--object-type` values are the audit object types `annotation`, `artifact`, `backup`, `cache`, `catalog`, `credential`, `experiment`, `inspection_checkout`, `lock`, `log`, `project`, `run`, `secret_value`, `source`, `validation`, and `worktree`.
+- `--object-id` without `--object-type` must be a complete ALab id or one of the stable audit literals `backups`, `cache`, or `skydiscover`.
 - Action filter values are the generic audit actions: `add`, `update`, `archive`, `unarchive`, `remove`, `restore`, `repair`, `revoke`, `regenerate`, `prune`, `gc`, and `clear`.
 - Success fields per event: `audit id`, `project id`, `exp id`, `actor type`, `actor credential id`, `action`, `object type`, `object id`, `cascade`, `reason`, `created at`.
 - Exit: `0`; `3` on auth failure; `2` on invalid filters.
@@ -769,7 +800,7 @@ Lifecycle command rules:
 - Context: Any or Project.
 - Credential: Root globally, or Root/admin when scoped to the event's project.
 - Audit output uses generic `action` plus `object type`; special action names such as `catalog_remove`, `worktree_remove`, and `checkout_remove` are not valid V1 output.
-- Success fields: `audit id`, `project id`, `exp id`, `actor type`, `actor credential id`, `action`, `object type`, `object id`, `cascade`, `reason`, `deleted ids`, sanitized `metadata`, `created at`.
+- Success fields: `audit id`, `project id`, `exp id`, `actor type`, `actor credential id`, `action`, `object type`, `object id`, `cascade`, `reason`, `deleted ids`, `sanitized metadata`, `created at`.
 - Exit: `0`; `2` if not found or outside project scope; `3` on auth failure.
 
 ### Source
@@ -779,9 +810,9 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Required args: exactly one of `--source-path`, `--source-git`, `--source-empty`.
-- Options: `--source-subdir`, `--name`, import limits.
+- Options: `--source-subdir`, `--name`, import limits; limit values must be non-negative integers.
 - Conflicts: multiple source origins; `--source-subdir` with `--source-empty`.
-- Success fields: `project id`, `source id`, `source ref`, `source name`, `tree hash`, `deduped`, warnings.
+- Success fields: `project id`, `source id`, `source ref`, `source name`, `tree hash`, `deduped`, repeated `warning`.
 - Exit: `0`; `2` on source invalid, limit exceeded, or name conflict; `3` on auth failure.
 
 `alab source list [--project <project_id>] [--include-archived]`
@@ -802,7 +833,8 @@ Lifecycle command rules:
 
 - Context: Project or explicit project.
 - Credential: Root/admin.
-- Success fields: `source id`, `previous status`, `source status`, timestamp.
+- Success fields for `archive`: `source id`, `previous status`, `source status`, `archived at`.
+- Success fields for `unarchive`: `source id`, `previous status`, `source status`, `unarchived at`.
 - Exit: `0`; `4` with `RESOURCE_BUSY` if archiving active default source; `3` on auth failure.
 
 `alab source remove <source_id> [--project <project_id>] (--dry-run|--force --confirm <source_id>) [--cascade] [--reason <text>]`
@@ -810,7 +842,8 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Required args: either `--dry-run` or both `--force` and matching `--confirm`.
-- Success fields: `source id`, `dry run`, `removed`, `cascade`, `audit id`, repeated blocker fields when blocked.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `source id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker` when blocked.
 - Dry run renders blockers and deletion counts without writing audit rows or deleting data.
 - Exit: `0`; `2` on missing or wrong confirmation; `3` on auth failure; `4` when source is not archived, any project config version references the source, or cascade blockers exist.
 
@@ -820,7 +853,7 @@ Lifecycle command rules:
 
 - Context: Any.
 - Credential: Root.
-- Options: `--origin-url`, exactly zero or one of `--ref` and `--commit`.
+- Options: `--origin-url`, exactly zero or one of `--ref` and `--commit`; `--commit` requires a full commit SHA.
 - Defaults: official SkyDiscover repository URL and upstream `main` resolved to an exact commit.
 - Success fields: `catalog`, `origin url`, `requested ref`, `pinned commit`, `local path`, `retrieved at`, `status`, `audit id`.
 - Exit: `0`; `2` on existing catalog for add, dirty catalog for update, invalid origin, invalid ref, or invalid commit; `3` on auth failure.
@@ -849,6 +882,7 @@ Lifecycle command rules:
 - Credential: Root.
 - Options: at least one cache selector.
 - Conflicts: top-level `--all` with `--docker-images`, `--skydiscover-envs`, `--trash`, or `--trash-all`. `--trash` requires `--older-than <days>`. `--trash-all` deletes all trash entries. Top-level `--all` includes Docker image cache, SkyDiscover env cache, and all trash entries.
+- Bounds: `--older-than` must be zero or greater.
 - Success fields: `cache pruned count`, repeated `cache kind`, `audit id`.
 - Exit: `0`; `2` on invalid selector combination; `3` on auth failure.
 
@@ -860,10 +894,12 @@ Lifecycle command rules:
 - Credential: Public when enabled, otherwise Root/admin.
 - Required args: `--name`; source origin optional and defaults to project default source.
 - Source conflicts: at most one of `--source-ref`, `--source-path`, `--source-git`, `--source-empty`, `--from-exp`.
-- Options: `--goal`, `--path`, repeated `--tag`, `--git-ref`, `--source-subdir`, `--from-commit`, mutable/visibility narrowing.
+- Options: `--goal`, `--path`, repeated `--tag`, `--git-ref`, `--source-subdir`, `--from-commit latest|final|best|<sha>`, repeated `--mutable-include`, repeated `--mutable-exclude`, `--visibility-scope none|same_project|explicit`, repeated `--visible-exp`.
+- `--from-commit` is valid only with `--from-exp`; custom commit selectors must be full or unambiguous SHA-like commit ids, not arbitrary Git refs.
 - Public no-key `--from-exp` uses public inheritance visibility: current project public policy intersected with the source experiment's stored visibility upper bound.
 - Public no-key `--source-git` may use local non-interactive Git credential helpers and renders `PUBLIC_GIT_CREDENTIAL_HELPER_USED` when applicable. Git credential prompts are disabled.
-- Success fields: `project id`, `exp id`, `experiment name`, `source id`, `branch`, `worktree path`, `token path`, `config version`, `next`.
+- Secret rule: create writes the raw worktree token to `token path` and never prints it.
+- Success fields: `project id`, `exp id`, `experiment name`, `source id`, `branch`, `worktree path`, `token path`, `config version`, repeated `warning`, `next`.
 - Exit: `0`; `2` on invalid source/name/path; `3` when auth required; `4` on invalid project status.
 
 `alab exp archive|unarchive <exp_id> [--project <project_id>]`
@@ -871,7 +907,8 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Options: none beyond explicit project selection.
-- Success fields: `exp id`, `previous status`, `experiment status`, timestamp.
+- Success fields for `archive`: `exp id`, `previous status`, `experiment status`, `archived at`.
+- Success fields for `unarchive`: `exp id`, `previous status`, `experiment status`, `unarchived at`.
 - Exit: `0`; `4` on active lock; `3` on auth failure.
 
 `alab exp remove <exp_id> [--project <project_id>] (--dry-run|--force --confirm <exp_id>) [--cascade] [--reason <text>]`
@@ -879,9 +916,11 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Required args: either `--dry-run` or both `--force` and matching `--confirm`.
-- Success fields: `exp id`, `dry run`, `removed`, `cascade`, `audit id`, repeated deleted object counts or blockers.
-- Dry run renders blockers and deletion counts without writing audit rows or deleting data.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `exp id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker`, `deleted runs`, `deleted artifacts`, `deleted logs`, `deleted annotations`, `deleted tags`, `deleted submissions`, `branch ref`, dry-run `branch ref exists`, actual-run `deleted branch ref` and `branch ref existed`, `deleted filesystem paths`, dry-run repeated `filesystem path` and `planned trash move`, actual-run `trash cleanup pending`.
+- Dry run renders blockers, deletion counts, branch ref state, target filesystem paths, and planned trash moves without writing audit rows or deleting data.
 - Cascade rule: because experiment remove is a whole-experiment deletion operation, child run, artifact, log, annotation, tag, inspection, worktree, and submission records do not need to be individually archived once the experiment itself is archived and active run/submit locks are absent.
+- Trash rule: actual remove stages registered worktree and inspection paths plus unshared experiment log/artifact files through ALab trash before DB/audit mutation. It deletes the experiment branch ref before DB/audit mutation and restores that ref if mutation fails. Experiment token rows are revoked and retained, and path registry rows are marked removed.
 - Exit: `0`; `2` on missing or wrong confirmation; `3` on auth failure; `4` when experiment is not archived or cascade blockers exist.
 
 `alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]`
@@ -889,6 +928,8 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin or visible token.
 - Required args: `--path`.
+- Options: `--commit latest|final|best|<sha>`; custom commit selectors must be full or unambiguous SHA-like commit ids, not arbitrary Git refs.
+- Secret rule: checkout writes the raw inspection token to `token path` and never prints it.
 - Success fields: `exp id`, `inspection path`, `inspection commit`, `token path`, `token id`, `next`.
 - Exit: `0`; `2` on invalid path/commit; `3` on auth failure.
 
@@ -897,8 +938,10 @@ Lifecycle command rules:
 - Context: Project, Experiment, Inspection, or explicit project.
 - Credential: Root/admin for any inspection checkout, or matching inspection token for its own checkout.
 - Required args: exactly one of `--token-id` or `--path`, plus either `--dry-run` or both `--force` and matching `--confirm`.
-- Success fields: `exp id`, `inspection path`, `token id`, `dry run`, `removed`, `token revoked`, `audit id`.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `exp id`, `inspection path`, `token id`, `dry run`, `removed`, conditional `path exists` or `path existed`, `token revocation target`, `token revoked`, conditional `planned trash move` or `trash path`, conditional `trash cleanup pending`, `audit id`.
 - Rule: if the registered filesystem path is already missing, actual remove reconciles DB state, revokes the inspection token, writes an audit event, and exits `0`.
+- Trash rule: actual remove stages the registered filesystem path through ALab trash before DB/audit mutation; if immediate deletion of staged trash fails, cleanup is delegated to `alab cache prune --trash --older-than <days>` or `alab cache prune --trash-all`.
 - Exit: `0`; `2` on invalid selector or confirmation; `3` on auth failure; `4` on scope failure.
 
 `alab exp worktree remove <exp_id> [--project <project_id>] (--dry-run|--force --confirm <exp_id>) [--reason <text>]`
@@ -906,8 +949,10 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Required args: either `--dry-run` or both `--force` and matching `--confirm`.
-- Success fields: `exp id`, `old worktree path`, `worktree state`, `dry run`, `removed`, `token revoked`, `audit id`.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `exp id`, `old worktree path`, `worktree state`, `dry run`, `removed`, conditional `path exists` or `path existed`, `dirty state`, `token revocation target`, `token revoked`, conditional `planned trash move` or `trash path`, conditional `trash cleanup pending`, `audit id`.
 - Rule: if the registered filesystem path is already missing, actual remove reconciles DB state, revokes the active worktree token, writes an audit event, and exits `0`.
+- Trash rule: actual remove stages the registered filesystem path through ALab trash before DB/audit mutation; if immediate deletion of staged trash fails, cleanup is delegated to `alab cache prune --trash --older-than <days>` or `alab cache prune --trash-all`.
 - Exit: `0`; `2` on missing or wrong confirmation; `3` on auth failure; `4` on filesystem cleanup failure.
 
 `alab exp worktree restore <exp_id> --path <dir> [--project <project_id>]`
@@ -915,6 +960,7 @@ Lifecycle command rules:
 - Context: Project or explicit project.
 - Credential: Root/admin.
 - Required args: `--path`.
+- Secret rule: restore writes the raw token to `token path` and never prints it.
 - Success fields: `exp id`, `branch`, `worktree path`, `worktree state`, `token path`, `revoked token id`, `new token id`.
 - Exit: `0`; `2` on invalid path; `3` on auth failure.
 
@@ -936,7 +982,7 @@ Lifecycle command rules:
 - Context: Experiment or Project.
 - Credential: owning worktree token for own experiment, or Root/admin.
 - Required args: tag for add/remove.
-- Success fields: `exp id`, `tag`, `action`, `tags`.
+- Success fields for `add|remove|list`: `exp id`, `tag`, `action`, `tags`.
 - Exit: `0`; `3` on auth failure; `4` on scope failure.
 
 ### Run And Submit
@@ -947,6 +993,7 @@ Lifecycle command rules:
 - Credential: valid worktree token.
 - Required args: `--message`.
 - Success fields: `run id`, `exp id`, `commit`, `created commit`, `run status`, `exit code`, `reward`, `reward parse status`, `stdout preview`, `stderr preview`, `artifact count`, `warning code`, `next`.
+- `created commit` is rendered as a boolean. `stdout preview`, `stderr preview`, `artifact count`, and repeated `warning code` reflect the saved run record and match observe run output for the same run.
 - Exit: `0` on passed run; `1` on failed/error/timeout run with saved record; `4` on scope or state failure.
 
 `alab submit --message <message> --summary <text>|--summary-file <path> --feedback <text>|--feedback-file <path> --ref <exp_id|none> [--ref <exp_id> ...] [--rerun]`
@@ -969,39 +1016,59 @@ Lifecycle command rules:
 - Credential: Root/admin in project context; token visibility in experiment/inspection context.
 - Required args: `search --query`, `show <exp_id>`.
 - Success fields per experiment: `project id`, `exp id`, `experiment name`, `experiment status`, `source id`, `source ref`, repeated `tag`, `latest run id`, `latest commit`, `final run id`, `final commit`, `best run id`, `reward`, `reward parse status`, `created at`, `updated at`, `closed at`, `archived at`.
+- `best` warning fields: when incompatible reward-policy runs are excluded, render an `object: warning` block with `warning code: BEST_INCOMPARABLE_RUNS_EXCLUDED`, stable `warning reason`, and `excluded count`.
 
 `alab observe runs list|show|archive|unarchive|remove ...`
 
 - Context and credential: same as observe experiments.
 - Required args: `show <run_id>`, `archive <run_id>`, `unarchive <run_id>`, or `remove <run_id> (--dry-run|--force --confirm <run_id>)`.
+- List filters: see [spec_observe_collaboration.md](spec_observe_collaboration.md).
 - Options: `remove` accepts `--cascade`, `--reason`, and `--dry-run`.
-- Success fields per run: `run id`, `exp id`, `commit`, `run status`, `exit code`, `reward`, `reward parse status`, `config version`, `stdout preview`, `stderr preview`, `artifact count`, `log count`, `hidden log available`, `started at`, `ended at`, repeated `warning code`.
-- Lifecycle success fields include previous archive status, archive status, removed, and audit id.
+- Conflicts: remove `--dry-run` with `--force` or `--confirm`.
+- Success fields for `list|show`: `run id`, `exp id`, `commit`, `run status`, `exit code`, `reward`, `reward parse status`, `config version`, `stdout preview`, `stderr preview`, `artifact count`, `log count`, `hidden log available`, `started at`, `ended at`, repeated `warning code`.
+- Success fields for `archive`: `run id`, `previous archive status`, `archive status`, `archived at`, `audit id`.
+- Success fields for `unarchive`: `run id`, `previous archive status`, `archive status`, `unarchived at`, `audit id`.
+- Success fields for `remove`: `run id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker`, `deleted artifacts`, `deleted logs`, `active dependent artifacts`, `active dependent logs`, `latest run id before`, `latest run id after`, `final run removed`, `deleted filesystem paths`, dry-run repeated `filesystem path` and `planned trash move`, and actual-run `trash cleanup pending`.
 - Credential: owning worktree token may archive/unarchive its own experiment runs; remove requires Root/admin.
+- Remove cascade rule: archived runs with dependent artifact or log rows render `dependent_records_require_cascade` unless `--cascade` is supplied. With `--cascade`, active dependent artifact/log rows render `dependent_records_not_archived`; archived dependent rows are deleted in the same audited operation and their unshared files are staged through ALab trash before database mutation.
 
 `alab observe artifacts list|show|export|archive|unarchive|remove ...`
 
 - Context and credential: same as observe experiments.
 - Required args: `show <artifact_id>`, `export <artifact_id> --out <path>`, `archive <artifact_id>`, `unarchive <artifact_id>`, or `remove <artifact_id> (--dry-run|--force --confirm <artifact_id>)`.
+- List filters: see [spec_observe_collaboration.md](spec_observe_collaboration.md).
 - Options: export accepts `--overwrite` and `--include-archived`; remove accepts `--cascade`, `--reason`, and `--dry-run`.
-- Success fields per artifact: `artifact id`, `exp id`, `run id`, `validation id`, `root`, `path`, `status`, `archive status`, `size bytes`, `content hash`, `created at`, `out`.
+- Conflicts: remove `--dry-run` with `--force` or `--confirm`.
+- Success fields for `list|show|export`: `artifact id`, `exp id`, `run id`, `validation id`, `root`, `path`, `status`, `archive status`, `size bytes`, `content hash`, `created at`, `out`.
+- Success fields for `archive`: `artifact id`, `previous archive status`, `archive status`, `archived at`, `audit id`.
+- Success fields for `unarchive`: `artifact id`, `previous archive status`, `archive status`, `unarchived at`, `audit id`.
+- Success fields for `remove`: `artifact id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker`, `deleted filesystem paths`, dry-run repeated `filesystem path` and `planned trash move`, and actual-run `trash cleanup pending`.
 - Exit: `2` with `OUTPUT_EXISTS` if export target exists without `--overwrite`.
 - Archived artifacts can be shown by id when authorized. Exporting archived artifacts requires `--include-archived`.
 - Credential: owning worktree token may archive/unarchive own experiment artifacts; remove requires Root/admin.
+- Remove filesystem rule: a captured artifact blob is staged through ALab trash only when no remaining artifact row references the same blob path.
 
 `alab observe logs list|show|export|archive|unarchive|remove ...`
 
 - Context and credential: same as observe experiments; hidden logs require Root/admin plus explicit `--include-hidden`.
 - Required args: `show <log_id>`, `export <log_id> --out <path>`, `archive <log_id>`, `unarchive <log_id>`, or `remove <log_id> (--dry-run|--force --confirm <log_id>)`.
+- List filters: see [spec_observe_collaboration.md](spec_observe_collaboration.md).
 - Options: show/export accept `--include-hidden`; export accepts `--include-archived`; remove accepts `--cascade`, `--reason`, and `--dry-run`.
-- Success fields per log: `log id`, `exp id`, `run id`, `validation id`, `stream`, `size bytes`, `stored bytes`, `truncated`, `hidden`, `archive status`, `preview`, `out`, `audit id`.
+- Conflicts: remove `--dry-run` with `--force` or `--confirm`.
+- Success fields for `list|export`: `log id`, `exp id`, `run id`, `validation id`, `stream`, `size bytes`, `stored bytes`, `truncated`, `hidden`, `archive status`, `preview`, `out`, `audit id`.
+- Success fields for `show`: `log id`, `exp id`, `run id`, `validation id`, `stream`, `size bytes`, `stored bytes`, `truncated`, `hidden`, `archive status`, `preview`, `content`, `out`, `audit id`.
+- Success fields for `archive`: `log id`, `previous archive status`, `archive status`, `archived at`, `audit id`.
+- Success fields for `unarchive`: `log id`, `previous archive status`, `archive status`, `unarchived at`, `audit id`.
+- Success fields for `remove`: `log id`, `dry run`, `removed`, `cascade`, `audit id`, repeated `blocker`, `deleted filesystem paths`, dry-run repeated `filesystem path` and `planned trash move`, and actual-run `trash cleanup pending`.
 - Archived logs can be shown by id, including log text, when authorized. Exporting archived logs requires `--include-archived`.
 - Credential: owning worktree token may archive/unarchive own visible logs; hidden log lifecycle and remove require Root/admin.
+- Remove filesystem rule: a log file is staged through ALab trash only when no remaining log row references the same file path.
 
 `alab observe annotations list|show ...`
 
 - Context and credential: same as observe experiments.
 - Required args: `show <annotation_id>`.
+- List filters: see [spec_observe_collaboration.md](spec_observe_collaboration.md).
 - Options: `--history`.
 - Success fields per annotation: `annotation id`, `target type`, `target id`, `resolved commit`, `status`, `current revision`, `visibility`, `author`, `body`, `created at`, `updated at`, repeated `revision`.
 
@@ -1043,6 +1110,7 @@ Lifecycle command rules:
 - Context: Experiment or Project.
 - Credential: creating token for its annotation, or Root/admin.
 - Required args: either `--dry-run` or both `--force` and matching `--confirm`.
-- Success fields: `annotation id`, `dry run`, `removed`, `audit id`.
+- Conflicts: `--dry-run` with `--force` or `--confirm`.
+- Success fields: `annotation id`, `dry run`, `removed`, `audit id`, repeated `blocker`, `deleted revisions`, `deleted filesystem paths`, and actual-run `trash cleanup pending`.
 - Dry run renders blockers and deletion counts without writing audit rows or deleting data.
 - Exit: `0`; `2` on missing or wrong confirmation; `3` on auth failure; `4` when annotation is not archived or scope fails.

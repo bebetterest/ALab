@@ -103,7 +103,8 @@ Pagination：
 
 - `list`、`search`、`best` 支持 `--limit <n>` 和 `--offset <n>`。
 - 默认 `--limit` 为 `50`。
-- 最大 `--limit` 为 `500`。
+- `--limit` 必须在 `1` 到 `500` 之间。
+- `--offset` 必须大于等于 `0`。
 
 Sorting：
 
@@ -111,35 +112,45 @@ Sorting：
 - Sort fields 是 command-specific whitelist。
 - Unknown sort field 以 `CONFIG_INVALID` 失败。
 - List/search 默认按最相关 timestamp descending；best 默认按 reward ranking。
+- Experiment list/search sort fields：`created`、`updated`、`name`、`status`、`reward`。
+- Experiment best 不接受 `--sort`；它始终使用 reward-policy ranking。
+- Run list sort fields：`started`、`ended`、`reward`、`status`、`config-version`、`exit-code`。
+- Artifact list sort fields：`created`、`path`、`size`、`status`、`content-hash`。
+- Log list sort fields：`created`、`stream`、`size`、`stored-bytes`、`hidden`、`truncated`。
+- Annotation list sort fields：`created`、`updated`、`target-type`、`target-id`、`status`、`created-by`。
+- Sort value 为 nullable 的 rows 始终排在有具体值的 rows 之后。
 
 ## 4. Filters
 
 Experiment list/search/best filters：
 
-- `--status`
+- `--status` 接受 `open`、`closed` 或 `archived`
 - repeated `--tag`
 - `--source-id`
 - `--name-query`
 - `--reward-min`
 - `--reward-max`
-- `--config-version`
+- 同时提供 reward bounds 时，`--reward-min` 必须小于或等于 `--reward-max`。
+- `--config-version` 接受正整数 config version number
 - `--created-after`
 - `--created-before`
 - `--updated-after`
 - `--updated-before`
 - `--include-archived`
 
+同一字段 family 中 matching `after` 和 `before` time bounds 必须有序。
 Repeated `--tag` 使用 AND semantics。
 
 Run list filters：
 
 - `--exp`
 - `--status`
-- `--config-version`
-- `--commit`
+- `--config-version` 接受正整数 config version number
+- `--commit` 接受完整或缩写的十六进制 commit SHA prefix
 - `--reward-min`
 - `--reward-max`
-- `--runner-type`
+- 同时提供 reward bounds 时，`--reward-min` 必须小于或等于 `--reward-max`。
+- `--runner-type` 接受 `local`、`docker`、`harbor`、`skydiscover_docker` 或 `skydiscover_python`
 - `--exit-code`
 - `--failure-reason-query`
 - `--started-after`
@@ -148,32 +159,39 @@ Run list filters：
 - `--ended-before`
 - `--include-archived`
 
+同一字段 family 中 matching `after` 和 `before` time bounds 必须有序。
+
 Artifact list filters：
 
 - `--exp`
 - `--run`
 - `--validation`
-- `--root`
+- `--root` 接受 `workspace` 或 `run`
 - `--status`
 - `--path-query`
-- `--content-hash`
+- `--content-hash` 接受 `sha256:<64-hex>`
 - `--created-after`
 - `--created-before`
-- `--size-min`
-- `--size-max`
+- `--size-min` 接受 non-negative integer byte count
+- `--size-max` 接受 non-negative integer byte count
+- 同时提供 size bounds 时，`--size-min` 必须小于或等于 `--size-max`。
 - `--include-archived`
+
+同一字段 family 中 matching `after` 和 `before` time bounds 必须有序。
 
 Log list filters：
 
 - `--exp`
 - `--run`
 - `--validation`
-- `--stream`
+- `--stream` 接受 `stdout`、`stderr`、`hidden_stdout` 或 `hidden_stderr`
 - `--truncated`
 - `--created-after`
 - `--created-before`
 - `--include-hidden`
 - `--include-archived`
+
+同一字段 family 中 matching `after` 和 `before` time bounds 必须有序。
 
 Annotation list filters：
 
@@ -188,6 +206,9 @@ Annotation list filters：
 - `--updated-after`
 - `--updated-before`
 - `--include-archived`
+- Object-backed `--target-id`/`--target` values 在 target type 已选择或可推断时必须是完整 experiment、run 或 artifact ids。`--created-by` 必须是完整 experiment 或 credential id。
+
+同一字段 family 中 matching `after` 和 `before` time bounds 必须有序。
 
 ## 5. Best Ranking
 
@@ -201,8 +222,8 @@ Annotation list filters：
 - 默认情况下，`best` 只比较 bound reward policy identity 与当前 active project reward policy 相同的 runs。Reward policy identity 包括 reward type、direction、primary metric，以及会影响 numeric value 的 reward extractor fields。
 - Reward policy identity comparison 独立于 config version。不同 config versions 的 runs 只有在 reward policy identity 匹配时才能一起排名。
 - 如果 project 当前 invalid，默认 `best` 仍使用 active valid config 的 reward policy identity。如果 project 没有 active valid config，`best` 以 `PROJECT_INVALID` 失败，并要求显式 `--config-version`。
-- 提供 `--config-version <n>` 时，`best` 只比较绑定该 config version 的 visible runs。
-- Incompatible reward policy identity 的 runs 会被排除，并渲染 `BEST_INCOMPARABLE_RUNS_EXCLUDED` 及 excluded count。
+- 提供 `--config-version <n>` 时，`<n>` 必须为正整数，`best` 只比较绑定该 config version 的 visible runs。
+- Incompatible reward policy identity 的 runs 会被排除。`best` 会把 `BEST_INCOMPARABLE_RUNS_EXCLUDED` 渲染为 warning block，并带 excluded count。
 - Tie 先按 run ended time descending，再按 experiment id。
 
 ## 6. Runs Show 和 Logs
@@ -226,6 +247,7 @@ Annotation list filters：
 - `logs show` 从 stored bytes 渲染 safe decoded text，并遵守 output size limits。
 - `logs export` 写 exact stored bytes。
 - Export target exists 且未提供 `--overwrite` 时，以 `OUTPUT_EXISTS` 失败。
+- Export parent directory 必须存在；ALab 不会为 log export 创建缺失的 parent directory。
 
 Hidden logs：
 
@@ -313,10 +335,11 @@ Commitish：
 
 Path 和 line rules：
 
-- Path/line targets 必须 repo-relative。
-- Line range 是 1-based inclusive。
+- Path/line targets 必须使用 normalized forward-slash repo-relative paths，不能包含 absolute、Windows-absolute、empty、`.`、`..`、backslash、NUL 或 newline components。
+- Line range 必须是 positive integer 1-based inclusive range，且 `end >= start`。
 - File/line targets anchored 到 experiment 和 resolved commit。
-- `lines:` target 要求 target file 在 resolved commit 存在，且 inclusive line range 有效。
+- `path:` target 要求 target path 在 resolved commit 存在，且是 Git blob 或 tree。
+- `lines:` target 要求 target path 在 resolved commit 存在且是 Git blob，并且 inclusive line range 对 captured file contents 有效。
 - Current experiment shorthand 只允许在 experiment context 中使用，并在 annotation creation 时 resolve 到当前 experiment current HEAD commit。
 - Current experiment shorthand 要求 worktree clean。如果存在 staged、unstaged、deleted、renamed、copied 或 untracked non-ignored changes，annotation creation 失败，不会锚定未提交内容。
 
@@ -328,8 +351,10 @@ Visibility：
 - `--private` 限制为 creating experiment 和 root/admin 可见，即使 target 属于另一个 visible experiment。
 - Experiment-private annotation 绑定 creating experiment identity，而不是某一个 raw token value。同一 experiment 的 regenerated worktree token 可在 normal creating-experiment ownership rules 下查看和编辑该 experiment 的 private annotations。
 - Project context 中 root/admin 必须用 `--private-to-exp <exp_id>` 创建 experiment-private annotation。
+- Annotation target object ids 与 `--private-to-exp` experiment ids 必须在 body-file reads 或 body storage 前校验为完整 ALab ids。
 - Private annotation 即使 project visibility 后续变宽，也保持 private。
 - Inspection tokens 不可 add/edit annotations。
+- Validation-owned artifact rows 不携带 experiment id，因此作为 annotation target 会以 `CONFIG_INVALID` rejected；annotation 需要绑定到具体 experiment 时，应使用 experiment/path/line target 或 run-owned artifact target。
 
 Body input：
 
@@ -338,7 +363,7 @@ Body input：
 - Body input 只接受 direct text 或 file input 二选一。
 - V1 不支持 `--body-stdin`。
 - Annotation body 不得包含 authoring experiment bound config version 下 active `secret_env` values 的 exact match。发现 exact secret value 时，creation/edit fail，且不存 revision。
-- Root/admin 从 project context 创建或编辑 annotation 时，authoring secret check 使用 target experiment 的 bound config version。无法 resolve 到唯一 experiment 的 target 在 body storage 前以 `CONFIG_INVALID` rejected，必须改写为 target 单个 experiment 或使用 explicit experiment-private target。
+- Root/admin 从 project context 创建或编辑 annotation 时，authoring secret check 使用 target experiment 的 bound config version。无法 resolve 到唯一 experiment 的 target 在 body storage 前以 `CONFIG_INVALID` rejected，必须改写为带有 concrete experiment identity 的 target；需要 experiment-private visibility 时，root/admin 再使用 `--private-to-exp <exp_id>`。
 
 Revision 和 archive：
 
@@ -349,7 +374,7 @@ Revision 和 archive：
 - Edit 不可改变 target。
 - `annotate archive` 使用与 edit 相同的 authorization rules。
 - `annotate unarchive` 使用与 archive 相同的 authorization rules。
-- `annotate remove` 使用与 archive 相同的 authorization rules，要求 annotation 已 archived，删除全部 revisions，并写 audit event。
+- `annotate remove` 使用与 archive 相同的 authorization rules，要求 annotation 已 archived，在同一个 audited transaction 中删除全部 revisions，记录 `deleted_revision_count`，且没有 filesystem target。
 - Archive tombstone annotation，不删除 revisions。
 - Archived annotations 默认从 list/search 隐藏，但 authorized 时可按 id show。
 

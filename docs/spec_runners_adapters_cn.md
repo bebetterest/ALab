@@ -108,7 +108,9 @@ ALAB_RUN_DIR=<run_dir path inside runner context>
 - `runner.command` 以 argv 执行，不通过 shell。
 - `runner.shell` 在支持的 V1 host 上显式使用 `/bin/sh -c <shell>`。
 - `runner.shell` 在 V1 只由 local runner 和 Docker runner shell mode 支持。Harbor、SkyDiscover Docker 和 SkyDiscover Python runner 拒绝用户 `runner.shell`，因为 adapter verifier/evaluator commands 由 adapter contract 管理。
+- Local runner workspace containment checks 使用 normalized path ancestry，而不是 string-prefix matching；因此带有 workspace 名称前缀的 sibling paths 仍会被判定为 escape 并失败。
 - `env_mode = "sanitized"` 只继承存在的 `PATH`、`LANG`、`LC_*`、`TZ`、`TMPDIR`，并把 `HOME` 设置为 temporary `home/` directory。
+- ALab 在启动 local runner process 前创建 sanitized temporary `home/` directory。
 - `env_mode = "full"` 继承完整 ALab process environment。
 - `env_mode = "none"` 不继承 host environment variables。
 - Effective env 是 inherited env，然后 `[env]`，然后 `[secret_env]`，然后 ALab internal variables。
@@ -130,6 +132,8 @@ ALAB_RUN_DIR=<run_dir path inside runner context>
 - `runner.build_args` 是 string key 到 string value 的 map。Build args 是普通 config value，不是 secret value，并会出现在 config export 中。
 - `runner.target` 选择 Dockerfile build target。
 - `runner.platform` 在本地 Docker 支持时传递 Docker platform selector。
+- V1 会在 config write 前验证 configured Docker platform selector。`linux` 使用粗粒度 Linux container capability。`linux/amd64` 和 `linux/arm64` 使用从 Docker native runtime architecture 与 reported Buildx platforms 推导出的 per-architecture capability rows。
+- 不支持或未知的 platform selector 会在写入 project config 前以 `CONFIG_INVALID` 使 config validation 失败。
 - `runner.user` 为 main runner process 传递 container user。ALab capture 时不提升权限。
 - `runner.cpus` 和 `runner.memory_mb` 在 Docker 支持时传递 CPU 和 memory limit。
 - 如果 configured Docker CPU 或 memory limit 不被本地 Docker environment 支持，config validation 在写入前以 `CONFIG_INVALID` 失败。
@@ -160,7 +164,7 @@ Network：
 - `runner.network = "default"` 使用 Docker default networking。
 - `runner.network = "none"` 使用 Docker no-network mode。
 - `runner.network = "host"` 在 V1 不支持，并以 `CONFIG_INVALID` 失败。
-- Runtime capability probes 仍用于 Docker availability、platform support 和 CPU/memory limit support。Probe results 按 runtime fingerprint 缓存；fingerprint 改变时，ALab 重新 probe。
+- Runtime capability probes 仍用于 Docker availability、粗粒度 Linux platform support、per-architecture Linux platform support 和 CPU/memory limit support。Probe results 按 runtime fingerprint 缓存；fingerprint 改变时，ALab 重新 probe。
 - `alab config validate --refresh-capabilities` 清除 cached capability results 并重新运行 probes。
 - 不支持 configured CPU 或 memory limit 时，在 config write 前以 `CONFIG_INVALID` 失败。
 
@@ -170,6 +174,7 @@ Capture：
 - Host 因 container ownership/permissions 无法读取的 files 记录为 artifact capture errors 或 skipped entries。
 - ALab 不使用 elevated privileges 重试 capture。
 - 如果 `runner.user` 导致 workspace 或 run output 对 host 不可读，run status 仍由 runner exit 和 reward parsing 决定；不可读文件记录为 capture warning 或 artifact error。
+- Docker image setup/build stdout 或 stderr 会按 configured secret bytes redaction 后存为 hidden log output，且不合并到 user-visible runner stdout/stderr。捕获到 setup output 时，保存的 run/validation 会渲染 `DOCKER_SETUP_OUTPUT_CAPTURED`。
 
 ## 6. Reward Types
 
@@ -233,6 +238,7 @@ Artifact roots：
 规则：
 
 - Artifact path 经 symlink/path normalization 后不得 escape root。
+- Artifact root containment checks 使用 normalized path ancestry，而不是 string-prefix matching。
 - Artifact glob matching 使用相对于所选 artifact root 的 Python `glob` semantics，包括 `**` recursive matching。ALab 将 separator normalize 为 `/`，按 resolved path 去重，并按 normalized relative path 稳定排序后 capture。
 - Glob 匹配 symlink 时，ALab resolve 它。
 - Resolved target 留在 artifact root 内时 capture target bytes。
@@ -243,7 +249,7 @@ Artifact roots：
 - Stdout/stderr 是 logs，不是 artifacts。
 - Oversized artifacts 被 skipped，且不改变 run/validation status。
 - Capture errors 不改变 run 或 validation status。
-- Capture errors 记录为 artifact statuses 和 warnings。
+- Capture errors 记录为 artifact statuses 和 `ARTIFACT_CAPTURE_ERROR` warnings。
 - 只要存在 run 或 validation record 且 temporary runtime directories 仍可用，ALab 会对 passed、failed、error 和 timeout results 尝试 artifact capture。Runner exit failure、reward parse failure 和 timeout 本身不会禁用 artifact capture。
 - Artifact export 写 exact captured bytes。
 - V1 不 redact artifact contents。
@@ -270,7 +276,7 @@ Blob storage：
 - Logs 是 byte files plus SQLite metadata，不是 authoritative SQLite text。
 - `preview_text` 是 CLI rendering 用的 safe UTF-8 replacement-decoded prefix。
 - `runs show` 输出 fixed-size stdout/stderr previews 和 log metadata。
-- Full visible logs 通过 `observe logs show|export` 访问。
+- Full visible logs 通过 `observe logs show|export` 访问；`show` 会将 stored log bytes 以 safe UTF-8 replacement-decoded `content` 渲染。
 - Hidden logs 需要 root/admin 且显式 `--include-hidden`。
 - Log archive、unarchive、remove 和 archived show/export 规则定义在 [spec_lifecycle.md](spec_lifecycle.md)。
 - Shared log files 只有在没有任何剩余 log row 引用时才删除。

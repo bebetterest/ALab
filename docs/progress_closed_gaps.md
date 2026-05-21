@@ -1,0 +1,55 @@
+# ALab Closed Progress Guardrails
+
+This file is the do-not-reopen guardrail list for ALab V1. It exists so `docs/progress.md` and `docs/progress_pipeline.md` can stay short.
+
+Read this file only when planned work might duplicate a closed proof family. It is not the active backlog, and it is not the evidence ledger. For exact proof, use `docs/completion_audit.md`.
+
+## Maintenance Rules
+
+- Add a guardrail only after implementation evidence is current and a focused check has passed.
+- Keep entries grouped by behavior family, not by every individual test assertion.
+- If a spec or implementation change invalidates a guardrail, update or remove the guardrail and reopen the matching audit row.
+- English is canonical; update `docs/progress_closed_gaps_cn.md` in the same change.
+
+## Guardrail Summary - 2026-05-21
+
+Do not spend another batch on these families unless a spec or implementation change invalidates the recorded evidence:
+
+- Runtime and layout guardrails: local CLI-only surface, no server/web UI/ORM/scheduler/agent/LLM-provider dependency roots, canonical home/artifact/log layout, marker-only project contexts, cwd-relative experiment worktree markers, and 128-bit home-id suffix checks.
+- Parser, renderer, and preflight guardrails: strict text object rendering, global/command option validation, payload file preflight, generated capability preflight, output alias boundaries, export-output preflight, command-specific config-value errors, complete ALab id selectors, RFC 3339 filters, `HOME_EXISTS`, and `OUTPUT_EXISTS`.
+- Public, visibility, observe, and annotation guardrails: public safe `status`, public `--from-exp` visibility intersection across current project policy and stored source-experiment upper bounds, explicit token/inspection observe visibility joins across experiment list/show and run/artifact/log read surfaces, experiment and observe-object list filter/sort matrices, broader non-disclosing `SCOPE_VIOLATION` selectors, observe read/lifecycle aliases, hidden-log access/export shapes, regenerated token private-annotation rights, admin `--private-to-exp` binding, annotation target resolution, and annotation authorization/lifecycle.
+- Source and experiment-state guardrails: public inline source import limits, public `--from-exp` visibility cap, Git selector abbreviation/ambiguity, source-dependent missing-path failures, source config-version hard-remove blockers with preserved refs, archived/closed/removed experiment command errors, and old experiment secret binding after project secret changes.
+- Lifecycle and hard-remove guardrails: stable dry-run/force/confirm blockers for project, source, validation, experiment, run, artifact, log, annotation, worktree, and inspection checkout surfaces; source/validation remove audit actor/cascade and metadata rows; source ref deletion with archived dependent experiment history retention; reference-counted artifact/log trash staging; validation/run shared blob deletion; latest/final run remove metadata on current run-removal paths; project/experiment hard-remove retained `path_registry` and credential rows with audit actor alignment.
+- Context marker guardrails: symlink aliases resolve to the registered context, missing markers fail with `CONTEXT_NOT_FOUND`, invalid JSON/home-id mismatch/registry disagreement fail with `CONTEXT_CONFLICT`, and these failure paths leave path registry rows and repair audits unchanged.
+- Context repair guardrails: moved experiment worktrees require the registered branch for self-token repair; moved inspection checkouts require the pinned inspection commit, preserve registry/audit state on mismatch, and record token-actor repair metadata after successful self-token repair.
+- Credential model guardrails: malformed credentials, unknown ids, type-prefix/type-row mismatches, revoked rows, verifier mismatches, required-scope mismatches, project mismatch, token-mode mismatch, and token-path mismatch all fail as generic `AUTH_DENIED: invalid credential`; raw credential secrets and salts use the documented `secrets` byte counts; project admin keys remain project-scoped and cannot manage credentials.
+- Credential/token side-effect guardrails: token regenerate/revoke paths have direct proof for audit metadata, raw-token non-rendering, old/new credential status changes, marker token-id update, raw token rotation, and private annotation continuity.
+- Maintenance object audit guardrails: backup/cache prune, lock clear, and catalog remove audit rows carry actor credential ids, generic action/object ids, cascade flags, reason where applicable, and schema-versioned metadata; cache trash and Docker warning branches record prune/warning counts; catalog removal preserves catalog-independent experiment/run/log history after local checkout deletion.
+- Credential audit guardrails: root credential regenerate and admin key create/revoke audit rows carry expected actor credential ids, generic action/object ids, cascade flags, schema-versioned metadata, revoked credential references where applicable, and no raw root/admin keys.
+- Reward, artifact, and log capture guardrails: exit-code/file/stdout-regex/Harbor/SkyDiscover reward parsing, saved reward-parse failures, artifact root and symlink containment, directory expansion/sort/deduplication, skipped/error/oversized artifact rows, log redaction/truncation/storage/export, hidden adapter streams, and shared log file reference deletion.
+- Runner cleanup guardrails: local, Docker, Harbor, SkyDiscover Python, and SkyDiscover Docker default/fake paths clean operation temp dirs, avoid visible worktree mutation, strip credentials, close stdin where applicable, remove named Docker containers on timeout, and save non-pass tails without leaking hidden logs.
+- Project config/schema guardrails: normalized path escapes, Docker image/Dockerfile/context mutual requirements, host-network rejection, unsupported platform selector rejection with Linux alias canonicalization, raw Docker passthrough rejection, build/env string-map strictness, adapter ref requirements, reward-type required fields, capture limit shapes, visibility/public-source policy shapes, and saved source-dependent runner/reward/Dockerfile/context failures.
+- Harbor guardrails: strict unsupported-field and placeholder validation for multi-step tasks, non-Linux OS/platform, GPU fields, storage, MCP servers, healthchecks, custom scheduling, external services, Compose/multi-container runtime, host environment placeholders, raw Docker args, and task-declared host mounts; shared/separate verifier default/fake execution with hidden logs.
+- SkyDiscover catalog/source guardrails: exact pinned commits, no auto-update during ref resolution, dirty catalog update rejection, unexpected remote rejection, active-config and open-experiment removal blockers, successful removal after dependencies close, catalog-independent historical observability, source precedence, `--source-ref` rejection, initial program import, missing-initial failure, explicit source hash-conflict rejection, and explicit Git/empty source success when no initial program exists.
+- SkyDiscover evaluator guardrails: Docker evaluator feedback/file-artifact separation, Docker evaluator hidden bundle and timeout cleanup on fake/default paths, Python evaluator hidden bundle, wrapper-subprocess import boundary, non-sandbox disclosure, dependency-installation saved failures, hidden setup logs, and no debug traceback on default/fake paths.
+
+## Recently Closed
+
+- 2026-05-21: shared-runner cleanup and adapter failure edges for current default/fake runner types.
+- 2026-05-21: project config/schema proof mapping for current schema/default source-dependent paths.
+- 2026-05-21: project/experiment hard-remove retained-row relationships for removed `path_registry` rows, revoked credentials, deleted primary rows, and audit actor alignment.
+- 2026-05-21: public `--from-exp` visibility-intersection behavior for `none`, `same_project`, current explicit project lists, and source-experiment explicit upper bounds.
+- 2026-05-21: source/validation hard-remove audit and reference relationships for config-version source blockers, source Git ref deletion metadata, archived dependent experiment retention, validation child deletion metadata, and admin actor/cascade audit rows.
+- 2026-05-21: maintenance object audit metadata relationships for backup prune, cache prune, stale lock clear, and SkyDiscover catalog remove rows.
+- 2026-05-21: credential audit metadata relationships for root regenerate and admin key create/revoke rows, including actor/action/object/cascade metadata and raw-key absence.
+- 2026-05-21: credential model proof mapping for generic auth-denial failures, high-entropy secret/salt source usage, and project-admin key-management authority boundaries.
+- 2026-05-21: inspection context repair pinned-commit and audit metadata relationships for moved inspection checkout self-repair.
+- 2026-05-21: token revoke/regenerate side-effect evidence mapping for audit metadata, token status, marker update, raw token rotation, and private annotation continuity.
+- 2026-05-21: context marker conflict and symlink-alias mapping for missing marker, invalid JSON, home mismatch, registry disagreement, and side-effect-free failures.
+- 2026-05-21: explicit token/inspection observe visibility joins for current project explicit lists, own-experiment retention, peer experiment/run/artifact/log reads, and non-disclosing unlisted experiment failures.
+- 2026-05-21: run/artifact/log/annotation observe list filter/sort matrices for current default local visible/admin paths, including scoped filters, range filters, archive inclusion, sort whitelists, and run reward null-last ordering.
+- 2026-05-21: experiment list/search/best filter, pagination, and sort matrices for current default local visible/admin paths, including repeated tag AND semantics, multi-source source-id filtering, status/time/name/reward/config filters, archive inclusion, experiment sort whitelists, best pagination, and reward null-last ordering.
+
+## Still Active Elsewhere
+
+Do not treat this file as a completion claim. The active queue remains in `docs/progress_pipeline.md`; exact open evidence remains in `docs/completion_audit.md`; historical implementation records remain in `docs/progress_log.md`.

@@ -79,24 +79,26 @@ PYTHONUNBUFFERED = "1"
 - 每个 experiment 创建时只绑定一个 source。如果 `exp create` 没有选择 source 或 `--from-exp`，ALab 使用 active config 的 `source.default_source_ref`。
 - 当 init 命令提供一个 effective default source origin 时，project init 的输入 config 可以省略 `source.default_source_ref`。ALab 先 staging 该 source，把 canonical `alab/source/<source_id>` ref 注入 stored config，然后验证完整 canonical config。
 - 如果 project init 输入 config 包含 `source.default_source_ref`，该值是 expected canonical source ref。若它与 staged canonical source ref 不同，init 以 `CONFIG_INVALID` 失败；ALab 不得静默 overwrite。
+- `project.allow_public_exp_create` 和 `public_source_import.enabled` 是 strict booleans。
 - `public_source_import.enabled` 默认 `true`。
 - Public source import limits 默认等于 normal source limits，并可由 project config 配置；V1 没有额外 hard-coded cap。
+- `public_source_import.max_files`、`public_source_import.max_total_bytes` 和 `public_source_import.max_file_bytes` 必须是 non-negative integers。
 - Public caller 不能在命令行把 public import limits 上调。
-- `mutable.include` 默认 `["**"]`；`mutable.exclude` 默认 `[]`。
+- `mutable.include` 默认 `["**"]`，且必须至少包含一个 non-empty single-line pattern；`mutable.exclude` 默认 `[]`，设置时包含 non-empty single-line patterns。
 - `visibility.scope` 是 `none`、`same_project` 或 `explicit`。
-- 只有 `scope = "explicit"` 时，`visibility.experiment_ids` required 且 non-empty。
+- 只有 `scope = "explicit"` 时，`visibility.experiment_ids` required 且 non-empty；entries 必须是 complete experiment ids，并会 normalized 为 sorted unique list。
 - `runner.type` 是 `local`、`docker`、`harbor`、`skydiscover_docker` 或 `skydiscover_python`。
-- `runner.timeout_seconds` 默认 `600`，范围 `1` 到 `86400`。
+- `runner.timeout_seconds` 默认 `600`，必须是 `1` 到 `86400` 之间的 integer。
 - `runner.working_directory` 是 repo-relative，不能 escape repository。
 - `runner.env_mode` 仅 local runner 有效，取值 `sanitized`、`full`、`none`。
 - Docker-backed runner 的 `runner.network` 是 `default` 或 `none`，默认 `default`。
 - Docker host networking 在 V1 不支持。`runner.network = "host"` 以 `CONFIG_INVALID` 失败。
-- `runner.command` 是 argv list mode；`runner.shell` 是 explicit shell mode；二者冲突。`runner.shell` 在 V1 只对 local runner 和 Docker runner shell mode 有效。Harbor 和 SkyDiscover adapters 拥有自己的 verifier/evaluator commands，并拒绝用户提供的 `runner.shell`。
+- `runner.command` 在提供时必须是 non-empty argv list mode；`runner.shell` 在提供时必须是 non-empty explicit shell mode；二者冲突。`runner.shell` 在 V1 只对 local runner 和 Docker runner shell mode 有效。Harbor 和 SkyDiscover adapters 拥有自己的 verifier/evaluator commands，并拒绝用户提供的 `runner.shell`。
 - Docker runner 需要且只需要 `runner.image` 或 `runner.dockerfile` 之一。
 - Dockerfile runner 需要 `runner.context`。
 - Docker runner 可设置 whitelisted Docker fields：`runner.build_args`、`runner.target`、`runner.platform`、`runner.user`、`runner.cpus`、`runner.memory_mb`。
 - Docker runner 拒绝 raw Docker CLI argument passthrough 和 extra host mount/volume。
-- `runner.cpus` 和 `runner.memory_mb` 对 Docker-backed runner 有效，前提是本地 Docker environment 支持。如果配置的限制不被支持，config validation 在写入前以 `CONFIG_INVALID` 失败。
+- `runner.cpus` 和 `runner.memory_mb` 对 Docker-backed runner 有效，前提是本地 Docker environment 支持。`runner.cpus` 必须是 positive finite number，`runner.memory_mb` 必须是 positive integer。如果配置的限制不被支持，config validation 在写入前以 `CONFIG_INVALID` 失败。
 - Harbor runner 需要 `runner.harbor_task_ref`。
 - SkyDiscover runner 需要 `runner.skydiscover_task_ref`。
 - SkyDiscover Python runner 可设置 `runner.program_path`，默认 `"."`。
@@ -105,8 +107,9 @@ PYTHONUNBUFFERED = "1"
 - `reward.primary_metric` 默认 `reward`，SkyDiscover 默认 `combined_score`。
 - `reward.type = "exit_code"` 要求 `reward.direction = "maximize"`。
 - `artifacts.globs = []` 表示无额外 artifact。
+- `artifacts.per_file_limit_bytes`、`artifacts.per_run_limit_bytes`、`logs.stdout_limit_bytes` 和 `logs.stderr_limit_bytes` 必须是 positive integers。
 - `logs.*_limit_bytes` 默认 `10485760`。
-- `env` 和 `secret_env` 是 valid environment variable name 到 string 的 map。Names 必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$`。
+- `env` 是 valid environment variable name 到 string 的 map。`secret_env` input values 是至少 4 个 UTF-8 bytes 的 single-line strings，或 config-import retain markers。Names 必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$`。
 
 Baseline trigger：
 
@@ -129,7 +132,7 @@ Config read/export 规则：
 - `project config show` 和 `project config export` 默认使用 `--version latest-attempted`。
 - `--version latest-attempted` 选择 `projects.latest_attempted_config_version`。
 - `--version active-valid` 选择 `projects.active_valid_config_version`，没有 active valid config 时以 `PROJECT_INVALID` 失败。
-- `--version <n>` 选择显式 retained config version number。
+- `--version <n>` 选择显式正整数 retained config version number。
 - Exported TOML 始终对 `[secret_env]` 使用 secret retain marker，不论选择哪个 version。
 
 ## 2. Project Lifecycle
@@ -189,7 +192,7 @@ Input precedence：
 2. Apply mode-specific source/Harbor/SkyDiscover data。
 3. Apply allowed CLI metadata overrides：project `--name`、`--task`、`--goal` 和 source selectors。
 4. Validate source-independent schema fields。此阶段只有 init 命令提供一个 effective default source origin 时才允许缺少 `source.default_source_ref`。
-5. Stage project repository，并 import/create effective default source。
+5. Stage project repository，并 import/create effective default source；如提供 init-time source import limits，必须在写入 project rows 前完成校验。
 6. 如果 adapter-derived editable source 和 explicit caller source 同时存在，比较 canonical tree hash。内容相同正常 dedupe；内容不同以 `SOURCE_INVALID` 和稳定 source conflict reason 失败。
 7. 当 input config 省略 `source.default_source_ref` 时，注入 staged canonical source ref。若 input config 提供了不同 ref，以 `CONFIG_INVALID` 失败。
 8. Validate full canonical config。
@@ -204,6 +207,7 @@ Runtime config：
 - Runner、reward、artifact、log、env、secret、Docker、Harbor 和 SkyDiscover runtime fields 都从 project config 读取，而不是 init flags。
 - ALab 不得 silently default reward type。Config 必须提供完整 reward policy。
 - Init source flags 是唯一 init-time runtime-affecting overrides，只用于 project creation 时 bootstrap initial default source；不得静默替换 input config 中冲突的 `source.default_source_ref`。
+- Project init 接受与 source import 相同的 source limit options（`--max-files`、`--max-total-bytes`、`--max-file-bytes`）来限制 staged initial source。取值必须是 non-negative integers。Malformed 或 negative limit values 以 `CONFIG_INVALID` 失败；exceeded limits 会在 source staging 或写入 project/source/config/admin credential rows 前以 `SOURCE_LIMIT_EXCEEDED` 失败。
 - Remote Git source 用 `--git-ref <branch|tag|sha>`。
 - `--source-ref` 始终表示 existing ALab source id 或 `alab/source/<source_id>`，不得用作 remote Git ref。
 - `project init harbor` 和 `project init skydiscover` 在 V1 不接受 `--source-ref`。新的 adapter project 必须从 `--source-path`、`--source-git`、`--source-empty` 或 adapter-derived editable source bootstrap initial editable source。Existing ALab source 是 project-scoped reproducibility record，不是 cross-project init input。
@@ -270,7 +274,7 @@ Limit rules：
 - Root/admin imports 可调高或调低 limits。
 - Public no-key inline import 使用 `[public_source_import]` limits。
 - Public limits 可配置，且没有额外 hard-coded cap。
-- Public caller 可在命令中调低 limits，但不能超过 configured public limits。
+- Public caller 可在命令中调低 limits，但不能超过 configured public limits。Policy-ceiling failures 必须在 source path reads、source copies、Git clones、source records 或 experiment rows 之前被发现。
 - 超限以 `SOURCE_LIMIT_EXCEEDED` 失败，不创建 source record 或 Git source ref。
 - Public no-key remote Git import 可以使用本机已有的 non-interactive Git credential helpers。helper 可用或被使用时必须渲染 `PUBLIC_GIT_CREDENTIAL_HELPER_USED`，并且 Git prompts 仍保持禁用。
 

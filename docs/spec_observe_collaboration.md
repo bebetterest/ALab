@@ -103,7 +103,8 @@ Pagination:
 
 - `list`, `search`, and `best` commands support `--limit <n>` and `--offset <n>`.
 - Default `--limit` is `50`.
-- Maximum `--limit` is `500`.
+- `--limit` must be between `1` and `500`.
+- `--offset` must be zero or greater.
 
 Sorting:
 
@@ -111,35 +112,45 @@ Sorting:
 - Sort fields are command-specific whitelists.
 - Unknown sort fields fail with `CONFIG_INVALID`.
 - Default sorting is by most relevant timestamp descending for list/search and by reward ranking for best.
+- Experiment list/search sort fields: `created`, `updated`, `name`, `status`, `reward`.
+- Experiment best does not accept `--sort`; it always uses reward-policy ranking.
+- Run list sort fields: `started`, `ended`, `reward`, `status`, `config-version`, `exit-code`.
+- Artifact list sort fields: `created`, `path`, `size`, `status`, `content-hash`.
+- Log list sort fields: `created`, `stream`, `size`, `stored-bytes`, `hidden`, `truncated`.
+- Annotation list sort fields: `created`, `updated`, `target-type`, `target-id`, `status`, `created-by`.
+- Rows with nullable sort values are always placed after rows with concrete values.
 
 ## 4. Filters
 
 Experiment list/search/best filters:
 
-- `--status`
+- `--status` accepts `open`, `closed`, or `archived`
 - repeated `--tag`
 - `--source-id`
 - `--name-query`
 - `--reward-min`
 - `--reward-max`
-- `--config-version`
+- When both reward bounds are supplied, `--reward-min` must be less than or equal to `--reward-max`.
+- `--config-version` accepts a positive config version number
 - `--created-after`
 - `--created-before`
 - `--updated-after`
 - `--updated-before`
 - `--include-archived`
 
+Matching `after` and `before` time bounds in the same field family must be ordered.
 Repeated `--tag` filters use AND semantics.
 
 Run list filters:
 
 - `--exp`
 - `--status`
-- `--config-version`
-- `--commit`
+- `--config-version` accepts a positive config version number
+- `--commit` accepts a full or abbreviated hexadecimal commit SHA prefix
 - `--reward-min`
 - `--reward-max`
-- `--runner-type`
+- When both reward bounds are supplied, `--reward-min` must be less than or equal to `--reward-max`.
+- `--runner-type` accepts `local`, `docker`, `harbor`, `skydiscover_docker`, or `skydiscover_python`
 - `--exit-code`
 - `--failure-reason-query`
 - `--started-after`
@@ -148,32 +159,39 @@ Run list filters:
 - `--ended-before`
 - `--include-archived`
 
+Matching `after` and `before` time bounds in the same field family must be ordered.
+
 Artifact list filters:
 
 - `--exp`
 - `--run`
 - `--validation`
-- `--root`
+- `--root` accepts `workspace` or `run`
 - `--status`
 - `--path-query`
-- `--content-hash`
+- `--content-hash` accepts `sha256:<64-hex>`
 - `--created-after`
 - `--created-before`
-- `--size-min`
-- `--size-max`
+- `--size-min` accepts a non-negative integer byte count
+- `--size-max` accepts a non-negative integer byte count
+- When both size bounds are supplied, `--size-min` must be less than or equal to `--size-max`.
 - `--include-archived`
+
+Matching `after` and `before` time bounds in the same field family must be ordered.
 
 Log list filters:
 
 - `--exp`
 - `--run`
 - `--validation`
-- `--stream`
+- `--stream` accepts `stdout`, `stderr`, `hidden_stdout`, or `hidden_stderr`
 - `--truncated`
 - `--created-after`
 - `--created-before`
 - `--include-hidden`
 - `--include-archived`
+
+Matching `after` and `before` time bounds in the same field family must be ordered.
 
 Annotation list filters:
 
@@ -188,6 +206,9 @@ Annotation list filters:
 - `--updated-after`
 - `--updated-before`
 - `--include-archived`
+- Object-backed `--target-id`/`--target` values must be complete experiment, run, or artifact ids when their target type is selected or inferable. `--created-by` must be a complete experiment or credential id.
+
+Matching `after` and `before` time bounds in the same field family must be ordered.
 
 ## 5. Best Ranking
 
@@ -201,8 +222,8 @@ Rules:
 - By default, `best` compares runs whose bound reward policy identity matches the current active project reward policy. Reward policy identity includes reward type, direction, primary metric, and reward extractor fields that affect the numeric value.
 - Reward policy identity comparison is independent of config version. Runs from different config versions may be ranked together only when their reward policy identity matches.
 - If the project is currently invalid, default `best` still uses the active valid config's reward policy identity. If the project has no active valid config, `best` fails with `PROJECT_INVALID` and asks for an explicit `--config-version`.
-- When `--config-version <n>` is supplied, `best` compares only visible runs bound to that config version.
-- Runs with incompatible reward policy identity are excluded and render `BEST_INCOMPARABLE_RUNS_EXCLUDED` with an excluded count.
+- When `--config-version <n>` is supplied, `<n>` must be positive and `best` compares only visible runs bound to that config version.
+- Runs with incompatible reward policy identity are excluded. `best` renders `BEST_INCOMPARABLE_RUNS_EXCLUDED` as a warning block with an excluded count.
 - Ties sort by run ended time descending, then experiment id.
 
 ## 6. Runs Show And Logs
@@ -226,6 +247,7 @@ Rules:
 - `logs show` renders safe decoded text from stored bytes, respecting output size limits.
 - `logs export` writes exact stored bytes.
 - Export fails with `OUTPUT_EXISTS` if output exists unless `--overwrite` is supplied.
+- Export parent directory must exist; ALab does not create missing parent directories for log exports.
 
 Hidden logs:
 
@@ -314,10 +336,11 @@ Commitish:
 
 Path and line rules:
 
-- Path and line targets must be repo-relative.
-- Line ranges are 1-based inclusive.
+- Path and line targets must use normalized forward-slash repo-relative paths with no absolute, Windows-absolute, empty, `.`, `..`, backslash, NUL, or newline components.
+- Line ranges are positive integer 1-based inclusive ranges with `end >= start`.
 - File/line targets are anchored to an experiment and resolved commit.
-- `lines:` targets require that the target file exists at the resolved commit and that the inclusive line range is valid.
+- `path:` targets require that the target path exists at the resolved commit as a Git blob or tree.
+- `lines:` targets require that the target path exists at the resolved commit as a Git blob and that the inclusive line range is valid for the captured file contents.
 - Current experiment shorthand is allowed only in experiment context and resolves to the current experiment's current HEAD commit at annotation creation time.
 - Current experiment shorthand requires a clean worktree. If staged, unstaged, deleted, renamed, copied, or untracked non-ignored changes exist, annotation creation fails rather than anchoring to uncommitted content.
 
@@ -329,8 +352,10 @@ Visibility:
 - `--private` restricts visibility to the creating experiment and root/admin, even when the target belongs to another visible experiment.
 - Experiment-private annotations are bound to the creating experiment identity, not to one raw token value. A regenerated worktree token for the same experiment can see and edit that experiment's private annotations under the normal creating-experiment ownership rules.
 - In project context, root/admin must use `--private-to-exp <exp_id>` to create an experiment-private annotation.
+- Annotation target object ids and `--private-to-exp` experiment ids are validated as complete ALab ids before body-file reads or body storage.
 - Private annotations remain private even if project visibility later broadens.
 - Inspection tokens cannot add or edit annotations.
+- Validation-owned artifact rows do not carry an experiment id and are rejected as annotation targets with `CONFIG_INVALID`; use an experiment/path/line target or a run-owned artifact target when the annotation must bind to a concrete experiment.
 
 Body input:
 
@@ -339,7 +364,7 @@ Body input:
 - Body input accepts exactly one of direct text or file input.
 - V1 does not support `--body-stdin`.
 - Annotation bodies must not contain exact active `secret_env` values for the authoring experiment's bound config version. If an exact secret value is found, creation or edit fails without storing a revision.
-- When root/admin creates or edits an annotation from project context, the authoring secret check uses the target experiment's bound config version. Targets that do not resolve to exactly one experiment are rejected with `CONFIG_INVALID` before body storage and must be rewritten to target one experiment or use an explicit experiment-private target.
+- When root/admin creates or edits an annotation from project context, the authoring secret check uses the target experiment's bound config version. Targets that do not resolve to exactly one experiment are rejected with `CONFIG_INVALID` before body storage and must be rewritten to a target with a concrete experiment identity; root/admin can then use `--private-to-exp <exp_id>` when experiment-private visibility is needed.
 
 Revision and archive:
 
@@ -350,7 +375,7 @@ Revision and archive:
 - Edits cannot change target.
 - `annotate archive` follows the same authorization rules as edit.
 - `annotate unarchive` follows the same authorization rules as archive.
-- `annotate remove` follows the same authorization rules as archive, requires the annotation to already be archived, deletes all revisions, and writes an audit event.
+- `annotate remove` follows the same authorization rules as archive, requires the annotation to already be archived, deletes all revisions in the same audited transaction, records `deleted_revision_count`, and has no filesystem targets.
 - Archive tombstones the annotation without deleting revisions.
 - Archived annotations are hidden from list/search by default but can be shown by id when authorized.
 

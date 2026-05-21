@@ -523,8 +523,9 @@ Checks：
 - `status IN ('captured','skipped','error')`
 - `archive_status IN ('active','archived')`
 - exactly one owner is set：`run_id` 或 `validation_id`。
-- `blob_path` 只有在 `status='captured'` 时 non-null。
-- `capture_error` 在 `status='error'` 时 non-null。
+- `size_bytes` 为 null 或 non-negative。
+- Captured rows 要求 non-null `blob_path`、`content_hash` 和 `size_bytes`；non-captured rows 的 `blob_path` 为 null。
+- `capture_error` 只有在 `status='error'` 时 non-null，且 error rows 必须有它。
 - `archived_at` 只有在 `archive_status='archived'` 时 non-null。
 
 Indexes：
@@ -560,6 +561,8 @@ Columns：
 Checks：
 
 - `stream IN ('stdout','stderr','hidden_stdout','hidden_stderr')`
+- `size_bytes` 和 `stored_bytes` 为 non-negative，且 `stored_bytes <= size_bytes`。
+- `truncated IN (0,1)` and `hidden IN (0,1)`。
 - hidden streams 要求 `hidden=1`。
 - visible streams 要求 `hidden=0`。
 - `archive_status IN ('active','archived')`
@@ -593,8 +596,10 @@ Indexes：
 
 Checks：
 
-- `target_type IN ('exp','run','artifact','path','lines')`
+- `target_type IN ('experiment','run','artifact','path','lines')`
 - `status IN ('active','archived')`
+- `created_by_type IN ('root','admin','token')`
+- `current_revision >= 1`
 - `resolved_commit` 对 path 和 lines targets non-null。
 - `target_json` 是 canonical JSON，包含 `schema_version = 1`，并在适用时保存 resolved experiment id、commit、repo path 和 line range。
 
@@ -611,6 +616,11 @@ Checks：
 Primary key：
 
 - `(annotation_id, revision)`
+
+Checks：
+
+- `revision >= 1`
+- `created_by_type IN ('root','admin','token')`
 
 Indexes：
 
@@ -729,6 +739,7 @@ Checks：
 - V1 中 `catalog_key IN ('skydiscover')`。
 - V1 中 `catalog_type IN ('skydiscover')`。
 - `status IN ('active','removed')`。
+- `status='active'` 时 `removed_at` 为 null，`status='removed'` 时 `removed_at` 为 non-null。
 - `metadata_json` 是 canonical JSON，包含 `schema_version = 1`，且只包含 safe catalog diagnostics。
 
 Rules：
@@ -758,6 +769,8 @@ Checks：
 
 - `cache_kind IN ('docker_image','skydiscover_python_env','trash')`。
 - `status IN ('active','removed')`。
+- `status='active'` 时 `removed_at` 为 null，`status='removed'` 时 `removed_at` 为 non-null。
+- `docker_image` rows 存 non-null `docker_tag` 和 null `path`；`skydiscover_python_env` 与 `trash` rows 存 non-null `path` 和 null `docker_tag`。
 - `metadata_json` 是 canonical JSON，包含 `schema_version = 1`，且只包含 safe cache diagnostics。
 
 Indexes：
@@ -774,21 +787,22 @@ Rules：
 
 ## 4. JSON Field Contracts
 
-以下所有 JSON fields 都是 canonical JSON objects，并包含 `schema_version = 1`。除非 contract 明确命名 `extensions` object，否则 unknown top-level keys validation fail。Renderer 只能暴露标记为 safe 的字段；public/token-scoped renderer 绝不能直接从 storage 读取 `exact`、raw path、hidden、secret 或 verifier fields。
+以下所有 JSON fields 都是 canonical JSON objects，并包含 integer `schema_version = 1`；boolean `true` 不可作为 schema version。除非 contract 明确命名 `extensions` object，否则 unknown top-level keys validation fail。Renderer 只能暴露标记为 safe 的字段；public/token-scoped renderer 绝不能直接从 storage 读取 `exact`、raw path、hidden、secret 或 verifier fields。
 
 - `credentials.metadata_json`：keys 是 `schema_version`、admin credential 的 `role`、token credential 的 `token_mode`、token credential 的 `created_for_path_hash`，以及 optional `display_label`。它绝不存 raw secrets 或 verifier hashes。Credential rows 在 project 或 experiment hard remove 后仍会保留，所以本表中的 project/experiment ids 是用于 audit 和 diagnostics 的 denormalized identifiers。
 - `audit_events.deleted_ids_json`：keys 是 `schema_version`、`counts` object 和 `ids` object。Object-type keys 映射到 sorted id arrays 和 deletion counts。它绝不存 raw secrets、verifier hashes、hidden asset contents、raw hidden logs 或 full hidden paths。
-- `audit_events.metadata_json`：keys 是 `schema_version`、optional `blockers`、optional `trash`、optional `filesystem`、optional `config`、optional `credential` 和 optional `safe_summary`。Trash paths 只能是相对 ALab home 的 path，或 sanitized same-parent trash label。它绝不存 raw secrets、verifier hashes、hidden asset contents、raw hidden logs 或 full hidden paths。
+- `audit_events.metadata_json`：keys 是 `schema_version` 加上 lifecycle/status transitions、credential ids and types、source refs、context repair、cache/backup pruning、lock clearing、filesystem/trash summaries、optional `blockers`、optional `trash` object or array、optional `filesystem`、optional `config`、optional `credential` 和 optional `safe_summary` 等 safe audit diagnostics。Trash paths 只能是相对 ALab home 的 path，或 sanitized same-parent trash label。它绝不存 raw secrets、verifier hashes、hidden asset contents、raw hidden logs 或 full hidden paths。
 - `sources.origin_metadata_json`：keys 是 `schema_version`、`tree_hash_algorithm`、`primary_origin` 和 `origins`。每个 origin entry 的 keys 是 `origin_id`、`origin_type`、`safe_summary`、`exact`、`warnings` 和 `created_at`。`exact` 是 origin-type-specific object，不得包含 raw credential、token、secret value、hidden asset content 或 raw hidden log。Token/public output 只渲染 `safe_summary` 和 warning codes。
-- `project_config_versions.canonical_config_json`：keys 是 `schema_version`、`project`、`source`、`runner`、`reward`、`artifacts`、`logs`、`env`、`secret_env`、`public_source_import`、`mutable` 和 `visibility`。`secret_env` entries 存 secret value ids 和 HMAC fingerprints，绝不存 raw secret values。
-- `experiments.metadata_json`：keys 是 `schema_version`、`name`、`name_slug`、`goal`、`creation_origin`、`requested_path`、`source_selector` 和 `display`。`creation_origin` 记录 `kind = source|from_exp`、resolved ids，以及适用时的 resolved commit。`display` 只包含 safe summaries。
-- `experiments.policy_json`：keys 是 `schema_version`、`mutable` 和 `visibility_upper_bound`。`mutable` 存 normalized `include` 和 `exclude` gitwildmatch pattern arrays。`visibility_upper_bound` 存 `scope = none|same_project|explicit` 和 sorted `experiment_ids`。
-- `runs.record_json` 和 `project_validations.record_json`：keys 是 `schema_version`、`config_hash`、`runner`、`reward`、`metrics`、`warnings`、`failure`、`artifacts`、`logs`、`timeout` 和 `adapter_feedback`。`metrics` 是 string-to-finite-number map。`runner` 和 `adapter_feedback` 只包含 safe summaries，除非命令是 root/admin-only。
+- `project_config_versions.canonical_config_json`：keys 是 `schema_version`、`project`、`source`、`runner`、`reward`、`artifacts`、`logs`、`git`、`env`、`secret_env`、`public_source_import`、`mutable` 和 `visibility`。Stored `secret_env` entries 是 `{secret_value_id, fingerprint}` marker objects，绝不存 raw secret values。
+- `experiments.metadata_json`：keys 是 `schema_version`、`name`、`name_slug`、`goal`、`creation_origin`、`requested_path`、`source_selector` 和 `display`。`creation_origin` 记录 `kind = source|inline_source|from_exp`、resolved ids、适用时的 inline source ref，以及从其他 experiment 继承时的 resolved commit。`display` 只包含 safe summaries。
+- `experiments.policy_json`：keys 是 `schema_version`、`mutable`、optional `mutable_override` 和 `visibility_upper_bound`。`mutable` 与 `mutable_override` 存 normalized `include` 和 `exclude` gitwildmatch pattern arrays；`include` 必须至少包含一个 non-empty single-line pattern，`exclude` entries 也必须是 non-empty single-line patterns。`visibility_upper_bound` 存 `scope = none|same_project|explicit` 和 sorted `experiment_ids`；ids 只在 `explicit` 时存在，且每个 entry 都是 complete experiment id。
+- `experiment_submissions.refs_json`：keys 是 `schema_version` 和 `refs`。`refs` 是 ordered non-empty array，只能包含单个 literal `none`，或 deduplicated complete experiment ids。
+- `runs.record_json` 和 `project_validations.record_json`：keys 是 `schema_version`、`config_hash`、`runner`、`reward`、`metrics`、`warnings`、`failure`、`artifacts`、`logs`、`timeout`、`adapter_feedback`、optional `interrupted` 和 optional `mutable_scope`。`metrics` 是 string-to-finite-number map。`runner` 和 `adapter_feedback` 只包含 safe summaries，除非命令是 root/admin-only。`mutable_scope` 只存 sanitized `SCOPE_VIOLATION` diagnostics，存在时使用 integer `schema_version = 1`。
 - `annotations.visibility_json`：keys 是 `schema_version`、`scope = project|private`、optional `creator_exp_id` 和 `constraints`。Private annotations 必须有 `creator_exp_id`。Project-visible annotations 绝不将 visibility 扩大到 target record visibility 之外。
-- `annotations.target_json`：keys 是 `schema_version`、`target_type`、`target_id`、optional `exp_id`、optional `commit`、optional `repo_path` 和 optional `line_range`。`line_range` 存 1-based inclusive `start` 和 `end`。
-- `runtime_capabilities.details_json`：keys 是 `schema_version`、`capability`、`safe_summary`、`probed_values` 和 optional `error_code`；它不存 environment maps。
-- `catalogs.metadata_json`：keys 是 `schema_version`、`safe_summary`、`task_refs`、`evaluator_refs` 和 optional `warnings`；它不存 hidden evaluator contents。
-- `cache_entries.metadata_json`：keys 是 `schema_version`、`safe_summary`、`inputs_hash` 和 optional `warnings`；它不存 raw secrets 或 hidden asset contents。
+- `annotations.target_json`：keys 是 `schema_version`、`target_type`、`target_id`、optional `exp_id`、optional `commit`、optional `repo_path` 和 optional `line_range`。Object targets 在 `target_id` 中使用 matching object 的 complete id，且 object target JSON 包含 resolved `exp_id`；experiment target 要求 `target_id == exp_id`。Validation-owned artifact rows 不携带 `exp_id`，不能表示为 annotation object targets。Path/line target ids 是 `exp_id:commit:repo_path`。`repo_path` 是 normalized forward-slash repo-relative path，不能包含 absolute、Windows-absolute、empty、`.`、`..`、backslash、NUL 或 newline components。`line_range` 存 positive integer 1-based inclusive `start` 和 `end`，且 `end >= start`。
+- `runtime_capabilities.details_json`：keys 是 `schema_version`、`capability`、`safe_summary`、`probed_values` 和 optional `error_code`；`capability` 是 non-empty string，`probed_values` 是 object，且它不存 environment maps。
+- `catalogs.metadata_json`：keys 是 `schema_version`、`safe_summary`、`task_refs`、`evaluator_refs` 和 optional `warnings`；task/evaluator refs 与 warnings 是 string arrays，且它不存 hidden evaluator contents。
+- `cache_entries.metadata_json`：keys 是 `schema_version`、`safe_summary`、`inputs_hash` 和 optional `warnings`；`inputs_hash` 是 non-empty string，warnings 是 string array，且它不存 raw secrets 或 hidden asset contents。
 
 `sources.origin_metadata_json` shape：
 
@@ -862,8 +876,8 @@ Storage rules：
 - File content 精确为一行 raw token 加一个 trailing newline。
 - POSIX permissions 存在时，token file 应以 `0600` permissions 写入。
 - 更宽权限产生 `TOKEN_FILE_PERMISSIONS`。
-- `.alab/token` 必须被 Git ignore。ALab 在创建或恢复 experiment worktree 和 inspection checkout 时写入 `.alab/` 的 worktree-local Git exclude rule；ALab staging logic 也始终排除 `.alab/**`。
-- Token regeneration 将 replacement token 写入 registered path，且绝不打印 raw token。
+- `.alab/token` 必须被 Git ignore。ALab 在创建或恢复 experiment worktree 和 inspection checkout 时写入 `.alab/` 的 worktree-local Git exclude rule；token regeneration 会为 registered path 刷新该 rule。ALab staging logic 也始终排除 `.alab/**`。
+- Token regeneration 将 replacement token 以 private permissions 写入 registered path，且绝不打印 raw token。
 
 Root lifecycle：
 
@@ -909,7 +923,8 @@ TOKEN = { retain = true, fingerprint = "hmac-sha256:..." }
 ```
 
 - Export 写 retain markers，绝不写 raw secrets。
-- Import 只在同一 project、同一个 `secret_env` name 且 stored secret fingerprint 仍匹配时接受 retain markers。
+- Import 只在同一 project、同一个 `secret_env` name 且 stored secret fingerprint 仍匹配时接受 retain markers。Dry-run import 执行相同的 retain-marker existence 和 fingerprint checks。
+- User config import 必须使用 `{ retain = true, fingerprint = "hmac-sha256:..." }` retain markers；stored `{ secret_value_id, fingerprint }` markers 是 internal persisted config data，不接受来自 config files。
 - `[secret_env]` 中的 string values 会创建新的 secret values。
 
 ## 7. Global Config
@@ -943,6 +958,8 @@ stale_after_ms = 120000
 - `format = "text"` 是唯一 valid persisted output value。
 - Rich 只能通过 `--output rich` 使用。
 - Time values 使用 integer milliseconds。
+- `storage.busy_timeout_ms` 配置 ALab database connections 使用的 SQLite `PRAGMA busy_timeout`。
+- Persisted global config 在 top level 只接受 `schema_version`、`[output]`、`[storage]` 和 `[locks]`，并且这些 tables 内只接受 documented fields。Unknown keys 或 non-table section values 以 `CONFIG_INVALID` 失败。
 - Invalid global config 在 home resolution 和 migration 后，以 `CONFIG_INVALID` 停止 normal command execution。
 - 当 global config invalid 时，只有 `auth init` 和 `config show|set|reset|validate` 可运行，以便用户诊断或修复文件。
 - `config set` 和 `config reset` 可修复 partially valid config 中的 known fields，并保留其他 valid configured values。若 TOML 文件无法 parse，只允许 `config reset --all` 重写。
@@ -1009,6 +1026,8 @@ Marker path：
 .alab/context.json
 ```
 
+Markers 是 `marker_version = 1` 的 JSON objects。Unknown top-level keys 会 fail closed。Common keys 包括 `home_id`、`context_type`、`project_id`、`exp_id`、`token_id`、`created_at`，以及 optional `repaired_at`。
+
 Project marker：
 
 ```json
@@ -1024,7 +1043,9 @@ Project marker：
 }
 ```
 
-Experiment marker 使用 `context_type = "experiment"`、non-null `exp_id`，以及 registered worktree token id。
+Project markers 还必须有 `canonical_repo_path_hash`，并且 `exp_id` 与 `token_id` 必须保持 null。
+
+Experiment marker 使用 `context_type = "experiment"`、non-null `exp_id`，以及 registered worktree token id。它不得包含 `canonical_repo_path_hash` 或 `inspection_commit`。
 
 Inspection marker 使用 `context_type = "inspection"`、non-null `exp_id`、inspection token id，以及 pinned `inspection_commit`。
 
@@ -1082,6 +1103,7 @@ Capability lookup rules：
 - Valid worktree 或 inspection token 只能在 old registered realpath 不再存在、marker `token_id` 匹配 token credential、raw token 验证通过、Git repository 位于 registered ALab branch 或 pinned inspection commit、且 target realpath 未被注册时 self-repair。
 - 如果 old path 仍存在，token self-repair 以 `CONTEXT_CONFLICT` fail。
 - Successful repair 更新 registry 和 marker metadata，但绝不打印或 regenerate raw token。
+- Successful repair 会写 audit metadata，包含 context type、repair mode、path registry id、previous path hash、repaired path hash、是否创建 registry row，以及 repaired timestamp。它绝不存储 raw path 或 raw token。
 
 ## 10. Migration And Backup
 

@@ -28,6 +28,7 @@ Rules:
 - Actual deletion requires both `--force` and `--confirm <object_id>`.
 - `--confirm` must exactly match the target object id.
 - A remove command that provides neither `--dry-run` nor `--force --confirm <object_id>` fails with `CONFIG_INVALID`.
+- `--dry-run` is mutually exclusive with `--force` and `--confirm`; mixed planning/destructive modes fail with `CONFIG_INVALID` before dry-run rendering, filesystem staging, audit writes, or DB mutation.
 - Actual deletion with missing `--force`, missing `--confirm`, or a wrong confirmation id fails with `CONFIG_INVALID`.
 - `--reason` is optional UTF-8 text and is limited to 65536 bytes after encoding.
 - `--cascade` is explicit. It may delete dependent authoritative objects only when every dependent authoritative object is already archived.
@@ -70,11 +71,15 @@ Rules:
 - Archive fails with `RESOURCE_BUSY` when active validation, source import, run, submit, worktree maintenance, or other project maintenance locks exist.
 - Unarchive restores `pre_archive_status`.
 - Unarchive is idempotent when the project is already unarchived. It returns success, renders the current state, and does not write a duplicate audit event.
+- Project archive/unarchive audit metadata records the previous status, resulting project status, and archive/unarchive timestamp.
 - Remove is root-only.
 - Project remove requires the project to be archived and requires `--cascade`.
 - Project remove is a whole-tree cascade exception. Once the project itself is archived and no active project, validation, source import, run, submit, worktree maintenance, or maintenance locks exist, `project remove --cascade` may delete the project DB tree even when child sources, experiments, runs, validations, artifacts, logs, annotations, and tags are not individually archived.
 - Project remove deletes the canonical repo, project artifact/log files, default and custom worktrees registered to the project, project control path, inspection contexts, and dependent records in one audited operation.
+- Project remove stages its project root, control path, and active registered worktree/inspection paths through the hard-remove trash flow before deleting dependent records. Nested paths covered by the project root are deduplicated before staging.
+- Project remove audit metadata stores sanitized filesystem target counts, absent counts, trash modes/labels, target kind/object ids, and original path hashes.
 - Project admin credentials and experiment tokens are revoked and retained for audit; credential rows are not hard-deleted.
+- Project path registry rows are marked `removed` and retained for audit and removed-path reuse; they are not hard-deleted.
 
 ## 4. Source Lifecycle
 
@@ -93,6 +98,7 @@ Rules:
 - Source archive is idempotent when the source is already archived. It returns success and does not write a duplicate audit event.
 - Source unarchive restores active status.
 - Source unarchive is idempotent when the source is already active. It returns success and does not write a duplicate audit event.
+- Source archive/unarchive audit metadata records the previous status, resulting source status, and archive/unarchive timestamp.
 - Source remove requires archived source.
 - If a source is referenced by any project config version, remove always fails in V1 because config versions are immutable reproducibility records.
 - If a source is referenced by experiments but no project config version references it, remove fails unless `--cascade` is supplied and every dependent experiment is already archived.
@@ -118,9 +124,12 @@ Rules:
 - Archive stores `pre_archive_status`.
 - Unarchive restores `pre_archive_status`; a closed experiment remains closed.
 - Unarchive is idempotent when the experiment is already unarchived. It returns success, renders the current state, and does not write a duplicate audit event.
+- Experiment archive/unarchive audit metadata records the previous status, resulting experiment status, and archive/unarchive timestamp.
 - Remove requires archived experiment.
 - Experiment remove is a whole-experiment cascade exception. Once the experiment itself is archived and has no active run or submit lock, `exp remove --cascade` may delete that experiment's runs, logs, artifacts, annotations, tags, inspection contexts, and final submission records even when those child records are not individually archived.
 - Experiment remove deletes the experiment branch, worktree and inspection contexts, tags, annotations, runs, logs, artifacts, and final submission records in one audited operation.
+- Experiment remove deletes the experiment branch ref before DB/audit mutation after filesystem staging. If the later DB/audit mutation fails, ALab best-effort restores the branch ref to its previous commit and restores staged filesystem paths.
+- Experiment remove audit metadata records the branch ref, previous branch commit, whether the ref was deleted, and whether it was already absent.
 - Experiment tokens are revoked and retained for audit.
 
 ## 6. Worktree And Inspection Context Lifecycle
@@ -145,6 +154,7 @@ Rules:
 - Restore requires a supplied empty or nonexistent path that does not nest inside another registered context.
 - Restore checks out the experiment branch HEAD, writes `.alab/context.json`, creates and writes a new worktree token, registers the path, and sets `worktree_state = 'active'`.
 - Restore never prints the raw token.
+- Worktree restore audit metadata records the branch, restored path hash, path registry id, created token id, any revoked token id, token mode, and resulting worktree state. It never stores the raw path or raw token.
 
 Inspection checkout command:
 
@@ -160,6 +170,7 @@ Rules:
 - Inspection checkout remove deletes the inspection filesystem worktree, revokes the inspection token, and marks the path registry row `removed`.
 - If the registered inspection checkout path is already missing, actual checkout remove reconciles state by revoking the inspection token, marking the path registry row `removed`, and writing an audit event whose metadata records that the filesystem path was already absent.
 - Actual filesystem deletion uses the same `tmp/trash/<audit_id>/` staging contract as hard remove flows.
+- Inspection checkout creation writes audit metadata with credential type, token mode, created token id, pinned inspection commit, path registry id, and created-for path hash. It never stores the raw checkout path or raw inspection token.
 - Inspection checkouts have no restore command. Create a new inspection checkout with `alab exp checkout`.
 
 ## 7. Run And Validation Lifecycle
@@ -185,11 +196,19 @@ Rules:
 - A worktree token may archive and unarchive runs from its own experiment.
 - Regenerated worktree tokens inherit this own-experiment run lifecycle capability because the permission is bound to the experiment identity, not to a specific old token value.
 - Root/admin may archive and unarchive any run in project scope.
+- Run archive/unarchive audit metadata records the previous archive status, resulting archive status, and archive/unarchive timestamp.
 - Run remove is root/admin only and requires archived run.
+- Run remove without `--cascade` is blocked by dependent artifact or log rows. With `--cascade`, active dependent artifact/log rows still block removal; archived dependent rows are deleted in the same audited transaction.
+- Run cascade remove uses the artifact/log reference-counted trash rules before DB mutation. Unshared captured artifact blobs and log files are staged through ALab trash; shared physical files stay in place.
 - Removing the experiment `latest_run_id` recomputes latest from remaining non-removed runs. If no run remains, `latest_run_id` becomes `none` and `latest_commit` remains the experiment branch HEAD.
 - Removing the experiment `final_run_id` keeps the experiment closed, preserves final commit, summary, feedback, and refs, and writes `final_run_removed_at`, `final_run_removed_by`, and `final_run_removed_audit_id`.
+- Run remove audit metadata records dependent artifact/log counts, active dependent counts, latest run id before/after, whether the final run was removed, sanitized filesystem target count, absent count, trash mode/label, target kind/object id, and original path hashes.
 - Validation lifecycle is root/admin only.
 - A validation proving `projects.active_valid_config_version` through `projects.active_validation_id` cannot be archived or removed.
+- Validation archive/unarchive audit metadata records the previous archive status, resulting archive status, and archive/unarchive timestamp.
+- Validation remove without `--cascade` is blocked by dependent artifact or log rows. With `--cascade`, active dependent artifact/log rows still block removal; archived dependent rows are deleted in the same audited transaction.
+- Validation cascade remove uses the artifact/log reference-counted trash rules before DB mutation. Unshared captured artifact blobs and log files are staged through ALab trash; shared physical files stay in place.
+- Validation remove audit metadata records dependent artifact/log counts, active dependent counts, sanitized filesystem target count, absent count, trash mode/label, target kind/object id, and original path hashes.
 
 ## 8. Artifact And Log Lifecycle
 
@@ -210,9 +229,12 @@ Rules:
 - A worktree token may archive and unarchive artifacts and visible logs from its own experiment.
 - Regenerated worktree tokens inherit this own-experiment artifact and visible-log lifecycle capability because the permission is bound to the experiment identity, not to a specific old token value.
 - Root/admin may archive and unarchive any artifact or log in project scope.
+- Artifact/log archive/unarchive audit metadata records the previous archive status, resulting archive status, and archive/unarchive timestamp.
 - Artifact and log remove are root/admin only and require archived object.
 - Hidden logs may only be archived, unarchived, or removed by root/admin.
 - Artifact blobs and log files are deleted only when no remaining row references the same content or file.
+- Standalone artifact/log remove stages the unshared blob/file through the hard-remove trash flow before DB/audit mutation. Shared blobs/files render `deleted filesystem paths: 0` and leave the physical bytes in place.
+- Artifact/log remove audit metadata records sanitized filesystem target count, absent count, trash mode/label, target kind/object id, and original path hashes.
 - Archived artifact and log rows are hidden from list commands by default.
 - Showing archived artifacts or logs by id requires authorization but not `--include-archived`. Exporting archived artifacts or logs requires authorization plus `--include-archived`.
 
@@ -230,14 +252,15 @@ Rules:
 
 - The creating token, project admin, and root may archive, unarchive, and remove annotations within existing visibility and ownership rules.
 - Annotation archive tombstones the annotation without deleting revisions.
-- Annotation remove deletes all revisions and writes an audit event.
+- Annotation archive/unarchive audit metadata records the previous status, resulting annotation status, and archive/unarchive timestamp.
+- Annotation remove deletes all revisions in the same audited transaction, records `deleted_revision_count`, and has no filesystem targets.
 - Tags keep immediate `add`, `remove`, and `list` behavior. Tags do not have archive or unarchive states.
 
 ## 10. Credentials, Secrets, Cache, Catalog, And Backup
 
 Audit rules:
 
-- Lifecycle audit events are written for every lifecycle mutation: archive, unarchive, remove, worktree restore/remove, checkout remove, context repair, credential revoke/regenerate, cache prune, backup prune, secret GC, catalog add/update/remove when they mutate local catalog state, project lock stale-clear when it removes locks, and source/catalog/cache cleanup.
+- Lifecycle audit events are written for every lifecycle mutation: archive, unarchive, remove, worktree restore/remove, checkout create/remove, context repair, credential revoke/regenerate, cache prune, backup prune, secret GC, catalog add/update/remove when they mutate local catalog state, project lock stale-clear when it removes locks, and source/catalog/cache cleanup.
 - Audit rows use a generic action plus object type model. Valid actions are `add`, `update`, `archive`, `unarchive`, `remove`, `restore`, `repair`, `revoke`, `regenerate`, `prune`, `gc`, and `clear`; object types distinguish project, source, experiment, run, validation, artifact, log, annotation, credential, secret value, cache, backup, catalog, lock, worktree, and inspection checkout events.
 - Commands that create an audit event should render `audit id` in success output unless a more specific command contract explicitly forbids rendering it. Rendering an audit id must never reveal raw secrets, verifier hashes, hidden asset contents, or raw hidden logs.
 - Ordinary run, submit, tag, annotation edit, and project config/env/secret set/import/unset mutation records remain authoritative in their own tables and do not create lifecycle audit rows unless another lifecycle operation acts on them. `project secret gc --apply` is still audited because it deletes unreferenced raw secret values.
@@ -246,6 +269,7 @@ Credential rules:
 
 - Root/admin keys and experiment tokens support revoke and regenerate only.
 - No credential hard remove exists in V1.
+- Credential revoke/regenerate audit metadata records sanitized credential type, previous/resulting status, revoked/created credential ids when applicable, token mode and registered path hash when applicable, and lifecycle timestamps. It never stores raw keys, tokens, salts, or verifier hashes.
 - Regenerated tokens write to registered or restored paths and never print raw token values.
 
 Secret rules:

@@ -108,7 +108,9 @@ Rules:
 - `runner.command` executes as argv without a shell.
 - `runner.shell` explicitly runs through `/bin/sh -c <shell>` on supported V1 hosts.
 - `runner.shell` is supported only by the local runner and Docker runner shell mode in V1. Harbor, SkyDiscover Docker, and SkyDiscover Python runners reject user `runner.shell` because adapter verifier/evaluator commands are owned by the adapter contract.
+- Local runner workspace containment checks use normalized path ancestry, not string-prefix matching, so sibling paths with the workspace name as a prefix still escape and fail.
 - `env_mode = "sanitized"` inherits only `PATH`, `LANG`, `LC_*`, `TZ`, and `TMPDIR` when present, and sets `HOME` to the operation temporary `home/` directory.
+- ALab creates the sanitized temporary `home/` directory before starting the local runner process.
 - `env_mode = "full"` inherits the complete ALab process environment.
 - `env_mode = "none"` inherits no host environment variables.
 - Effective env is selected inherited environment, then `[env]`, then `[secret_env]`, then ALab internal variables.
@@ -130,6 +132,8 @@ Scope:
 - `runner.build_args` is a map of string keys to string values. Build args are plain config values, not secret values, and are included in config export.
 - `runner.target` selects a Dockerfile build target.
 - `runner.platform` passes a Docker platform selector when supported by the local Docker installation.
+- V1 validates configured Docker platform selectors before config write. `linux` uses the coarse Linux container capability. `linux/amd64` and `linux/arm64` use per-architecture capability rows derived from Docker's native runtime architecture plus reported Buildx platforms.
+- Unsupported or unknown platform selectors fail config validation with `CONFIG_INVALID` before a project config is written.
 - `runner.user` passes the container user for the main runner process. ALab does not elevate privileges during capture.
 - `runner.cpus` and `runner.memory_mb` pass Docker CPU and memory limits when supported.
 - If configured Docker CPU or memory limits are not supported by the local Docker environment, config validation fails before write with `CONFIG_INVALID`.
@@ -160,7 +164,7 @@ Network:
 - `runner.network = "default"` uses Docker default networking.
 - `runner.network = "none"` passes Docker no-network mode.
 - `runner.network = "host"` is not supported in V1 and fails config validation with `CONFIG_INVALID`.
-- Runtime capability probes are still used for Docker availability, platform support, and CPU/memory limit support. Probe results are cached by runtime fingerprint; if the fingerprint changes, ALab probes again.
+- Runtime capability probes are still used for Docker availability, coarse Linux platform support, per-architecture Linux platform support, and CPU/memory limit support. Probe results are cached by runtime fingerprint; if the fingerprint changes, ALab probes again.
 - `alab config validate --refresh-capabilities` clears cached capability results and reruns probes.
 - Unsupported configured CPU or memory limits fail before config write with `CONFIG_INVALID`.
 
@@ -170,6 +174,7 @@ Capture:
 - Files the host cannot read because of container ownership or permissions are recorded as artifact capture errors or skipped entries.
 - ALab does not retry capture with elevated privileges.
 - If `runner.user` makes workspace or run output unreadable to the host, the run status is still determined by runner exit and reward parsing; unreadable files become capture warnings or artifact errors.
+- Docker image setup/build stdout or stderr is stored as hidden log output, redacted for configured secret bytes, and not merged into user-visible runner stdout/stderr. When setup output is captured, the saved run/validation renders `DOCKER_SETUP_OUTPUT_CAPTURED`.
 
 ## 6. Reward Types
 
@@ -234,6 +239,7 @@ Artifact roots:
 Rules:
 
 - Artifact paths must not escape their root after symlink/path normalization.
+- Artifact root containment checks use normalized path ancestry, not string-prefix matching.
 - Artifact glob matching uses Python `glob` semantics relative to the selected artifact root, including `**` recursive matching. ALab normalizes separators to `/`, deduplicates matches by resolved path, and sorts matched paths by normalized relative path before capture.
 - When a glob matches a symlink, ALab resolves it.
 - Symlinks whose resolved target stays inside the artifact root are captured as target bytes.
@@ -244,7 +250,7 @@ Rules:
 - Stdout/stderr are logs, not artifacts.
 - Oversized artifacts are skipped and recorded without changing run/validation status.
 - Capture errors do not change run or validation status.
-- Capture errors are recorded as artifact statuses and warnings.
+- Capture errors are recorded as artifact statuses and `ARTIFACT_CAPTURE_ERROR` warnings.
 - ALab attempts artifact capture for passed, failed, error, and timeout results whenever a run or validation record exists and temporary runtime directories are still available. Runner exit failure, reward parse failure, and timeout do not by themselves disable artifact capture.
 - Artifact export writes exact captured bytes.
 - V1 does not redact artifact contents.
@@ -271,7 +277,7 @@ Rules:
 - Logs are stored as byte files plus SQLite metadata, not as authoritative SQLite text.
 - `preview_text` is a safe UTF-8 replacement-decoded prefix for CLI rendering only.
 - `runs show` renders fixed-size stdout/stderr previews and log metadata.
-- Full visible logs are accessed through `observe logs show|export`.
+- Full visible logs are accessed through `observe logs show|export`; `show` renders the stored log bytes as safe UTF-8 replacement-decoded `content`.
 - Hidden logs require root/admin plus explicit `--include-hidden`.
 - Log archive, unarchive, remove, and archived show/export rules are defined in [spec_lifecycle.md](spec_lifecycle.md).
 - Shared log files are deleted only when no remaining log row references them.

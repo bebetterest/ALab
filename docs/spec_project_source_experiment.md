@@ -79,24 +79,26 @@ Field rules:
 - Each experiment binds exactly one source at creation. If `exp create` does not select a source or `--from-exp`, ALab uses the active config's `source.default_source_ref`.
 - Project init input configs may omit `source.default_source_ref` when the init command supplies exactly one effective default source origin. ALab stages that source first, injects its canonical `alab/source/<source_id>` ref into the stored config, and then validates the full canonical config.
 - If a project init input config includes `source.default_source_ref`, the value is an expected canonical source ref. If it differs from the staged canonical source ref, init fails with `CONFIG_INVALID`; ALab must not silently overwrite it.
+- `project.allow_public_exp_create` and `public_source_import.enabled` are strict booleans.
 - `public_source_import.enabled` defaults to `true`.
 - Public source import limits default to the normal source limits and are project-configurable. V1 has no separate hard-coded cap.
+- `public_source_import.max_files`, `public_source_import.max_total_bytes`, and `public_source_import.max_file_bytes` must be non-negative integers.
 - Public callers may not override public import limits upward at command time.
-- `mutable.include` defaults to `["**"]`; `mutable.exclude` defaults to `[]`.
+- `mutable.include` defaults to `["**"]` and must contain at least one non-empty single-line pattern; `mutable.exclude` defaults to `[]` and, when set, contains non-empty single-line patterns.
 - `visibility.scope` is `none`, `same_project`, or `explicit`.
-- `visibility.experiment_ids` is required and non-empty only when `scope = "explicit"`.
+- `visibility.experiment_ids` is required and non-empty only when `scope = "explicit"`; entries must be complete experiment ids and are normalized to a sorted unique list.
 - `runner.type` is `local`, `docker`, `harbor`, `skydiscover_docker`, or `skydiscover_python`.
-- `runner.timeout_seconds` defaults to `600` and must be between `1` and `86400`.
+- `runner.timeout_seconds` defaults to `600` and must be an integer between `1` and `86400`.
 - `runner.working_directory` is repo-relative and must not escape the repository.
 - `runner.env_mode` is valid only for local runner and is `sanitized`, `full`, or `none`.
 - `runner.network` is valid for Docker-backed runners and is `default` or `none`; it defaults to `default`.
 - Docker host networking is not supported in V1. `runner.network = "host"` fails config validation with `CONFIG_INVALID`.
-- `runner.command` is argv list mode; `runner.shell` is explicit shell mode; they conflict. `runner.shell` is valid only for the local runner and Docker runner shell mode in V1. Harbor and SkyDiscover adapters own their verifier/evaluator commands and reject user `runner.shell`.
+- `runner.command` is non-empty argv list mode when provided; `runner.shell` is non-empty explicit shell mode when provided; they conflict. `runner.shell` is valid only for the local runner and Docker runner shell mode in V1. Harbor and SkyDiscover adapters own their verifier/evaluator commands and reject user `runner.shell`.
 - Docker runner requires exactly one of `runner.image` or `runner.dockerfile`.
 - Dockerfile runner requires `runner.context`.
 - Docker runner may set whitelisted Docker fields: `runner.build_args`, `runner.target`, `runner.platform`, `runner.user`, `runner.cpus`, and `runner.memory_mb`.
 - Docker runner rejects raw Docker CLI argument passthrough and extra host mounts or volumes.
-- `runner.cpus` and `runner.memory_mb` are valid for Docker-backed runners when supported by the local Docker environment. If either configured limit is unsupported, config validation fails before write with `CONFIG_INVALID`.
+- `runner.cpus` and `runner.memory_mb` are valid for Docker-backed runners when supported by the local Docker environment. `runner.cpus` must be a positive finite number, and `runner.memory_mb` must be a positive integer. If either configured limit is unsupported, config validation fails before write with `CONFIG_INVALID`.
 - Harbor runner requires `runner.harbor_task_ref`.
 - SkyDiscover runners require `runner.skydiscover_task_ref`.
 - SkyDiscover Python runner may set `runner.program_path`, default `"."`.
@@ -105,8 +107,9 @@ Field rules:
 - `reward.primary_metric` defaults to `reward`, except SkyDiscover defaults to `combined_score`.
 - `reward.type = "exit_code"` requires `reward.direction = "maximize"`.
 - `artifacts.globs = []` means no extra artifacts.
+- `artifacts.per_file_limit_bytes`, `artifacts.per_run_limit_bytes`, `logs.stdout_limit_bytes`, and `logs.stderr_limit_bytes` must be positive integers.
 - `logs.*_limit_bytes` default to `10485760`.
-- `env` and `secret_env` are maps of valid environment variable names to strings. Names must match `^[A-Za-z_][A-Za-z0-9_]*$`.
+- `env` is a map of valid environment variable names to strings. `secret_env` input values are single-line strings at least 4 UTF-8 bytes, or config-import retain markers. Names must match `^[A-Za-z_][A-Za-z0-9_]*$`.
 
 Baseline trigger rule:
 
@@ -128,7 +131,7 @@ Config read/export rule:
 - `project config show` and `project config export` default to `--version latest-attempted`.
 - `--version latest-attempted` selects `projects.latest_attempted_config_version`.
 - `--version active-valid` selects `projects.active_valid_config_version` and fails with `PROJECT_INVALID` when no active valid config exists.
-- `--version <n>` selects an explicit retained config version by number.
+- `--version <n>` selects an explicit positive retained config version number.
 - Exported TOML always uses secret retain markers for `[secret_env]`, regardless of selected version.
 
 ## 2. Project Lifecycle
@@ -189,7 +192,7 @@ Input precedence:
 2. Apply mode-specific source/Harbor/SkyDiscover data.
 3. Apply allowed CLI metadata overrides: project `--name`, `--task`, `--goal`, and source selectors.
 4. Validate source-independent schema fields. At this stage, missing `source.default_source_ref` is allowed only when the init command supplies one effective default source origin.
-5. Stage the project repository and import/create the effective default source.
+5. Stage the project repository and import/create the effective default source, enforcing any init-time source import limits before project rows are written.
 6. If an adapter-derived editable source and an explicit caller source are both present, compare canonical tree hashes. Identical content dedupes normally; different content fails with `SOURCE_INVALID` and a stable source conflict reason.
 7. Inject the staged canonical source ref into `source.default_source_ref` when the input config omitted it. If the input config supplied a different ref, fail with `CONFIG_INVALID`.
 8. Validate the full canonical config.
@@ -204,6 +207,7 @@ Runtime config rules:
 - Runner, reward, artifact, log, env, secret, Docker, Harbor, and SkyDiscover runtime fields are read from project config, not from init flags.
 - ALab must not silently default reward type. The config must provide a complete reward policy.
 - Init source flags are the only init-time runtime-affecting overrides. They exist to bootstrap the initial default source during project creation, not to silently replace a conflicting `source.default_source_ref` already present in the input config.
+- Project init accepts the same source limit options as source import (`--max-files`, `--max-total-bytes`, `--max-file-bytes`) for the staged initial source. Values must be non-negative integers. Malformed or negative limit values fail with `CONFIG_INVALID`; exceeded limits fail with `SOURCE_LIMIT_EXCEEDED` before source staging or project/source/config/admin credential rows are written.
 - Remote Git source selection uses `--git-ref <branch|tag|sha>`.
 - `--source-ref` always means an existing ALab source id or `alab/source/<source_id>` and must not be used for remote Git refs.
 - `project init harbor` and `project init skydiscover` do not accept `--source-ref` in V1. A new adapter project must bootstrap its initial editable source from `--source-path`, `--source-git`, `--source-empty`, or an adapter-derived editable source. Existing ALab sources are project-scoped reproducibility records, not cross-project init inputs.
@@ -275,7 +279,7 @@ Limit rules:
 - Root/admin imports may raise or lower limits.
 - Public no-key inline imports use `[public_source_import]` limits.
 - Public limits are project-configurable and have no separate hard-coded cap.
-- Public callers may lower limits per command but may not raise them above the configured public limits.
+- Public callers may lower limits per command but may not raise them above the configured public limits. Policy-ceiling failures must be detected before source path reads, source copies, Git clones, source records, or experiment rows.
 - If an import exceeds effective limits, the command fails with `SOURCE_LIMIT_EXCEEDED` and creates no source record or Git source ref.
 - Public no-key remote Git imports may use existing non-interactive Git credential helpers on the local machine. They must render `PUBLIC_GIT_CREDENTIAL_HELPER_USED` when a helper is available or used, and Git prompts remain disabled.
 

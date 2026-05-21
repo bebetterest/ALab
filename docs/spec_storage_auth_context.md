@@ -523,8 +523,9 @@ Checks:
 - `status IN ('captured','skipped','error')`
 - `archive_status IN ('active','archived')`
 - exactly one owner is set: `run_id` or `validation_id`.
-- `blob_path` is non-null only when `status='captured'`.
-- `capture_error` is non-null when `status='error'`.
+- `size_bytes` is null or non-negative.
+- Captured rows require non-null `blob_path`, `content_hash`, and `size_bytes`; non-captured rows have null `blob_path`.
+- `capture_error` is non-null only when `status='error'`, and error rows require it.
 - `archived_at` is non-null only when `archive_status='archived'`.
 
 Indexes:
@@ -560,6 +561,8 @@ Columns:
 Checks:
 
 - `stream IN ('stdout','stderr','hidden_stdout','hidden_stderr')`
+- `size_bytes` and `stored_bytes` are non-negative, and `stored_bytes <= size_bytes`.
+- `truncated IN (0,1)` and `hidden IN (0,1)`.
 - hidden streams require `hidden=1`.
 - visible streams require `hidden=0`.
 - `archive_status IN ('active','archived')`
@@ -593,8 +596,10 @@ Indexes:
 
 Checks:
 
-- `target_type IN ('exp','run','artifact','path','lines')`
+- `target_type IN ('experiment','run','artifact','path','lines')`
 - `status IN ('active','archived')`
+- `created_by_type IN ('root','admin','token')`
+- `current_revision >= 1`
 - `resolved_commit` is non-null for path and lines targets.
 - `target_json` is canonical JSON with `schema_version = 1` and stores the resolved experiment id, commit, repo path, and line range when applicable.
 
@@ -611,6 +616,11 @@ Checks:
 Primary key:
 
 - `(annotation_id, revision)`
+
+Checks:
+
+- `revision >= 1`
+- `created_by_type IN ('root','admin','token')`
 
 Indexes:
 
@@ -729,6 +739,7 @@ Checks:
 - `catalog_key IN ('skydiscover')` in V1.
 - `catalog_type IN ('skydiscover')` in V1.
 - `status IN ('active','removed')`.
+- `removed_at` is null when `status='active'` and non-null when `status='removed'`.
 - `metadata_json` is canonical JSON with `schema_version = 1` and contains only safe catalog diagnostics.
 
 Rules:
@@ -758,6 +769,8 @@ Checks:
 
 - `cache_kind IN ('docker_image','skydiscover_python_env','trash')`.
 - `status IN ('active','removed')`.
+- `removed_at` is null when `status='active'` and non-null when `status='removed'`.
+- `docker_image` rows store a non-null `docker_tag` and null `path`; `skydiscover_python_env` and `trash` rows store a non-null `path` and null `docker_tag`.
 - `metadata_json` is canonical JSON with `schema_version = 1` and contains only safe cache diagnostics.
 
 Indexes:
@@ -774,21 +787,22 @@ Rules:
 
 ## 4. JSON Field Contracts
 
-All JSON fields below are canonical JSON objects with `schema_version = 1`. Unknown top-level keys fail validation unless the contract names an `extensions` object. Renderers may expose only fields marked safe by the owning service result; public and token-scoped renderers must never read `exact`, raw path, hidden, secret, or verifier fields directly from storage.
+All JSON fields below are canonical JSON objects with integer `schema_version = 1`; boolean `true` is not accepted as a schema version. Unknown top-level keys fail validation unless the contract names an `extensions` object. Renderers may expose only fields marked safe by the owning service result; public and token-scoped renderers must never read `exact`, raw path, hidden, secret, or verifier fields directly from storage.
 
 - `credentials.metadata_json`: keys are `schema_version`, `role` for admin credentials, `token_mode` for token credentials, `created_for_path_hash` for token credentials, and optional `display_label`. It never stores raw secrets or verifier hashes. Credential rows are retained after project or experiment hard remove, so project and experiment ids in this table are denormalized identifiers for audit and diagnostics.
 - `audit_events.deleted_ids_json`: keys are `schema_version`, `counts` object, and `ids` object. Object-type keys map to sorted id arrays and deletion counts. It never stores raw secrets, verifier hashes, hidden asset contents, raw hidden logs, or full hidden paths.
-- `audit_events.metadata_json`: keys are `schema_version`, optional `blockers`, optional `trash`, optional `filesystem`, optional `config`, optional `credential`, and optional `safe_summary`. Trash paths are relative to ALab home or sanitized same-parent trash labels. It never stores raw secrets, verifier hashes, hidden asset contents, raw hidden logs, or full hidden paths.
+- `audit_events.metadata_json`: keys are `schema_version` plus safe audit diagnostics for lifecycle/status transitions, credential ids and types, source refs, context repair, cache/backup pruning, lock clearing, filesystem/trash summaries, optional `blockers`, optional `trash` object or array, optional `filesystem`, optional `config`, optional `credential`, and optional `safe_summary`. Trash paths are relative to ALab home or sanitized same-parent trash labels. It never stores raw secrets, verifier hashes, hidden asset contents, raw hidden logs, or full hidden paths.
 - `sources.origin_metadata_json`: keys are `schema_version`, `tree_hash_algorithm`, `primary_origin`, and `origins`. Each origin has `origin_id`, `origin_type`, `safe_summary`, `exact`, `warnings`, and `created_at`. `exact` stores origin-type-specific structured values and must not contain raw credentials, tokens, secret values, hidden asset contents, or raw hidden logs. Token and public output render only `safe_summary` and warning codes.
-- `project_config_versions.canonical_config_json`: keys are `schema_version`, `project`, `source`, `runner`, `reward`, `artifacts`, `logs`, `env`, `secret_env`, `public_source_import`, `mutable`, and `visibility`. `secret_env` entries store secret value ids and HMAC fingerprints, never raw secret values.
-- `experiments.metadata_json`: keys are `schema_version`, `name`, `name_slug`, `goal`, `creation_origin`, `requested_path`, `source_selector`, and `display`. `creation_origin` records `kind = source|from_exp`, resolved ids, and resolved commit when applicable. `display` contains safe summaries only.
-- `experiments.policy_json`: keys are `schema_version`, `mutable`, and `visibility_upper_bound`. `mutable` stores normalized `include` and `exclude` gitwildmatch pattern arrays. `visibility_upper_bound` stores `scope = none|same_project|explicit` and sorted `experiment_ids`.
-- `runs.record_json` and `project_validations.record_json`: keys are `schema_version`, `config_hash`, `runner`, `reward`, `metrics`, `warnings`, `failure`, `artifacts`, `logs`, `timeout`, and `adapter_feedback`. `metrics` is a string-to-finite-number map. `runner` and `adapter_feedback` contain safe summaries only unless the command is root/admin-only.
+- `project_config_versions.canonical_config_json`: keys are `schema_version`, `project`, `source`, `runner`, `reward`, `artifacts`, `logs`, `git`, `env`, `secret_env`, `public_source_import`, `mutable`, and `visibility`. Stored `secret_env` entries are `{secret_value_id, fingerprint}` marker objects and never raw secret values.
+- `experiments.metadata_json`: keys are `schema_version`, `name`, `name_slug`, `goal`, `creation_origin`, `requested_path`, `source_selector`, and `display`. `creation_origin` records `kind = source|inline_source|from_exp`, resolved ids, the inline source ref when applicable, and resolved commit when inheriting from another experiment. `display` contains safe summaries only.
+- `experiments.policy_json`: keys are `schema_version`, `mutable`, optional `mutable_override`, and `visibility_upper_bound`. `mutable` and `mutable_override` store normalized `include` and `exclude` gitwildmatch pattern arrays; `include` must contain at least one non-empty single-line pattern, and `exclude` entries must also be non-empty single-line patterns. `visibility_upper_bound` stores `scope = none|same_project|explicit` and sorted `experiment_ids`; ids are present only for `explicit`, and every entry is a complete experiment id.
+- `experiment_submissions.refs_json`: keys are `schema_version` and `refs`. `refs` is an ordered non-empty array containing either the single literal `none` or deduplicated complete experiment ids.
+- `runs.record_json` and `project_validations.record_json`: keys are `schema_version`, `config_hash`, `runner`, `reward`, `metrics`, `warnings`, `failure`, `artifacts`, `logs`, `timeout`, `adapter_feedback`, optional `interrupted`, and optional `mutable_scope`. `metrics` is a string-to-finite-number map. `runner` and `adapter_feedback` contain safe summaries only unless the command is root/admin-only. `mutable_scope` stores sanitized `SCOPE_VIOLATION` diagnostics only and uses integer `schema_version = 1` when present.
 - `annotations.visibility_json`: keys are `schema_version`, `scope = project|private`, optional `creator_exp_id`, and `constraints`. Private annotations require `creator_exp_id`. Project-visible annotations never expand visibility beyond the target record's visibility.
-- `annotations.target_json`: keys are `schema_version`, `target_type`, `target_id`, optional `exp_id`, optional `commit`, optional `repo_path`, and optional `line_range`. `line_range` stores 1-based inclusive `start` and `end`.
-- `runtime_capabilities.details_json`: keys are `schema_version`, `capability`, `safe_summary`, `probed_values`, and optional `error_code`; it stores no environment maps.
-- `catalogs.metadata_json`: keys are `schema_version`, `safe_summary`, `task_refs`, `evaluator_refs`, and optional `warnings`; it stores no hidden evaluator contents.
-- `cache_entries.metadata_json`: keys are `schema_version`, `safe_summary`, `inputs_hash`, and optional `warnings`; it stores no raw secrets or hidden asset contents.
+- `annotations.target_json`: keys are `schema_version`, `target_type`, `target_id`, optional `exp_id`, optional `commit`, optional `repo_path`, and optional `line_range`. Object targets use complete matching object ids in `target_id`, and object target JSON includes the resolved `exp_id`; experiment targets require `target_id == exp_id`. Validation-owned artifact rows do not carry an `exp_id` and cannot be represented as annotation object targets. Path and line target ids are `exp_id:commit:repo_path`. `repo_path` is a normalized forward-slash repo-relative path with no absolute, Windows-absolute, empty, `.`, `..`, backslash, NUL, or newline components. `line_range` stores positive integer 1-based inclusive `start` and `end`, with `end >= start`.
+- `runtime_capabilities.details_json`: keys are `schema_version`, `capability`, `safe_summary`, `probed_values`, and optional `error_code`; `capability` is a non-empty string, `probed_values` is an object, and it stores no environment maps.
+- `catalogs.metadata_json`: keys are `schema_version`, `safe_summary`, `task_refs`, `evaluator_refs`, and optional `warnings`; task/evaluator refs and warnings are string arrays, and it stores no hidden evaluator contents.
+- `cache_entries.metadata_json`: keys are `schema_version`, `safe_summary`, `inputs_hash`, and optional `warnings`; `inputs_hash` is a non-empty string, warnings are a string array, and it stores no raw secrets or hidden asset contents.
 
 `sources.origin_metadata_json` shape:
 
@@ -862,8 +876,8 @@ Storage rules:
 - File content is exactly one raw token line plus one trailing newline.
 - Token files should be written with `0600` permissions where POSIX permissions exist.
 - Broader permissions produce `TOKEN_FILE_PERMISSIONS`.
-- `.alab/token` must be ignored by Git. ALab ensures this by writing worktree-local Git exclude rules for `.alab/` when creating or restoring experiment worktrees and inspection checkouts; ALab staging logic also always excludes `.alab/**`.
-- Token regeneration writes the replacement token to the registered path and never prints the raw token.
+- `.alab/token` must be ignored by Git. ALab ensures this by writing worktree-local Git exclude rules for `.alab/` when creating or restoring experiment worktrees and inspection checkouts; token regeneration refreshes that rule for the registered path. ALab staging logic also always excludes `.alab/**`.
+- Token regeneration writes the replacement token to the registered path with private permissions and never prints the raw token.
 
 Root lifecycle:
 
@@ -909,7 +923,8 @@ TOKEN = { retain = true, fingerprint = "hmac-sha256:..." }
 ```
 
 - Export writes retain markers, never raw secrets.
-- Import accepts retain markers only for the same project, the same `secret_env` name, and a still-matching stored secret fingerprint.
+- Import accepts retain markers only for the same project, the same `secret_env` name, and a still-matching stored secret fingerprint. Dry-run imports apply the same retain-marker existence and fingerprint checks.
+- User config imports must use `{ retain = true, fingerprint = "hmac-sha256:..." }` retain markers; stored `{ secret_value_id, fingerprint }` markers are internal persisted config data and are not accepted from config files.
 - String values in `[secret_env]` create new secret values.
 
 ## 7. Global Config
@@ -943,6 +958,8 @@ Rules:
 - `format = "text"` is the only valid persisted output value.
 - Rich is available only through `--output rich`.
 - Time values are integer milliseconds.
+- `storage.busy_timeout_ms` configures SQLite `PRAGMA busy_timeout` for ALab database connections.
+- Persisted global config accepts only `schema_version`, `[output]`, `[storage]`, and `[locks]` at the top level, and only documented fields inside those tables. Unknown keys or non-table section values fail with `CONFIG_INVALID`.
 - Invalid global config stops normal command execution with `CONFIG_INVALID` after home resolution and migration.
 - When global config is invalid, only `auth init` and `config show|set|reset|validate` may run so users can diagnose or repair the file.
 - `config set` and `config reset` may repair known fields in a partially valid config while preserving other valid configured values. If the TOML file cannot be parsed, only `config reset --all` may rewrite it.
@@ -1009,6 +1026,8 @@ Marker path:
 .alab/context.json
 ```
 
+Markers are JSON objects with `marker_version = 1`. Unknown top-level keys fail closed. Common keys are `home_id`, `context_type`, `project_id`, `exp_id`, `token_id`, `created_at`, and optional `repaired_at`.
+
 Project marker:
 
 ```json
@@ -1024,7 +1043,9 @@ Project marker:
 }
 ```
 
-Experiment marker uses `context_type = "experiment"`, non-null `exp_id`, and the registered worktree token id.
+Project markers additionally require `canonical_repo_path_hash` and must keep `exp_id` and `token_id` null.
+
+Experiment marker uses `context_type = "experiment"`, non-null `exp_id`, and the registered worktree token id. It must not include `canonical_repo_path_hash` or `inspection_commit`.
 
 Inspection marker uses `context_type = "inspection"`, non-null `exp_id`, the inspection token id, and a pinned `inspection_commit`.
 
@@ -1082,6 +1103,7 @@ Capability lookup rules:
 - A valid worktree or inspection token may self-repair only when the old registered realpath no longer exists, marker `token_id` matches the token credential, the raw token verifies, the Git repository is on the registered ALab branch or pinned inspection commit, and the target realpath is not already registered.
 - If the old path still exists, token self-repair fails with `CONTEXT_CONFLICT`.
 - Successful repair updates registry and marker metadata but never prints or regenerates a raw token.
+- Successful repair writes audit metadata with context type, repair mode, path registry id, previous path hash, repaired path hash, whether a registry row was created, and repaired timestamp. It never stores the raw path or raw token.
 
 ## 10. Migration And Backup
 
