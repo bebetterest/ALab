@@ -7371,3 +7371,22 @@ Validation:
 - `git diff --check`
 - `rg -n "[ \t]+$" src/alab/source_import.py tests/test_smoke.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
 - Post-record docs sanity: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+
+## 2026-05-21 Documentation Consistency Closeout
+
+Implemented:
+
+- Ran the final documentation consistency pass for the current documentation set.
+- Reclassified the documentation consistency P0 gate and the documentation/milestone blueprint row as proved for current README/spec/progress/audit/local-note state.
+- Reclassified the local-only product-scope row as proved for the current surface because the runtime-surface guard and manual documentation pass now cover the previously open docs/README consistency condition.
+- Updated the ignored local `AGENTS_cn.md` note so it matches `AGENTS.md` on the split between dashboard, pipeline, closed gaps, historical log, and completion audit.
+- Removed the final docs consistency pass from the active queue and added a closed guardrail.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing tests/test_cli_contract.py::test_local_agent_notes_and_env_files_are_gitignored tests/test_cli_contract.py::test_env_example_documents_setup_environment_variables tests/test_cli_contract.py::test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencies tests/test_cli_contract.py::test_v1_security_boundary_excludes_encryption_grants_and_rewrap_artifacts tests/test_cli_contract.py::test_cli_primary_object_type_tables_are_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_english_and_chinese_conflict_option_contracts_are_synchronized tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md AGENTS_cn.md` returned no matches.

@@ -16,6 +16,7 @@
 除非 spec 或 implementation change 推翻已记录证据，不要再为这些 families 单独开 batch：
 
 - Runtime 和 layout guardrails：local CLI-only surface、无 server/web UI/ORM/scheduler/agent/LLM-provider dependency roots、canonical home/artifact/log layout、marker-only project contexts、cwd-relative experiment worktree markers，以及 128-bit home-id suffix checks。
+- Documentation consistency guardrails：README/README_cn repository trees、opt-in pytest marker commands、Markdown Chinese pairs、CLI spec English/Chinese command and field synchronization、`.env.example` references、`.gitignore` local-note/env policy、progress dashboard/pipeline/guardrail/log/audit split，以及 ignored local AGENTS/CORE note alignment 都有当前 focused evidence。
 - Security boundary guardrails：V1 保持 plaintext local storage、verifier-only credentials，并且没有 encrypted storage、grant-file、public-grant、token-rewrap、DEK、ciphertext、keyring 或 cryptography implementation artifacts；README/blueprint 的 collaboration-boundary 和 no-strong-local-security wording 与该实现边界保持同步。
 - Parser、renderer 和 preflight guardrails：strict text object rendering、global/command option validation、payload file preflight、generated capability preflight、output alias boundaries、export-output preflight、command-specific config-value errors、complete ALab id selectors、RFC 3339 filters、`HOME_EXISTS` 和 `OUTPUT_EXISTS`。
 - Public、visibility、observe 和 annotation guardrails：public safe `status`、跨 current project policy 与 stored source-experiment upper bounds 的 public `--from-exp` visibility intersection、跨 experiment list/show 与 run/artifact/log read surfaces 的 explicit token/inspection observe visibility joins、experiment 与 observe-object list filter/sort matrices、更宽 non-disclosing `SCOPE_VIOLATION` selectors、observe read/lifecycle aliases、hidden-log access/export shapes、regenerated token private-annotation rights、admin `--private-to-exp` binding、annotation target resolution，以及 annotation authorization/lifecycle。
@@ -43,6 +44,7 @@
 
 ## 最近关闭
 
+- 2026-05-21：documentation consistency proof，覆盖 README/README_cn、Markdown pair coverage、CLI spec synchronization、`.env.example`、`.gitignore`、progress/audit ledgers，以及 ignored local AGENTS/CORE notes。
 - 2026-05-21：当前 default/fake runner types 的 shared-runner cleanup 和 adapter failure edges。
 - 2026-05-21：当前 schema/default source-dependent paths 的 project config/schema proof mapping。
 - 2026-05-21：project config edit semantics proof mapping，覆盖 latest-attempted base、no-op edits、metadata-only inherited edits、monotonic revert versions、invalid-runtime preservation 和 dry-run no-write behavior。

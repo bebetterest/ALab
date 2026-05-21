@@ -16,6 +16,7 @@ Read this file only when planned work might duplicate a closed proof family. It 
 Do not spend another batch on these families unless a spec or implementation change invalidates the recorded evidence:
 
 - Runtime and layout guardrails: local CLI-only surface, no server/web UI/ORM/scheduler/agent/LLM-provider dependency roots, canonical home/artifact/log layout, marker-only project contexts, cwd-relative experiment worktree markers, and 128-bit home-id suffix checks.
+- Documentation consistency guardrails: README/README_cn repository trees, opt-in pytest marker commands, Markdown Chinese pairs, CLI spec English/Chinese command and field synchronization, `.env.example` references, `.gitignore` local-note/env policy, progress dashboard/pipeline/guardrail/log/audit split, and ignored local AGENTS/CORE note alignment have current focused evidence.
 - Security boundary guardrails: V1 remains plaintext local storage with verifier-only credentials and no encrypted storage, grant-file, public-grant, token-rewrap, DEK, ciphertext, keyring, or cryptography implementation artifacts; README/blueprint keep the collaboration-boundary and no-strong-local-security wording synchronized with that implementation boundary.
 - Parser, renderer, and preflight guardrails: strict text object rendering, global/command option validation, payload file preflight, generated capability preflight, output alias boundaries, export-output preflight, command-specific config-value errors, complete ALab id selectors, RFC 3339 filters, `HOME_EXISTS`, and `OUTPUT_EXISTS`.
 - Public, visibility, observe, and annotation guardrails: public safe `status`, public `--from-exp` visibility intersection across current project policy and stored source-experiment upper bounds, explicit token/inspection observe visibility joins across experiment list/show and run/artifact/log read surfaces, experiment and observe-object list filter/sort matrices, broader non-disclosing `SCOPE_VIOLATION` selectors, observe read/lifecycle aliases, hidden-log access/export shapes, regenerated token private-annotation rights, admin `--private-to-exp` binding, annotation target resolution, and annotation authorization/lifecycle.
@@ -43,6 +44,7 @@ Do not spend another batch on these families unless a spec or implementation cha
 
 ## Recently Closed
 
+- 2026-05-21: documentation consistency proof for README/README_cn, Markdown pair coverage, CLI spec synchronization, `.env.example`, `.gitignore`, progress/audit ledgers, and ignored local AGENTS/CORE notes.
 - 2026-05-21: shared-runner cleanup and adapter failure edges for current default/fake runner types.
 - 2026-05-21: project config/schema proof mapping for current schema/default source-dependent paths.
 - 2026-05-21: project config edit semantics proof mapping for latest-attempted base, no-op edits, metadata-only inherited edits, monotonic revert versions, invalid-runtime preservation, and dry-run no-write behavior.
