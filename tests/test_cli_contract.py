@@ -79,6 +79,131 @@ _CAPABILITY_PATH_SETS = (
     cli.INSPECTION_TOKEN,
 )
 
+_LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE = {
+    ("project", "archive"): (
+        "tests/test_smoke.py::test_project_remove_cascades_whole_tree_through_trash",
+        "tests/test_cli_contract.py::test_project_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("project", "unarchive"): (
+        "tests/test_smoke.py::test_project_remove_cascades_whole_tree_through_trash",
+        "tests/test_cli_contract.py::test_project_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("project", "validation", "archive"): (
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_cli_contract.py::test_project_validation_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("project", "validation", "unarchive"): (
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_cli_contract.py::test_project_validation_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("source", "archive"): (
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_cli_contract.py::test_source_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("source", "unarchive"): (
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_cli_contract.py::test_source_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("exp", "archive"): (
+        "tests/test_smoke.py::test_experiment_remove_cascades_filesystem_paths",
+    ),
+    ("exp", "unarchive"): (
+        "tests/test_smoke.py::test_experiment_remove_cascades_filesystem_paths",
+    ),
+    ("observe", "runs", "archive"): (
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+    ),
+    ("observe", "runs", "unarchive"): (
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+    ),
+    ("observe", "artifacts", "archive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("observe", "artifacts", "unarchive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("observe", "logs", "archive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("observe", "logs", "unarchive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("runs", "archive"): (
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+    ),
+    ("runs", "unarchive"): (
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+    ),
+    ("artifacts", "archive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("artifacts", "unarchive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("logs", "archive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("logs", "unarchive"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("annotate", "archive"): (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+        "tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec",
+    ),
+    ("annotate", "unarchive"): (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+        "tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec",
+    ),
+}
+
+_LIFECYCLE_REMOVE_EVIDENCE = {
+    ("project", "remove"): (
+        "tests/test_smoke.py::test_project_remove_cascades_whole_tree_through_trash",
+        "tests/test_cli_contract.py::test_project_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("project", "validation", "remove"): (
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+    ),
+    ("source", "remove"): (
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_cli_contract.py::test_source_lifecycle_success_fields_follow_cli_spec",
+    ),
+    ("exp", "remove"): (
+        "tests/test_smoke.py::test_experiment_remove_cascades_filesystem_paths",
+    ),
+    ("exp", "checkout", "remove"): (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+    ),
+    ("exp", "worktree", "remove"): (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+    ),
+    ("observe", "runs", "remove"): (
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+    ),
+    ("observe", "artifacts", "remove"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("observe", "logs", "remove"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("runs", "remove"): (
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+    ),
+    ("artifacts", "remove"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("logs", "remove"): (
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+    ),
+    ("annotate", "remove"): (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+        "tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec",
+    ),
+    ("catalog", "skydiscover", "remove"): (
+        "tests/test_smoke.py::test_skydiscover_catalog_remove_blockers_unexpected_remote_and_history",
+    ),
+}
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SPEC_CLI_PATH = _REPO_ROOT / "docs" / "spec_cli.md"
 _SPEC_CLI_CN_PATH = _REPO_ROOT / "docs" / "spec_cli_cn.md"
@@ -3130,6 +3255,46 @@ def test_registered_alias_groups_are_limited_to_covered_observe_surfaces() -> No
         ("observe runs unarchive", "runs unarchive"),
     }
     assert observed == expected
+
+
+def test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces() -> None:
+    archive_unarchive_paths = {
+        spec.path
+        for spec in registry.COMMANDS
+        if spec.path[-1] in {"archive", "unarchive"}
+    }
+    remove_paths = {
+        spec.path
+        for spec in registry.COMMANDS
+        if spec.path[-1] == "remove" and spec.path != ("exp", "tag", "remove")
+    }
+
+    assert set(_LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE) == archive_unarchive_paths
+    assert set(_LIFECYCLE_REMOVE_EVIDENCE) == remove_paths
+    assert ("exp", "tag", "remove") in registry.COMMANDS_BY_PATH
+
+    refs_by_file: defaultdict[str, set[str]] = defaultdict(set)
+    for evidence_map in (_LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE, _LIFECYCLE_REMOVE_EVIDENCE):
+        for path, refs in evidence_map.items():
+            assert refs, path
+            for ref in refs:
+                file_name, delimiter, test_name = ref.partition("::")
+                assert delimiter == "::" and test_name.startswith("test_"), ref
+                refs_by_file[file_name].add(test_name)
+
+    missing_refs: list[str] = []
+    for file_name, expected_tests in refs_by_file.items():
+        module = ast.parse((_REPO_ROOT / file_name).read_text(encoding="utf-8"))
+        actual_tests = {
+            node.name
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+        }
+        missing_refs.extend(
+            f"{file_name}::{test_name}"
+            for test_name in sorted(expected_tests - actual_tests)
+        )
+    assert missing_refs == []
 
 
 def test_command_registry_object_types_follow_cli_contract_table() -> None:
