@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -972,6 +973,60 @@ def test_artifact_capture_expands_directories_sorts_and_deduplicates(tmp_path) -
     captured_artifacts = [artifact for artifact in captured if artifact["status"] == "captured"]
     assert [artifact["size_bytes"] for artifact in captured_artifacts] == [2, 2]
     assert len({artifact["blob_path"] for artifact in captured_artifacts}) == 2
+
+
+def test_artifact_capture_records_read_errors_without_blob(tmp_path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    run_dir = tmp_path / "run"
+    artifact_store = tmp_path / "artifacts"
+    workspace.mkdir()
+    run_dir.mkdir()
+    unreadable = workspace / "unreadable.txt"
+    unreadable.write_text("host cannot read this output\n", encoding="utf-8")
+    config = ProjectConfig.model_validate(
+        {
+            "schema_version": 1,
+            "project": {"name": "Artifact Read Error", "task": "Record unreadable outputs"},
+            "runner": {
+                "type": "local",
+                "timeout_seconds": 30,
+                "working_directory": ".",
+                "env_mode": "none",
+                "command": [sys.executable, "-c", "print('unused')"],
+            },
+            "reward": {"type": "exit_code", "direction": "maximize", "primary_metric": "reward"},
+            "artifacts": {"globs": ["workspace:unreadable.txt"]},
+        }
+    )
+
+    original_read_bytes = Path.read_bytes
+
+    def fake_read_bytes(path: Path) -> bytes:
+        if path == unreadable:
+            raise OSError("simulated unreadable output")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", fake_read_bytes)
+
+    captured = capture_artifacts(
+        config=config,
+        workspace=workspace,
+        run_dir=run_dir,
+        artifact_store=artifact_store,
+        project_id="proj-local",
+        exp_id="exp-local",
+        run_id="run-local",
+        validation_id=None,
+    )
+
+    assert len(captured) == 1
+    assert captured[0]["relative_path"] == "unreadable.txt"
+    assert captured[0]["status"] == "error"
+    assert captured[0]["size_bytes"] is None
+    assert captured[0]["content_hash"] is None
+    assert captured[0]["blob_path"] is None
+    assert "simulated unreadable output" in captured[0]["capture_error"]
+    assert not artifact_store.exists()
 
 
 def test_file_reward_rejects_symlink_escape_at_parse_time(tmp_path) -> None:
