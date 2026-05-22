@@ -357,6 +357,49 @@ _RUNNER_ADAPTER_EVIDENCE = {
     ),
 }
 
+_STORAGE_AUDIT_OBJECT_EVIDENCE = {
+    "schema_index_and_json_contracts": (
+        "tests/test_migrations.py::test_database_connections_use_wal_mode",
+        "tests/test_migrations.py::test_database_connections_use_configured_busy_timeout",
+        "tests/test_migrations.py::test_required_storage_tables_and_columns_are_created",
+        "tests/test_migrations.py::test_required_storage_indexes_are_created",
+        "tests/test_migrations.py::test_representative_ddl_enum_checks_are_enforced",
+        "tests/test_migrations.py::test_contract_json_obj_enforces_schema_version_and_known_keys",
+        "tests/test_migrations.py::test_audit_json_contracts_enforce_documented_shape",
+        "tests/test_migrations.py::test_runtime_catalog_and_cache_metadata_contracts_enforce_documented_shape",
+    ),
+    "maintenance_and_catalog_audit_relationships": (
+        "tests/test_smoke.py::test_auth_init_and_config_show",
+        "tests/test_smoke.py::test_cache_prune_removes_trash_cache_entries",
+        "tests/test_smoke.py::test_cache_prune_docker_image_failure_renders_warning_and_keeps_entry",
+        "tests/test_smoke.py::test_skydiscover_catalog_remove_blockers_unexpected_remote_and_history",
+        "tests/test_cli_contract.py::test_audit_success_fields_follow_cli_spec",
+    ),
+    "credential_token_and_context_audit_relationships": (
+        "tests/test_smoke.py::test_auth_init_and_config_show",
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_smoke.py::test_context_self_repair_requires_registered_branch",
+        "tests/test_cli_contract.py::test_experiment_token_success_fields_follow_cli_spec",
+        "tests/test_cli_contract.py::test_project_admin_key_authority_edges_are_scoped_and_side_effect_free",
+        "tests/test_cli_contract.py::test_home_filesystem_and_path_registry_evidence_map_refs_stay_current",
+    ),
+    "lifecycle_remove_retained_rows_and_trash": (
+        "tests/test_cli_contract.py::test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces",
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_smoke.py::test_experiment_remove_cascades_filesystem_paths",
+        "tests/test_smoke.py::test_project_remove_cascades_whole_tree_through_trash",
+        "tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata",
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+        "tests/test_smoke.py::test_validation_and_run_artifacts_share_blob_reference_counting",
+    ),
+    "annotation_and_visibility_audit_relationships": (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+        "tests/test_smoke.py::test_experiment_search_best_and_same_project_visibility",
+        "tests/test_cli_contract.py::test_admin_private_to_exp_annotation_binds_creator_exp_and_remove_audit",
+        "tests/test_cli_contract.py::test_annotation_authorization_matrix_blocks_peer_and_inspection_mutations",
+    ),
+}
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SPEC_CLI_PATH = _REPO_ROOT / "docs" / "spec_cli.md"
 _SPEC_CLI_CN_PATH = _REPO_ROOT / "docs" / "spec_cli_cn.md"
@@ -3506,6 +3549,22 @@ def test_runner_adapter_evidence_map_refs_stay_current() -> None:
     _assert_evidence_refs_exist(
         ref
         for refs in _RUNNER_ADAPTER_EVIDENCE.values()
+        for ref in refs
+    )
+
+
+def test_storage_audit_object_evidence_map_refs_stay_current() -> None:
+    assert set(_STORAGE_AUDIT_OBJECT_EVIDENCE) == {
+        "schema_index_and_json_contracts",
+        "maintenance_and_catalog_audit_relationships",
+        "credential_token_and_context_audit_relationships",
+        "lifecycle_remove_retained_rows_and_trash",
+        "annotation_and_visibility_audit_relationships",
+    }
+    assert all(refs for refs in _STORAGE_AUDIT_OBJECT_EVIDENCE.values())
+    _assert_evidence_refs_exist(
+        ref
+        for refs in _STORAGE_AUDIT_OBJECT_EVIDENCE.values()
         for ref in refs
     )
 

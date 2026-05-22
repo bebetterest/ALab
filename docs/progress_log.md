@@ -7520,6 +7520,25 @@ Validation:
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
 
+## 2026-05-22 Storage Audit Object Evidence Map
+
+Implemented:
+
+- Added `tests/test_cli_contract.py::test_storage_audit_object_evidence_map_refs_stay_current`.
+- Mapped schema/index/JSON contracts, maintenance/catalog audit metadata, credential/token/context audit metadata, lifecycle retained-row/trash relationships, and annotation/visibility audit relationships to exact tests.
+- Reclassified the core object model, SQLite retained-row relationship, and audit event retention rows as proved for current default/local object families.
+- Updated dashboard, pipeline, and closed-gap guardrails so this storage/audit/object proof family is not reopened without a named edge.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_storage_audit_object_evidence_map_refs_stay_current -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_storage_audit_object_evidence_map_refs_stay_current tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
 ## 2026-05-22 Capability Help And Payload Preflight Closeout
 
 Implemented:

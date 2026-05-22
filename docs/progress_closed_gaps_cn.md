@@ -16,6 +16,7 @@
 除非 spec 或 implementation change 推翻已记录证据，不要再为这些 families 单独开 batch：
 
 - Runtime 和 layout guardrails：local CLI-only surface、无 server/web UI/ORM/scheduler/agent/LLM-provider dependency roots、canonical home/artifact/log layout、home/filesystem/path-registry evidence mapping、marker-only project contexts、cwd-relative experiment worktree markers，以及 128-bit home-id suffix checks。
+- Storage/audit/object guardrails：schema/index/JSON contracts、retained `path_registry` 和 credential rows、maintenance/catalog audit metadata、credential/token/context audit metadata、lifecycle trash/reference-count relationships、annotation audit metadata，以及 visibility-linked object history 已映射到当前 default/local object families 的直接证据。
 - Core successful workflow guardrails：auth init、project init、baseline validation、reusable-source experiment creation、run/submit、observe/search/best history inspection、public/private collaboration visibility、lifecycle state transitions，以及 default/fake adapter paths 已对当前 default/local runnable V1 workflow 共同证明。
 - Capability/help/payload preflight guardrails：generated capability surfaces、locked-command explanations、ambient-key non-expansion、explicit-key unlock paths、invalid explicit credential preflight、token/public isolation、context conflict priority、text payload readers、stdin/file conflicts、output parent checks 和 `OUTPUT_EXISTS` behavior 已对当前 registered command surfaces 证明。
 - Runtime stack and architecture guardrails：pyproject 保持 `alab` console script、Python 3.11 floor、uv package mode、runtime dependency roots 和 dev dependency separation；`src/alab/cli.py` 暴露 Typer boundary，并把 arbitrary argv 与 `--help` 委托给 ALab pre-scan/capability logic；runtime imports 覆盖 Typer、Pydantic 和 standard-library `sqlite3`，同时 banned server/ORM/agent/LLM dependency roots 保持缺失。
@@ -49,6 +50,7 @@
 ## 最近关闭
 
 - 2026-05-22：core successful workflow proof，覆盖 auth init、project init、baseline validation、reusable-source experiment creation、run/submit、observe/search/best history inspection、public/private visibility、lifecycle state transitions 和 default/fake adapter paths。
+- 2026-05-22：storage/audit/object evidence map，覆盖 schema/index/JSON、maintenance/catalog audit、credential/token/context audit、lifecycle retained-row/trash relationships，以及 annotation/visibility audit relationships。
 - 2026-05-22：capability/help/payload preflight proof，覆盖当前 generated/default/context surfaces、text payload readers、output preflight、credential preflight 和 side-effect-free rejection variants。
 - 2026-05-22：source/public experiment direction evidence map，覆盖 canonical source metadata、standalone import selectors/warnings、public inline imports、public `--from-exp`、archived source refs 和 adapter source bootstrap。
 - 2026-05-22：runner/adapter direction evidence map，覆盖 shared runner contracts、config schema/saved failures、local rewards、fake/default Docker、artifact/log lifecycle、Harbor、SkyDiscover 和 opt-in real-environment gates。
