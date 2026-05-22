@@ -50,7 +50,7 @@ jobs:
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+      PYTHONPYCACHEPREFIX: /tmp/alab-pycache
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+      PYTHONPYCACHEPREFIX: /tmp/alab-pycache
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -138,7 +138,7 @@ jobs:
       ALAB_RUN_REAL_DOCKER: "1"
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+      PYTHONPYCACHEPREFIX: /tmp/alab-pycache
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -175,7 +175,7 @@ jobs:
       ALAB_RUN_REAL_SKYDISCOVER_PYTHON: "1"
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+      PYTHONPYCACHEPREFIX: /tmp/alab-pycache
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -208,7 +208,7 @@ jobs:
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+      PYTHONPYCACHEPREFIX: /tmp/alab-pycache
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -249,7 +249,7 @@ jobs:
       ALAB_RUN_LIVE_SKYDISCOVER_CATALOG: "1"
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+      PYTHONPYCACHEPREFIX: /tmp/alab-pycache
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
