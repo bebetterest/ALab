@@ -28,6 +28,7 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Inspect current context with `alab status` and `alab help`.
 - Read task files and project instructions that are present in the worktree.
 - Inspect visible historical experiments with `alab observe experiments ...` and related visible runs, artifacts, logs, and annotations. Use this evidence to find promising approaches, avoid repeated failures, and understand prior best or final commits. Visibility is still enforced by ALab; do not try to access hidden or unavailable records.
+- When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, read its source code, and compare it with the current worktree. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, or project control files.
 - Change task-relevant source files in the worktree and keep the implementation understandable for later workers.
 - Run local cheap checks when they exist, then run `alab run --message "<brief reason>"`.
 - Diagnose failed or weak runs using visible stdout/stderr previews, warning codes, artifacts, logs, metrics, and annotations.

@@ -9,6 +9,7 @@ alab status
 alab help
 alab run --message "<message>"
 alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
+alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]
 alab observe experiments list|search|show|best ...
 alab observe runs list|show ...
 alab observe artifacts list|show|export ...
@@ -21,6 +22,7 @@ Worker lifecycle permissions are intentionally narrow:
 
 - `run` and `submit` require the valid worktree token from the current experiment.
 - Observe commands show only records visible to the current token.
+- `exp checkout` can create an inspection checkout only for experiments visible to the current token.
 - Hidden logs require root/admin and are outside this skill.
 - Worker annotation mutation is limited to visible targets and annotations created by the worker token.
 
@@ -40,6 +42,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`alab submit`**: Close the experiment with final summary and feedback after a supporting passed run.
   Parameters: Required `--message`, one of `--summary`/`--summary-file`, one of `--feedback`/`--feedback-file`, and at least one `--ref`; optional `--rerun`.
   Use the output for: Final run id, final commit, stored summary/feedback, experiment status, and submitted refs.
+- **`alab exp checkout`**: Create an inspection checkout of a visible historical experiment at a selected commit.
+  Parameters: Required `<exp_id>` and `--path <dir>`; optional `--commit final|latest|best|<sha>`. Use an empty path outside the current worktree and other ALab contexts.
+  Use the output for: A read-only comparison workspace with source code from a visible prior experiment. Read it for implementation ideas, then copy only genuinely useful task-relevant source files or snippets into the current worktree. Do not copy `.alab/`, raw tokens, hidden assets, or project control files.
 - **`observe experiments list`**: See visible experiments in the project.
   Parameters: Filters include `--status`, repeated `--tag`, `--source-id`, `--name-query`, reward bounds, config version, timestamps, and `--include-archived`; pagination uses `--limit`/`--offset`; sorting uses `--sort <field>:<asc|desc>`.
   Use the output for: Find prior attempts, similar tags, source lineage, closed experiments, and possible refs.
@@ -88,6 +93,14 @@ alab observe annotations list --target-type experiment --target-id <exp_id>
 ```
 
 Use visible history as evidence and inspiration, not as permission expansion. Prefer high-reward passed runs, useful warning patterns, clear annotations, and comparable task/source lineage. If a prior experiment materially informed the final answer, include it as a submit ref.
+
+When a visible experiment looks potentially useful, inspect its code directly instead of relying only on summaries:
+
+```text
+alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
+```
+
+Use `best` for reward-led exploration, `final` to inspect a submitted candidate, and `latest` when the current branch tip is what matters. Read and compare the checkout before copying anything. Copy only source content that advances the current task, adapt it to the current worktree, and keep the copied influence visible in the final `--ref <exp_id>`.
 
 ## Forbidden Surface
 
