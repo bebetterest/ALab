@@ -20533,7 +20533,7 @@ def test_runtime_stack_and_entrypoint_follow_blueprint_contract(tmp_path: Path) 
     import_roots = _runtime_import_roots()
     required_runtime_roots = {"typer", "rich", "pydantic", "tomli_w", "pathspec"}
 
-    assert pyproject["project"]["name"] == "alab"
+    assert pyproject["project"]["name"] == "alab-cli"
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert pyproject["project"]["scripts"] == {"alab": "alab.cli:main"}
     assert pyproject["tool"]["uv"]["package"] is True
