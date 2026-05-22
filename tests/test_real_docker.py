@@ -376,10 +376,12 @@ globs = ["run:cli-artifact.txt"]
         "validation id",
         "validation status",
         "admin key",
+        "warning code",
         "next",
     ]
     assert "project status: valid" in project_out
     assert "validation status: passed" in project_out
+    assert "warning code: DOCKER_SETUP_OUTPUT_CAPTURED" in project_out
     project_id = _field(project_out, "project id")
     validation_id = _field(project_out, "validation id")
 

@@ -7552,3 +7552,18 @@ Validation:
 - Focused docs sync: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-22 Real Docker-Backed Gate Closeout
+
+Implemented:
+
+- Fixed the opt-in real Docker CLI workflow test to expect the current `project init` warning field for hidden Docker setup output.
+- Reclassified the real Docker-backed subset as proved on the current Darwin/Docker Desktop host: Docker runner, Dockerfile cache, CLI Docker workflow, Harbor verifier variants, and SkyDiscover Docker evaluator.
+- Kept live SkyDiscover catalog and SkyDiscover Python local-wheel/network/native dependency gates explicitly `ENV-GATED`.
+- Updated the dashboard, pipeline, audit, and closed-gap guardrails so future work does not reopen the real Docker-backed subset without a host/platform change.
+
+Validation:
+
+- `ALAB_RUN_REAL_DOCKER=1 UV_LOCKED=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_real_docker.py::test_real_docker_cli_project_run_workflow -q`
+- `ALAB_RUN_REAL_DOCKER=1 UV_LOCKED=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -m real_docker -q`
+- Full default-suite/static checks are recorded in the P0 completion gate for this same closeout batch.
