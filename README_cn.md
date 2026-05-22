@@ -15,7 +15,8 @@ ALab V1 有意保持 local-only：没有 server、sync service、Web UI、内置
 - Git-backed experiment isolation：每个 experiment 是独立 branch/worktree，并有 worktree token 用于 run 和 submit。
 - 可复现 project setup：project config 控制 runner、reward、artifact capture、environment、secrets、mutable paths 和 visibility。
 - Runner 支持 local subprocess、Docker image/Dockerfile、Harbor verifier，以及 SkyDiscover Python/Docker evaluator。
-- 协作边界，不是本地强安全：root/admin key 和 experiment token 约束 CLI capability，但本地 project records 仍是 plaintext。
+- 协作边界，不是本地强安全隔离：root/admin key 和 experiment token 约束 CLI capability，但本地 project records 仍是 plaintext。
+- Secret hygiene：不存 raw key/token；生成的 raw key 只打印一次，experiment token 留在 token file 中，`secret_env` values 不会渲染或 export。
 - 开源文档集：英文为 canonical，并配套同步中文 `*_cn.md` 文档。
 
 ## Current Status

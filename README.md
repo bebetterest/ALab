@@ -15,7 +15,8 @@ ALab V1 is intentionally local-only: no server, sync service, web UI, built-in a
 - Git-backed experiment isolation: each experiment is an isolated branch/worktree with a worktree token for run and submit operations.
 - Reproducible project setup: project config controls runner, reward, artifact capture, environment, secrets, mutable paths, and visibility.
 - Runner support for local subprocesses, Docker images/Dockerfiles, Harbor verifiers, and SkyDiscover Python/Docker evaluators.
-- Collaboration boundary, not local strong security: root/admin keys and experiment tokens gate CLI capabilities, while local project records remain plaintext.
+- Collaboration boundary, not strong local security: root/admin keys and experiment tokens gate CLI capabilities, while local project records remain plaintext.
+- Secret hygiene: raw keys/tokens are not stored; generated raw keys are printed once, experiment tokens stay in token files, and `secret_env` values are not rendered or exported.
 - Open-source documentation set with English canonical docs and synchronized Chinese `*_cn.md` companions.
 
 ## Current Status
