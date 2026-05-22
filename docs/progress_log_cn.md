@@ -7487,3 +7487,17 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 Core Successful Workflow Closeout
+
+已实现：
+
+- 将 top-level core successful workflow row 重新归类为当前 default/local/fake-adapter workflow 已证明。
+- 将该 closeout 绑定到已证明的 public/private collaboration rows、adapter-derived source rows、lifecycle rows、runner/adapter rows，以及 2026-05-22 full default-suite rerun。
+- 更新 dashboard、pipeline 和 closed-gap guardrails，防止未来 agent 在没有 named audit edge 时重开宽泛 core workflow proof。
+
+验证：
+
+- Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。

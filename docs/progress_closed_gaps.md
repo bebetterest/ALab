@@ -11,11 +11,12 @@ Read this file only when planned work might duplicate a closed proof family. It 
 - If a spec or implementation change invalidates a guardrail, update or remove the guardrail and reopen the matching audit row.
 - English is canonical; update `docs/progress_closed_gaps_cn.md` in the same change.
 
-## Guardrail Summary - 2026-05-21
+## Guardrail Summary - 2026-05-22
 
 Do not spend another batch on these families unless a spec or implementation change invalidates the recorded evidence:
 
 - Runtime and layout guardrails: local CLI-only surface, no server/web UI/ORM/scheduler/agent/LLM-provider dependency roots, canonical home/artifact/log layout, home/filesystem/path-registry evidence mapping, marker-only project contexts, cwd-relative experiment worktree markers, and 128-bit home-id suffix checks.
+- Core successful workflow guardrails: auth init, project init, baseline validation, reusable-source experiment creation, run/submit, observe/search/best history inspection, public/private collaboration visibility, lifecycle state transitions, and default/fake adapter paths are proved together for the current default/local runnable V1 workflow.
 - Runtime stack and architecture guardrails: pyproject keeps the `alab` console script, Python 3.11 floor, uv package mode, runtime dependency roots, and dev dependency separation; `src/alab/cli.py` exposes a Typer boundary that delegates arbitrary argv and `--help` to ALab pre-scan/capability logic; runtime imports cover Typer, Pydantic, and standard-library `sqlite3` while banned server/ORM/agent/LLM dependency roots remain absent.
 - Host-support policy guardrails: blueprint/README keep macOS/Linux as the V1 host policy, Windows remains outside V1 acceptance testing, the current default-suite host must be macOS/Linux, and real Docker/SkyDiscover/Harbor behavior stays behind opt-in pytest markers.
 - Documentation consistency guardrails: README/README_cn repository trees, opt-in pytest marker commands, Markdown Chinese pairs, CLI spec English/Chinese command and field synchronization, `.env.example` references, `.gitignore` local-note/env policy, progress dashboard/pipeline/guardrail/log/audit split, and ignored local AGENTS/CORE note alignment have current focused evidence.
@@ -46,6 +47,7 @@ Do not spend another batch on these families unless a spec or implementation cha
 
 ## Recently Closed
 
+- 2026-05-22: core successful workflow proof for auth init, project init, baseline validation, reusable-source experiment creation, run/submit, observe/search/best history inspection, public/private visibility, lifecycle state transitions, and default/fake adapter paths.
 - 2026-05-22: source/public experiment direction evidence map for canonical source metadata, standalone import selectors/warnings, public inline imports, public `--from-exp`, archived source refs, and adapter source bootstrap.
 - 2026-05-22: runner/adapter direction evidence map for shared runner contracts, config schema/saved failures, local rewards, fake/default Docker, artifact/log lifecycle, Harbor, SkyDiscover, and opt-in real-environment gates.
 - 2026-05-21: host-support policy proof for macOS/Linux-only V1 host support, Windows exclusion, current Darwin default-suite host, and opt-in real runner markers.
