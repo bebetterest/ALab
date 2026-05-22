@@ -7501,3 +7501,17 @@
 - Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 Capability Help And Payload Preflight Closeout
+
+已实现：
+
+- 将 context-aware help/capability preflight rows 重新归类为当前 generated/default/context surfaces 已证明。
+- 将 file/output payload preflight row 重新归类为当前 text payload readers、stdin/file conflicts、output parent checks 和 `OUTPUT_EXISTS` behavior 已证明。
+- 更新 dashboard、pipeline 和 closed-gap guardrails，确保除非新增 registered command、context mode、credential surface 或 payload option 改变矩阵，否则不重开这些 preflight families。
+
+验证：
+
+- Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
