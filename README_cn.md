@@ -43,10 +43,10 @@ ALab V1 有意保持 local-only：没有 server、sync service、Web UI、内置
 
 ## Installation
 
-ALab 是标准 Python package，并定义了 `alab` console script。等 package 发布到 Python package index 后，可直接用 pip 安装：
+ALab 以 `alab-cli` Python package 分发，并安装 `alab` console script。等 package 发布到 Python package index 后，可直接用 pip 安装：
 
 ```sh
-python -m pip install alab
+python -m pip install alab-cli
 alab help
 ```
 
@@ -237,8 +237,8 @@ ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache uv run pytest -m live
 - `uv.lock` 会被 tracked，因为 CI 和本地 validation 使用 `uv run --locked`。
 - 本地 cache/output paths 应保持 ignored（`.uv-cache/`、`.pytest_cache/`、`.ruff_cache/`、`.alab-demo/`、`.env`）。
 - GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 pytest suite；真实 Docker 和 live/networked SkyDiscover gates 仍是 manual workflow inputs。
-- 推送 `pyproject.toml` 的 `project.version` 变更到 `main` 时，会通过 PyPI Trusted Publishing 构建并发布 package。
-- 首次自动发布前，PyPI project 需要信任 repository `bebetterest/ALab`、workflow `ci.yml` 和 environment `pypi`。
+- 推送到 `main` 时会检查 PyPI 是否已有当前 `pyproject.toml` package version；如果缺少该精确版本，CI 会通过 PyPI Trusted Publishing 构建并发布，否则跳过发布。
+- 首次自动发布前，PyPI `alab-cli` project 需要信任 repository `bebetterest/ALab`、workflow `ci.yml` 和 environment `pypi`。
 
 ## Security And Data Model
 

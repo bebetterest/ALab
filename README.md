@@ -43,10 +43,10 @@ Local environment variables are documented in [.env.example](.env.example). Real
 
 ## Installation
 
-ALab is a standard Python package with an `alab` console script. Once the package is published to a Python package index, install it directly with pip:
+ALab is distributed as the `alab-cli` Python package and installs the `alab` console script. Once the package is published to a Python package index, install it directly with pip:
 
 ```sh
-python -m pip install alab
+python -m pip install alab-cli
 alab help
 ```
 
@@ -237,8 +237,8 @@ Notes:
 - `uv.lock` is tracked because CI and local validation use `uv run --locked`.
 - Keep local cache/output paths ignored (`.uv-cache/`, `.pytest_cache/`, `.ruff_cache/`, `.alab-demo/`, `.env`).
 - GitHub Actions runs the default lint and pytest suite on pull requests and pushes to `main`; real Docker and live/networked SkyDiscover gates remain manual workflow inputs.
-- Pushing a `pyproject.toml` `project.version` change to `main` builds and publishes the package through PyPI Trusted Publishing.
-- The PyPI project must trust repository `bebetterest/ALab`, workflow `ci.yml`, and environment `pypi` before the first automated publish can succeed.
+- Pushes to `main` check PyPI for the current `pyproject.toml` package version; if that exact version is missing, CI builds and publishes through PyPI Trusted Publishing, otherwise it skips publishing.
+- The PyPI `alab-cli` project must trust repository `bebetterest/ALab`, workflow `ci.yml`, and environment `pypi` before the first automated publish can succeed.
 
 ## Security And Data Model
 

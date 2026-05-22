@@ -298,48 +298,64 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      - name: Detect package version change
+      - name: Check PyPI release state
         id: version
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
         run: |
           python - <<'PY'
+          import json
           import os
-          import subprocess
+          import re
           import tomllib
+          import urllib.error
+          import urllib.parse
+          import urllib.request
           from pathlib import Path
 
-          def project_version(text: str) -> str:
-              return tomllib.loads(text)["project"]["version"]
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
+          package_name = project["name"]
+          current = project["version"]
+          normalized_name = re.sub(r"[-_.]+", "-", package_name).lower()
+          url = f"https://pypi.org/pypi/{urllib.parse.quote(normalized_name)}/json"
+          package_exists = True
+          version_exists = False
+          latest = "none"
 
-          current = project_version(Path("pyproject.toml").read_text(encoding="utf-8"))
-          before_sha = os.environ.get("BEFORE_SHA") or ""
-          previous = ""
-          if before_sha and set(before_sha) != {"0"}:
-              try:
-                  previous_text = subprocess.check_output(
-                      ["git", "show", f"{before_sha}:pyproject.toml"],
-                      text=True,
-                      stderr=subprocess.DEVNULL,
-                  )
-                  previous = project_version(previous_text)
-              except (KeyError, subprocess.CalledProcessError, tomllib.TOMLDecodeError):
-                  previous = ""
+          try:
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  payload = json.load(response)
+          except urllib.error.HTTPError as exc:
+              if exc.code == 404:
+                  package_exists = False
+                  payload = {"info": {}, "releases": {}}
+              else:
+                  raise
 
-          should_publish = current != previous
+          if package_exists:
+              releases = payload.get("releases", {})
+              version_exists = current in releases
+              latest = payload.get("info", {}).get("version") or "none"
+
+          should_publish = not version_exists
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"package_name={package_name}\n")
               output.write(f"version={current}\n")
-              output.write(f"previous_version={previous or 'none'}\n")
+              output.write(f"pypi_latest_version={latest}\n")
+              output.write(f"pypi_package_exists={str(package_exists).lower()}\n")
+              output.write(f"pypi_version_exists={str(version_exists).lower()}\n")
               output.write(f"should_publish={str(should_publish).lower()}\n")
 
+          print(f"package name: {package_name}")
           print(f"current version: {current}")
-          print(f"previous version: {previous or 'none'}")
+          print(f"PyPI package exists: {package_exists}")
+          print(f"PyPI latest version: {latest}")
+          print(f"PyPI has current version: {version_exists}")
           print(f"should publish: {should_publish}")
           PY
 
-      - name: Stop when package version did not change
+      - name: Stop when PyPI already has current version
         if: ${{ steps.version.outputs.should_publish != 'true' }}
-        run: echo "pyproject.toml changed without a project.version change; skipping publish."
+        run: |
+          echo "PyPI already has ${{ steps.version.outputs.package_name }} ${{ steps.version.outputs.version }}; skipping publish."
 
       - name: Install build tools
         if: ${{ steps.version.outputs.should_publish == 'true' }}
