@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tomllib
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -201,6 +202,33 @@ _LIFECYCLE_REMOVE_EVIDENCE = {
     ),
     ("catalog", "skydiscover", "remove"): (
         "tests/test_smoke.py::test_skydiscover_catalog_remove_blockers_unexpected_remote_and_history",
+    ),
+}
+
+_HOME_FILESYSTEM_EVIDENCE = {
+    "home_resolution_and_layout": (
+        "tests/test_smoke.py::test_auth_init_and_config_show",
+        "tests/test_cli_contract.py::test_alab_home_layout_and_markers_follow_blueprint",
+        "tests/test_cli_contract.py::test_home_exists_and_output_exists_render_stable_error_blocks",
+        "tests/test_cli_contract.py::test_registered_commands_reject_global_option_errors_before_home_creation",
+        "tests/test_cli_contract.py::test_global_repair_command_success_fields_follow_cli_spec",
+    ),
+    "path_registry_hashing_and_reuse": (
+        "tests/test_migrations.py::test_removed_path_registry_rows_do_not_block_path_reuse",
+        "tests/test_migrations.py::test_path_hash_case_normalizes_on_case_insensitive_filesystems",
+        "tests/test_migrations.py::test_path_hash_detects_case_insensitive_parent_for_missing_child",
+        "tests/test_migrations.py::test_path_hash_preserves_case_on_case_sensitive_filesystems",
+    ),
+    "context_marker_contracts_and_conflicts": (
+        "tests/test_migrations.py::test_context_marker_json_contract_enforces_documented_shape",
+        "tests/test_cli_contract.py::test_status_object_type_tracks_context_mode",
+        "tests/test_cli_contract.py::test_context_marker_conflicts_are_strict_and_side_effect_free",
+        "tests/test_cli_contract.py::test_explicit_keys_preserve_context_conflict_before_handler_effects",
+    ),
+    "worktree_checkout_and_repair_paths": (
+        "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
+        "tests/test_smoke.py::test_context_self_repair_requires_registered_branch",
+        "tests/test_cli_contract.py::test_cli_token_writes_use_private_permissions_and_git_exclude",
     ),
 }
 
@@ -3257,6 +3285,28 @@ def test_registered_alias_groups_are_limited_to_covered_observe_surfaces() -> No
     assert observed == expected
 
 
+def _assert_evidence_refs_exist(refs: Iterable[str]) -> None:
+    refs_by_file: defaultdict[str, set[str]] = defaultdict(set)
+    for ref in refs:
+        file_name, delimiter, test_name = ref.partition("::")
+        assert delimiter == "::" and test_name.startswith("test_"), ref
+        refs_by_file[file_name].add(test_name)
+
+    missing_refs: list[str] = []
+    for file_name, expected_tests in refs_by_file.items():
+        module = ast.parse((_REPO_ROOT / file_name).read_text(encoding="utf-8"))
+        actual_tests = {
+            node.name
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+        }
+        missing_refs.extend(
+            f"{file_name}::{test_name}"
+            for test_name in sorted(expected_tests - actual_tests)
+        )
+    assert missing_refs == []
+
+
 def test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces() -> None:
     archive_unarchive_paths = {
         spec.path
@@ -3273,28 +3323,30 @@ def test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_s
     assert set(_LIFECYCLE_REMOVE_EVIDENCE) == remove_paths
     assert ("exp", "tag", "remove") in registry.COMMANDS_BY_PATH
 
-    refs_by_file: defaultdict[str, set[str]] = defaultdict(set)
     for evidence_map in (_LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE, _LIFECYCLE_REMOVE_EVIDENCE):
         for path, refs in evidence_map.items():
             assert refs, path
-            for ref in refs:
-                file_name, delimiter, test_name = ref.partition("::")
-                assert delimiter == "::" and test_name.startswith("test_"), ref
-                refs_by_file[file_name].add(test_name)
+    _assert_evidence_refs_exist(
+        ref
+        for evidence_map in (_LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE, _LIFECYCLE_REMOVE_EVIDENCE)
+        for refs in evidence_map.values()
+        for ref in refs
+    )
 
-    missing_refs: list[str] = []
-    for file_name, expected_tests in refs_by_file.items():
-        module = ast.parse((_REPO_ROOT / file_name).read_text(encoding="utf-8"))
-        actual_tests = {
-            node.name
-            for node in module.body
-            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
-        }
-        missing_refs.extend(
-            f"{file_name}::{test_name}"
-            for test_name in sorted(expected_tests - actual_tests)
-        )
-    assert missing_refs == []
+
+def test_home_filesystem_and_path_registry_evidence_map_refs_stay_current() -> None:
+    assert set(_HOME_FILESYSTEM_EVIDENCE) == {
+        "home_resolution_and_layout",
+        "path_registry_hashing_and_reuse",
+        "context_marker_contracts_and_conflicts",
+        "worktree_checkout_and_repair_paths",
+    }
+    assert all(refs for refs in _HOME_FILESYSTEM_EVIDENCE.values())
+    _assert_evidence_refs_exist(
+        ref
+        for refs in _HOME_FILESYSTEM_EVIDENCE.values()
+        for ref in refs
+    )
 
 
 def test_command_registry_object_types_follow_cli_contract_table() -> None:
@@ -20236,6 +20288,36 @@ def test_runtime_stack_and_entrypoint_follow_blueprint_contract(tmp_path: Path) 
     assert "error code: COMMAND_UNAVAILABLE" in unknown_result.stderr
     assert "Usage:" not in no_args.stdout
     assert "Usage:" not in help_result.stdout
+
+
+def test_host_support_policy_and_opt_in_runner_gates_are_documented() -> None:
+    blueprint = (_REPO_ROOT / "docs" / "blueprint.md").read_text(encoding="utf-8")
+    blueprint_cn = (_REPO_ROOT / "docs" / "blueprint_cn.md").read_text(encoding="utf-8")
+    readme = _README_PATH.read_text(encoding="utf-8")
+    readme_cn = _README_CN_PATH.read_text(encoding="utf-8")
+    pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
+    marker_names = {
+        marker.split(":", 1)[0]
+        for marker in pyproject["tool"]["pytest"]["ini_options"]["markers"]
+    }
+
+    assert sys.platform.startswith(("darwin", "linux"))
+    assert "Supported hosts are macOS and Linux" in blueprint
+    assert "Windows is not part of V1 acceptance testing" in blueprint
+    assert "Windows host support" in blueprint
+    assert "支持 host 为 macOS 和 Linux" in blueprint_cn
+    assert "Windows 不进入 V1 acceptance testing" in blueprint_cn
+    assert "ALAB_RUN_REAL_DOCKER=1" in readme
+    assert "ALAB_RUN_REAL_DOCKER=1" in readme_cn
+    assert "ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1" in readme
+    assert "ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1" in readme
+    assert {
+        "real_docker",
+        "real_skydiscover_python",
+        "networked_skydiscover_python",
+        "native_skydiscover_python",
+        "live_skydiscover_catalog",
+    } <= marker_names
 
 
 def test_runtime_surface_stays_local_cli_without_server_orm_or_agent_dependencies() -> None:

@@ -5358,6 +5358,18 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
 - `git diff --check`
 
+## 2026-05-21 Host Support Policy Proof
+
+已实现：
+
+- 新增 `tests/test_cli_contract.py::test_host_support_policy_and_opt_in_runner_gates_are_documented`。
+- 通过断言当前 host 为 macOS/Linux、blueprint 和中文 blueprint 将 Windows 排除在 V1 acceptance 之外、README/README_cn 记录 opt-in real runner commands，并且 `pyproject.toml` 保留 opt-in real runner markers，证明 current default/local scope 的 host policy row。
+- Real Docker/Harbor/SkyDiscover validation 继续保持为 `ENV-GATED`。
+
+验证：
+
+- Focused host-policy checks 已纳入 batch 后的 docs/static validation run。
+
 ## 2026-05-21 Live SkyDiscover Catalog Revalidation
 
 已验证：
@@ -7424,3 +7436,35 @@
 - Focused docs sanity：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - Full default suite：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
 - Full static checks：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`；`PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`；`git diff --check`
+
+## 2026-05-21 Home Filesystem And Path Registry Evidence Map
+
+已实现：
+
+- 新增 `tests/test_cli_contract.py::test_home_filesystem_and_path_registry_evidence_map_refs_stay_current`。
+- 将 home resolution/layout、path-registry hashing/reuse、context marker contracts/conflicts，以及 worktree/checkout/repair path evidence 映射到精确 tests。
+- 将 ALab home/filesystem layout、home resolution 和 context marker/path-registry audit rows 重新归类为当前 default/local behavior 已证明。
+- 将 full default-suite gate 标为 stale，因为本 batch 在上次 full-suite pass 后修改了 tests 和 docs。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_home_filesystem_and_path_registry_evidence_map_refs_stay_current tests/test_cli_contract.py::test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
+- `git diff --check`
+
+## 2026-05-21 Final Default-Suite Closeout Gate
+
+已验证：
+
+- 在 home/filesystem/path-registry evidence-map 和 host-support policy proof batch 后，重新运行完整 default/local gate。
+- 将 P0 full default-suite gate 重新归类为当前 worktree 已证明。
+- 从 active queue 移除 full-suite rerun 项；未来只有 implementation/test changes 后，或 release claim 前，才重新加入。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md tests/test_cli_contract.py` 无匹配。

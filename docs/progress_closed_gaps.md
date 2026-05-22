@@ -15,8 +15,9 @@ Read this file only when planned work might duplicate a closed proof family. It 
 
 Do not spend another batch on these families unless a spec or implementation change invalidates the recorded evidence:
 
-- Runtime and layout guardrails: local CLI-only surface, no server/web UI/ORM/scheduler/agent/LLM-provider dependency roots, canonical home/artifact/log layout, marker-only project contexts, cwd-relative experiment worktree markers, and 128-bit home-id suffix checks.
+- Runtime and layout guardrails: local CLI-only surface, no server/web UI/ORM/scheduler/agent/LLM-provider dependency roots, canonical home/artifact/log layout, home/filesystem/path-registry evidence mapping, marker-only project contexts, cwd-relative experiment worktree markers, and 128-bit home-id suffix checks.
 - Runtime stack and architecture guardrails: pyproject keeps the `alab` console script, Python 3.11 floor, uv package mode, runtime dependency roots, and dev dependency separation; `src/alab/cli.py` exposes a Typer boundary that delegates arbitrary argv and `--help` to ALab pre-scan/capability logic; runtime imports cover Typer, Pydantic, and standard-library `sqlite3` while banned server/ORM/agent/LLM dependency roots remain absent.
+- Host-support policy guardrails: blueprint/README keep macOS/Linux as the V1 host policy, Windows remains outside V1 acceptance testing, the current default-suite host must be macOS/Linux, and real Docker/SkyDiscover/Harbor behavior stays behind opt-in pytest markers.
 - Documentation consistency guardrails: README/README_cn repository trees, opt-in pytest marker commands, Markdown Chinese pairs, CLI spec English/Chinese command and field synchronization, `.env.example` references, `.gitignore` local-note/env policy, progress dashboard/pipeline/guardrail/log/audit split, and ignored local AGENTS/CORE note alignment have current focused evidence.
 - Security boundary guardrails: V1 remains plaintext local storage with verifier-only credentials and no encrypted storage, grant-file, public-grant, token-rewrap, DEK, ciphertext, keyring, or cryptography implementation artifacts; README/blueprint keep the collaboration-boundary and no-strong-local-security wording synchronized with that implementation boundary.
 - Parser, renderer, and preflight guardrails: strict text object rendering, global/command option validation, payload file preflight, generated capability preflight, output alias boundaries, export-output preflight, command-specific config-value errors, complete ALab id selectors, RFC 3339 filters, `HOME_EXISTS`, and `OUTPUT_EXISTS`.
@@ -45,6 +46,9 @@ Do not spend another batch on these families unless a spec or implementation cha
 
 ## Recently Closed
 
+- 2026-05-21: host-support policy proof for macOS/Linux-only V1 host support, Windows exclusion, current Darwin default-suite host, and opt-in real runner markers.
+- 2026-05-21: final default-suite closeout gate for the current worktree after the home/filesystem and host-support evidence-map batch.
+- 2026-05-21: home/filesystem/path-registry evidence mapping for home resolution/layout, path-registry hash/reuse, context marker conflict contracts, and worktree/checkout/repair paths.
 - 2026-05-21: lifecycle archive/unarchive/remove row-by-row evidence mapping for every current registered archive/unarchive surface and every current registered hard-remove/cleanup remove surface except immediate tag removal.
 - 2026-05-21: runtime stack and architecture proof for Typer entrypoint delegation, pyproject stack contracts, runtime imports, no ORM/server/agent dependency drift, and Rich non-persistence.
 - 2026-05-21: documentation consistency proof for README/README_cn, Markdown pair coverage, CLI spec synchronization, `.env.example`, `.gitignore`, progress/audit ledgers, and ignored local AGENTS/CORE notes.

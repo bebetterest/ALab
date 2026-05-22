@@ -5270,6 +5270,18 @@ Validation:
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
 - `git diff --check`
 
+## 2026-05-21 Host Support Policy Proof
+
+Implemented:
+
+- Added `tests/test_cli_contract.py::test_host_support_policy_and_opt_in_runner_gates_are_documented`.
+- Proved the host policy row for current default/local scope by asserting the current host is macOS/Linux, blueprint and Chinese blueprint exclude Windows from V1 acceptance, README/README_cn document opt-in real runner commands, and `pyproject.toml` keeps the opt-in real runner markers.
+- Kept real Docker/Harbor/SkyDiscover validation as `ENV-GATED`.
+
+Validation:
+
+- Focused host-policy checks are included in the post-batch docs/static validation run.
+
 ## 2026-05-21 Live SkyDiscover Catalog Revalidation
 
 Validated:
@@ -7430,3 +7442,35 @@ Validation:
 - Focused docs sanity: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - Full default suite: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
 - Full static checks: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`; `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`; `git diff --check`
+
+## 2026-05-21 Home Filesystem And Path Registry Evidence Map
+
+Implemented:
+
+- Added `tests/test_cli_contract.py::test_home_filesystem_and_path_registry_evidence_map_refs_stay_current`.
+- Mapped home resolution/layout, path-registry hashing/reuse, context marker contracts/conflicts, and worktree/checkout/repair path evidence to exact tests.
+- Reclassified the ALab home/filesystem layout, home resolution, and context marker/path-registry audit rows as proved for current default/local behavior.
+- Marked the full default-suite gate stale because this batch changed tests and docs after the previous full-suite pass.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_home_filesystem_and_path_registry_evidence_map_refs_stay_current tests/test_cli_contract.py::test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
+- `git diff --check`
+
+## 2026-05-21 Final Default-Suite Closeout Gate
+
+Validated:
+
+- Re-ran the full default/local gate after the home/filesystem/path-registry evidence-map and host-support policy proof batches.
+- Reclassified the P0 full default-suite gate as proved for the current worktree.
+- Removed the full-suite rerun item from the active queue; future work should re-add it only after implementation/test changes or before a release claim.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md tests/test_cli_contract.py` returned no matches.
