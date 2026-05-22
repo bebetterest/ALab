@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -51,7 +52,7 @@ def _field_labels(output: str) -> list[str]:
     return labels
 
 
-def _require_real_docker_image(image: str) -> None:
+def _require_real_docker_daemon() -> None:
     if os.environ.get("ALAB_RUN_REAL_DOCKER", "").lower() not in {"1", "true", "yes"}:
         pytest.skip("set ALAB_RUN_REAL_DOCKER=1 to run real Docker integration tests")
     try:
@@ -63,6 +64,10 @@ def _require_real_docker_image(image: str) -> None:
     if version.returncode != 0:
         reason = (version.stderr or version.stdout).decode("utf-8", errors="replace").strip()
         pytest.skip(f"docker daemon is not available: {reason}")
+
+
+def _require_real_docker_image(image: str) -> None:
+    _require_real_docker_daemon()
     inspect = _docker(["image", "inspect", image], timeout=30)
     if inspect.returncode == 0:
         return
@@ -90,6 +95,48 @@ def _skydiscover_docker_resolver(evaluator_dir: Path):
         "pinned_commit": "d" * 40,
         "target_path": str(evaluator_dir),
     }
+
+
+def test_real_docker_config_validate_refreshes_capability_cache(tmp_path, capsys) -> None:
+    _require_real_docker_daemon()
+    home = tmp_path / "home"
+
+    assert run(["--home", str(home), "auth", "init"]) == 0
+    capsys.readouterr()
+    assert run(["--home", str(home), "config", "validate", "--refresh-capabilities"]) == 0
+    out = capsys.readouterr().out
+
+    assert "object: config" in out
+    assert "object: capability" in out
+    assert "capability: docker.availability" in out
+    assert "capability: docker.platform.linux" in out
+    assert "capability: docker.resource.cpus" in out
+    assert "capability: docker.resource.memory" in out
+
+    with sqlite3.connect(home / "alab.db") as conn:
+        rows = dict(conn.execute("SELECT capability_key, status FROM runtime_capabilities").fetchall())
+        details = {
+            key: json.loads(value)
+            for key, value in conn.execute("SELECT capability_key, details_json FROM runtime_capabilities").fetchall()
+        }
+
+    expected_keys = {
+        "docker.availability",
+        "docker.platform.linux",
+        "docker.platform.linux/amd64",
+        "docker.platform.linux/arm64",
+        "docker.resource.cpus",
+        "docker.resource.memory",
+    }
+    assert set(rows) == expected_keys
+    assert set(details) == expected_keys
+    assert rows["docker.availability"] == "supported"
+    assert rows["docker.platform.linux"] == "supported"
+    assert rows["docker.resource.cpus"] == "supported"
+    assert rows["docker.resource.memory"] == "supported"
+    assert any(rows[key] == "supported" for key in ("docker.platform.linux/amd64", "docker.platform.linux/arm64"))
+    assert details["docker.availability"]["probed_values"]["server_version"]
+    assert details["docker.platform.linux"]["probed_values"]["ostype"] == "linux"
 
 
 def test_real_docker_runner_mount_env_and_reward(tmp_path) -> None:

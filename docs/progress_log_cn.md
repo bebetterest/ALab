@@ -7582,3 +7582,22 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 Real Docker Capability Refresh Gate Closeout
+
+已实现：
+
+- 新增 opt-in real Docker `config validate --refresh-capabilities` 测试：要求 daemon 可达，验证渲染的 capability rows，并检查持久化的 Docker availability、Linux platform、architecture、CPU 和 memory resource rows。
+- 将 global config 的 real Docker refresh row 重新归类为当前 Darwin/Docker Desktop host 已证明；不同 release-target Docker daemons 仍保持 opt-in。
+- 更新 audit、dashboard、pipeline 和 guardrails，避免未来在 host/platform/Docker version 未变化时重新打开当前 real Docker capability refresh。
+
+验证：
+
+- `ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_real_docker.py::test_real_docker_config_validate_refreshes_capability_cache -q`
+- `ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -m real_docker -q`（`10 passed`）
+- Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_real_docker.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。

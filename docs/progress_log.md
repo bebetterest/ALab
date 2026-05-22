@@ -7588,3 +7588,22 @@ Validation:
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-22 Real Docker Capability Refresh Gate Closeout
+
+Implemented:
+
+- Added an opt-in real Docker `config validate --refresh-capabilities` test that requires a reachable daemon, verifies rendered capability rows, and checks persisted Docker availability, Linux platform, architecture, CPU, and memory resource rows.
+- Reclassified the global config real Docker refresh row as proved for the current Darwin/Docker Desktop host while keeping different release-target Docker daemons opt-in.
+- Updated audit, dashboard, pipeline, and guardrails so future work does not reopen current real Docker capability refresh without a host/platform/Docker-version change.
+
+Validation:
+
+- `ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_real_docker.py::test_real_docker_config_validate_refreshes_capability_cache -q`
+- `ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -m real_docker -q` (`10 passed`)
+- Focused docs sync: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_real_docker.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
