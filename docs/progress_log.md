@@ -7624,3 +7624,33 @@ Validation:
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
 - `git diff --check`
 - `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-22 Live SkyDiscover Catalog Gate Closeout
+
+Implemented:
+
+- Re-ran the opt-in live SkyDiscover catalog marker in the current network environment; it passed instead of skipping.
+- Reclassified current live SkyDiscover catalog and real-environment runner rows as proved for the current Darwin host, alongside the already proved real Docker-backed and SkyDiscover Python dependency gates.
+- Updated the dashboard, pipeline, completion audit, and closed-gap guardrails so the active queue now only tracks grouped blueprint/subsystem audit-row decomposition. Release-target host, platform, Docker, Python dependency, or upstream SkyDiscover catalog changes still require rerunning the relevant opt-in gates.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked env ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 pytest -m live_skydiscover_catalog -q -rs` (`1 passed`)
+- Focused docs sync: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-22 Final Requirement Ledger Closeout
+
+Implemented:
+
+- Reclassified the top-level blueprint/subsystem requirement audit gate as proved for the current V1 evidence ledger after confirming no active `PARTIAL`, `PENDING`, or `ENV-GATED` requirement rows remain outside status legend and future-state instructions.
+- Cleared the active pipeline queue for the current worktree and updated the dashboard/closed-gap guardrails to treat future work as newly scoped changes rather than inherited backlog.
+- Kept release-target real-environment reruns conditional on host/platform/Python/network/upstream behavior changes.
+
+Validation:
+
+- ``rg -n '^\| .* \| `PARTIAL`|^\| .* \| `PENDING`|^\| .* \| `ENV-GATED`' docs/completion_audit.md docs/completion_audit_cn.md`` returned no active requirement-row matches.
+- Focused docs sync: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.

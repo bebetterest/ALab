@@ -14,16 +14,15 @@
 
 ## 当前 Active Batch - 2026-05-22
 
-- Focus：storage/audit/object retained-relationship proof、core successful workflow proof、CLI golden/command-contract completeness、capability/help/payload preflight proof、runtime stack/architecture proof、host-support policy proof、documentation consistency proof、source/public experiment direction proof、runner/adapter direction proof、当前 Darwin real Docker-backed runner 与 capability-refresh validation、run/submit lifecycle proof、lifecycle archive/unarchive/remove evidence mapping、home/filesystem/path-registry evidence mapping、exp-create source-binding/default-source proof、source import canonical tree-hash/remote-Git fidelity proof、project init precedence proof mapping、config edit semantics proof mapping、public `--source-git` credential-helper warning proof、context repair old-path blocker proof、security boundary negative proof、config capability-refresh evidence mapping、shared-runner cleanup、project config/schema proof mapping、project/experiment hard-remove retained-row relationships、source/validation hard-remove audit/reference relationships、maintenance object audit metadata、credential model proof mapping、credential audit metadata、token revoke/regenerate side-effect mapping、context marker conflict/alias mapping、inspection context repair pinned-commit/audit metadata、public `--from-exp` visibility-intersection proof、explicit token/inspection observe visibility joins、run/artifact/log/annotation list filter/sort matrices、experiment list/search filter/sort matrices，以及 final default-suite gate 已对当前 default/fake paths 完成 closeout validation。
-- 重复处理 guardrail：`docs/progress_closed_gaps.md` 现在负责 do-not-reopen list。只有下一批像已关闭 family 时才打开。
-- 下一步 evidence：closeout 期间默认不再新增。只有 `docs/completion_audit.md` 点名具体 defect，或明确 release target 需要剩余 live SkyDiscover catalog gate 时，才重新打开 implementation work。
+- Focus：当前 worktree 没有剩余 active implementation 或 evidence batch。
+- 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
+- 下一步 evidence：当前 worktree 无需新增。只有 `docs/completion_audit.md` 点名具体 defect、changed requirement 使现有 evidence row 过宽而无法判断，或明确 release target 不同于当前已证明的 real-environment gates 时，才重新打开工作。
 
 ## Active Queue
 
-| Priority | Batch | Why it is next | Evidence target | Suggested focused checks |
-| --- | --- | --- | --- | --- |
-| P0 | Post-closeout audit-row decomposition | 只有从 default/local runnable V1 closeout 继续进入 exhaustive release evidence 时才需要。最近的 default/fake-path proof families，包括 storage/audit/object retained relationships、core successful workflow、CLI golden/command-contract completeness、capability/help/payload preflight、source/public experiment direction、runner/adapter direction、host-support policy、lifecycle archive/unarchive/remove 和 home/filesystem/path-registry mapping，已经有 direct evidence，除非有 named gap，否则不要重开。 | 剩余 grouped blueprint/subsystem audit row，而不是宽泛的已证明 family。 | 每次围绕一个 named audit edge 增加窄 tests 或 exact evidence references。 |
-| P1 | Remaining live catalog gate | Docker-backed Docker/Harbor/SkyDiscover Docker gates、real Docker capability refresh 和 SkyDiscover Python local-wheel/network/native dependency gates 已在当前 Darwin host 通过。唯一剩余 real-environment gate 是 live SkyDiscover catalog reachability，目前被此环境到 GitHub 的 SSL access 阻塞。 | Live SkyDiscover catalog row。 | 在能访问 GitHub 的网络上重跑 `ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ... pytest -m live_skydiscover_catalog -q -rs`；只有 release host/platform/Python environment 不同时才重跑 Docker/Python opt-in gates。 |
+当前 worktree 没有剩余 active queue。
+
+未来 queue rows 必须先点名具体 changed requirement、command、option、invariant、warning/error code、lifecycle rule、visibility rule、runner contract、persistence contract、release-target environment 或 upstream catalog behavior，再开始 implementation。
 
 ## Guardrail 指针
 

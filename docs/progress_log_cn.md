@@ -7618,3 +7618,33 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
 - `git diff --check`
 - `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 Live SkyDiscover Catalog Gate Closeout
+
+已实现：
+
+- 在当前网络环境重新运行 opt-in live SkyDiscover catalog marker；本次通过而不是 skip。
+- 将当前 live SkyDiscover catalog 和 real-environment runner rows 重新归类为当前 Darwin host 已证明，并与此前已证明的 real Docker-backed 与 SkyDiscover Python dependency gates 对齐。
+- 更新 dashboard、pipeline、completion audit 和 closed-gap guardrails，使 active queue 现在只保留 grouped blueprint/subsystem audit-row decomposition。Release-target host、platform、Docker、Python dependency 或 upstream SkyDiscover catalog 发生变化时，仍必须重跑对应 opt-in gates。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked env ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 pytest -m live_skydiscover_catalog -q -rs`（`1 passed`）
+- Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 Final Requirement Ledger Closeout
+
+已实现：
+
+- 确认除 status legend 和 future-state instructions 外，没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` requirement rows 后，将 top-level blueprint/subsystem requirement audit gate 重新归类为当前 V1 evidence ledger 已证明。
+- 清空当前 worktree 的 active pipeline queue，并更新 dashboard/closed-gap guardrails，使未来工作按新的 scoped changes 处理，而不是继承旧 backlog。
+- Release-target real-environment reruns 继续只在 host/platform/Python/network/upstream behavior 变化时触发。
+
+验证：
+
+- ``rg -n '^\| .* \| `PARTIAL`|^\| .* \| `PENDING`|^\| .* \| `ENV-GATED`' docs/completion_audit.md docs/completion_audit_cn.md`` 无 active requirement-row 匹配。
+- Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。

@@ -21,7 +21,7 @@
 - Capability/help/payload preflight guardrails：generated capability surfaces、locked-command explanations、ambient-key non-expansion、explicit-key unlock paths、invalid explicit credential preflight、token/public isolation、context conflict priority、text payload readers、stdin/file conflicts、output parent checks 和 `OUTPUT_EXISTS` behavior 已对当前 registered command surfaces 证明。
 - CLI golden/command-contract guardrails：当前 registered CLI surfaces 已证明 generated parser/capability/output matrices、primary object type 与 success-field synchronization、saved result-failure rendering、system-error/debug behavior、warning/error catalogs、object-specific not-found selectors、non-disclosing visibility failures，以及 documentation contract checks；`test_completion_audit_cli_evidence_rows_are_not_stale` 会防止 CLI audit summary rows 在拆分后的 CLI rows 仍为 proved 时退回 stale partial wording。
 - Runtime stack and architecture guardrails：pyproject 保持 `alab` console script、Python 3.11 floor、uv package mode、runtime dependency roots 和 dev dependency separation；`src/alab/cli.py` 暴露 Typer boundary，并把 arbitrary argv 与 `--help` 委托给 ALab pre-scan/capability logic；runtime imports 覆盖 Typer、Pydantic 和 standard-library `sqlite3`，同时 banned server/ORM/agent/LLM dependency roots 保持缺失。
-- Host-support policy guardrails：blueprint/README 保持 macOS/Linux 作为 V1 host policy，Windows 继续不进入 V1 acceptance testing，当前 default-suite host 必须是 macOS/Linux，当前 Darwin real Docker-backed Docker/Harbor/SkyDiscover Docker gates、real Docker capability refresh 和 SkyDiscover Python dependency gates 已有 opt-in proof，剩余 live SkyDiscover catalog behavior 继续放在 opt-in pytest marker 后。
+- Host-support policy guardrails：blueprint/README 保持 macOS/Linux 作为 V1 host policy，Windows 继续不进入 V1 acceptance testing，当前 default-suite host 必须是 macOS/Linux，当前 Darwin real Docker-backed Docker/Harbor/SkyDiscover Docker gates、real Docker capability refresh、live SkyDiscover catalog 和 SkyDiscover Python dependency gates 已有 opt-in proof；只有 release-target host/platform/Python/network behavior 变化时才重跑。
 - Documentation consistency guardrails：README/README_cn repository trees、opt-in pytest marker commands、Markdown Chinese pairs、CLI spec English/Chinese command and field synchronization、`.env.example` references、`.gitignore` local-note/env policy、progress dashboard/pipeline/guardrail/log/audit split，以及 ignored local AGENTS/CORE note alignment 都有当前 focused evidence。
 - Security boundary guardrails：V1 保持 plaintext local storage、verifier-only credentials，并且没有 encrypted storage、grant-file、public-grant、token-rewrap、DEK、ciphertext、keyring 或 cryptography implementation artifacts；README/blueprint 的 collaboration-boundary 和 no-strong-local-security wording 与该实现边界保持同步。
 - Parser、renderer 和 preflight guardrails：strict text object rendering、global/command option validation、payload file preflight、generated capability preflight、output alias boundaries、export-output preflight、command-specific config-value errors、complete ALab id selectors、RFC 3339 filters、`HOME_EXISTS` 和 `OUTPUT_EXISTS`。
@@ -50,8 +50,10 @@
 
 ## 最近关闭
 
+- 2026-05-22：当前 worktree 的最终 requirement-ledger closeout；`docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
 - 2026-05-22：当前 Darwin real Docker capability-refresh validation，覆盖 daemon availability、Linux platform rows、architecture platform rows 和 CPU/memory resource rows，证据为 `tests/test_real_docker.py::test_real_docker_config_validate_refreshes_capability_cache`。
 - 2026-05-22：当前 registered surfaces 的 CLI golden/command-contract completion proof 和 audit-summary consistency guard，证据为 `tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`。
+- 2026-05-22：当前 live SkyDiscover catalog validation，命令为 `ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ... uv run --locked pytest -m live_skydiscover_catalog -q -rs`（`1 passed`）。
 - 2026-05-22：当前 Darwin SkyDiscover Python dependency validation，覆盖 local-wheel/cache、networked dependency 和 native dependency evaluator paths。
 - 2026-05-22：当前 Darwin real Docker-backed runner validation，覆盖 Docker runner、Dockerfile cache、CLI Docker workflow、real Docker capability refresh、Harbor verifier variants 和 SkyDiscover Docker evaluator，命令为 `ALAB_RUN_REAL_DOCKER=1 ... uv run --locked pytest -m real_docker -q`（`10 passed`）。
 - 2026-05-22：core successful workflow proof，覆盖 auth init、project init、baseline validation、reusable-source experiment creation、run/submit、observe/search/best history inspection、public/private visibility、lifecycle state transitions 和 default/fake adapter paths。
@@ -91,4 +93,4 @@
 
 ## 仍在别处 Active
 
-不要把本文视为 completion claim。Active queue 仍在 `docs/progress_pipeline.md`；精确 open evidence 仍在 `docs/completion_audit.md`；历史 implementation records 仍在 `docs/progress_log.md`。
+当前 worktree 没有剩余 active queue。未来工作应作为新的 scoped change 处理：先在 `docs/completion_audit.md` 点名精确 edge；只有需要 implementation 或 evidence work 时，才在 `docs/progress_pipeline.md` 创建 queue row；历史 implementation records 继续放在 `docs/progress_log.md`。
