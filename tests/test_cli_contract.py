@@ -403,6 +403,8 @@ _STORAGE_AUDIT_OBJECT_EVIDENCE = {
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SPEC_CLI_PATH = _REPO_ROOT / "docs" / "spec_cli.md"
 _SPEC_CLI_CN_PATH = _REPO_ROOT / "docs" / "spec_cli_cn.md"
+_COMPLETION_AUDIT_PATH = _REPO_ROOT / "docs" / "completion_audit.md"
+_COMPLETION_AUDIT_CN_PATH = _REPO_ROOT / "docs" / "completion_audit_cn.md"
 _README_PATH = _REPO_ROOT / "README.md"
 _README_CN_PATH = _REPO_ROOT / "README_cn.md"
 _PYPROJECT_PATH = _REPO_ROOT / "pyproject.toml"
@@ -1044,6 +1046,33 @@ def _split_markdown_table_row(line: str) -> list[str]:
             current.append(char)
     cells.append("".join(current).strip())
     return cells
+
+
+def _markdown_table_rows_after_heading(markdown_path: Path, heading: str) -> list[list[str]]:
+    lines = markdown_path.read_text(encoding="utf-8").splitlines()
+    seen_heading = False
+    in_table = False
+    rows: list[list[str]] = []
+    for line in lines:
+        stripped = line.strip()
+        if not seen_heading:
+            if stripped == heading:
+                seen_heading = True
+            continue
+        if stripped.startswith("#") and in_table:
+            break
+        if not line.startswith("|"):
+            if in_table and rows:
+                break
+            continue
+        in_table = True
+        cells = _split_markdown_table_row(line)
+        if not cells or cells[0].startswith("---"):
+            continue
+        if cells[0] in {"Gate", "Blueprint area", "Requirement group from `docs/spec_tests.md`", "Spec area"}:
+            continue
+        rows.append(cells)
+    return rows
 
 
 def _expand_command_pattern(pattern: str) -> list[tuple[str, ...]]:
@@ -3567,6 +3596,30 @@ def test_storage_audit_object_evidence_map_refs_stay_current() -> None:
         for refs in _STORAGE_AUDIT_OBJECT_EVIDENCE.values()
         for ref in refs
     )
+
+
+def test_completion_audit_cli_evidence_rows_are_not_stale() -> None:
+    def check(path: Path, p0_heading: str, cli_heading: str) -> list[dict[str, str]]:
+        mismatches: list[dict[str, str]] = []
+        p0_rows = _markdown_table_rows_after_heading(path, p0_heading)
+        product_rows = _markdown_table_rows_after_heading(path, "## Blueprint Product Invariants Evidence")
+        cli_rows = _markdown_table_rows_after_heading(path, cli_heading)
+        long_tail_rows = _markdown_table_rows_after_heading(path, "### CLI Long-Tail Requirement Evidence")
+
+        guarded_rows = [
+            *[row for row in p0_rows if row and row[0].startswith("CLI golden")],
+            *[row for row in product_rows if row and row[0].startswith("CLI/output contract")],
+            *[row for row in cli_rows if row and row[0].startswith("Primary object types")],
+            *long_tail_rows,
+        ]
+        for row in guarded_rows:
+            status = row[1] if len(row) > 1 else ""
+            if "`PROVED`" not in status or any(marker in status for marker in ("`PARTIAL`", "`PENDING`", "`ENV-GATED`")):
+                mismatches.append({"file": path.name, "row": row[0] if row else "", "status": status})
+        return mismatches
+
+    assert check(_COMPLETION_AUDIT_PATH, "## P0 Completion Gates", "## CLI Contract Evidence") == []
+    assert check(_COMPLETION_AUDIT_CN_PATH, "## P0 完成门槛", "## CLI Contract 证据") == []
 
 
 def test_command_registry_object_types_follow_cli_contract_table() -> None:

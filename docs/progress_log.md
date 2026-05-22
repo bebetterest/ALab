@@ -7607,3 +7607,20 @@ Validation:
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" tests/test_real_docker.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-22 CLI Audit Summary Closeout
+
+Implemented:
+
+- Added `tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale` so the P0 CLI gate, product CLI/output row, CLI summary row, and decomposed CLI long-tail rows cannot contradict each other.
+- Reclassified CLI golden/command-contract completeness as proved for current registered CLI surfaces because the decomposed CLI long-tail rows now cover parser, renderer, capability, success-schema, saved result-failure, system-error, error/warning catalog, payload, and documentation-contract evidence.
+- Updated dashboard, pipeline, and guardrails so future work does not reopen CLI golden/command-contract completion without a named command/output change.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.

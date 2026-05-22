@@ -7601,3 +7601,20 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" tests/test_real_docker.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 CLI Audit Summary Closeout
+
+已实现：
+
+- 新增 `tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`，使 P0 CLI gate、product CLI/output row、CLI summary row 和拆分后的 CLI long-tail rows 不能互相矛盾。
+- 将 CLI golden/command-contract completeness 重新归类为当前 registered CLI surfaces 已证明，因为拆分后的 CLI long-tail rows 现在覆盖 parser、renderer、capability、success-schema、saved result-failure、system-error、error/warning catalog、payload 和 documentation-contract evidence。
+- 更新 dashboard、pipeline 和 guardrails，避免未来在没有 named command/output change 时重新打开 CLI golden/command-contract completion。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q tests/test_cli_contract.py`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
