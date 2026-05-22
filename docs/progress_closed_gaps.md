@@ -46,6 +46,8 @@ Do not spend another batch on these families unless a spec or implementation cha
 
 ## Recently Closed
 
+- 2026-05-22: source/public experiment direction evidence map for canonical source metadata, standalone import selectors/warnings, public inline imports, public `--from-exp`, archived source refs, and adapter source bootstrap.
+- 2026-05-22: runner/adapter direction evidence map for shared runner contracts, config schema/saved failures, local rewards, fake/default Docker, artifact/log lifecycle, Harbor, SkyDiscover, and opt-in real-environment gates.
 - 2026-05-21: host-support policy proof for macOS/Linux-only V1 host support, Windows exclusion, current Darwin default-suite host, and opt-in real runner markers.
 - 2026-05-21: final default-suite closeout gate for the current worktree after the home/filesystem and host-support evidence-map batch.
 - 2026-05-21: home/filesystem/path-registry evidence mapping for home resolution/layout, path-registry hash/reuse, context marker conflict contracts, and worktree/checkout/repair paths.

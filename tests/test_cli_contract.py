@@ -232,6 +232,131 @@ _HOME_FILESYSTEM_EVIDENCE = {
     ),
 }
 
+_SOURCE_PUBLIC_EXPERIMENT_EVIDENCE = {
+    "canonical_source_storage_and_metadata": (
+        "tests/test_smoke.py::test_canonical_tree_hash_manifest_matches_v1_spec",
+        "tests/test_migrations.py::test_source_origin_metadata_contract_enforces_documented_shape",
+        "tests/test_smoke.py::test_project_init_requires_explicit_mode_source_origin",
+        "tests/test_smoke.py::test_project_init_source_ref_mismatch_cleans_staged_paths",
+    ),
+    "standalone_source_import_selectors_and_warnings": (
+        "tests/test_cli_contract.py::test_source_import_origin_variants_success_fields_follow_cli_spec",
+        "tests/test_cli_contract.py::test_source_import_warning_success_fields_follow_cli_spec",
+        "tests/test_smoke.py::test_source_import_dedupes_active_sources_and_ignores_archived",
+        "tests/test_smoke.py::test_source_import_respects_git_and_alab_ignore_rules",
+        "tests/test_smoke.py::test_source_import_empty_after_filter_warns",
+        "tests/test_smoke.py::test_standalone_source_import_limit_failure_is_atomic",
+        "tests/test_smoke.py::test_source_selector_option_scope_errors_do_not_write",
+    ),
+    "public_inline_source_import": (
+        "tests/test_smoke.py::test_public_exp_create_inline_source_import",
+        "tests/test_smoke.py::test_public_inline_source_import_enforces_project_limits",
+        "tests/test_smoke.py::test_public_inline_source_import_disabled_requires_admin",
+        "tests/test_cli_contract.py::test_experiment_create_inline_source_variants_success_fields_follow_cli_spec",
+    ),
+    "public_from_exp_and_visibility": (
+        "tests/test_smoke.py::test_public_exp_create_from_exp_uses_latest_commit",
+        "tests/test_smoke.py::test_public_from_exp_respects_visibility_upper_bound",
+        "tests/test_cli_contract.py::test_experiment_create_from_exp_success_fields_follow_cli_spec",
+    ),
+    "archived_source_and_source_ref": (
+        "tests/test_smoke.py::test_admin_exp_create_can_bind_archived_source_ref",
+        "tests/test_smoke.py::test_config_source_observe_and_tags",
+        "tests/test_cli_contract.py::test_experiment_create_source_ref_success_fields_follow_cli_spec",
+    ),
+    "adapter_source_bootstrap": (
+        "tests/test_smoke.py::test_harbor_project_init_uses_declared_source_and_excludes_private_assets",
+        "tests/test_smoke.py::test_adapter_init_rejects_conflicting_explicit_source",
+        "tests/test_smoke.py::test_skydiscover_project_init_uses_initial_program_metadata",
+        "tests/test_smoke.py::test_skydiscover_project_init_requires_initial_program_without_explicit_source",
+        "tests/test_smoke.py::test_skydiscover_project_init_source_precedence_and_rejections",
+        "tests/test_smoke.py::test_skydiscover_project_init_allows_explicit_git_and_empty_without_initial_program",
+        "tests/test_cli_contract.py::test_project_init_adapter_mode_variants_success_fields_follow_cli_spec",
+    ),
+}
+
+_RUNNER_ADAPTER_EVIDENCE = {
+    "shared_runner_contract": (
+        "tests/test_runner_local.py::test_sanitized_local_runner_creates_temp_home_and_strips_alab_credentials",
+        "tests/test_runner_local.py::test_full_local_runner_strips_alab_credentials_and_internal_env_overrides",
+        "tests/test_runner_local.py::test_local_runner_stdin_is_closed",
+        "tests/test_runner_docker.py::test_docker_runner_env_is_hostless_and_internal_env_overrides_config_env",
+        "tests/test_runner_docker.py::test_docker_runner_timeout_removes_named_container_and_redacts_output",
+        "tests/test_runner_harbor.py::test_harbor_adapter_resolver_failures_do_not_create_runtime_dirs",
+        "tests/test_runner_skydiscover.py::test_skydiscover_adapter_resolver_failures_do_not_create_runtime_dirs",
+        "tests/test_smoke.py::test_runner_workspace_is_contextless_and_stdin_closed",
+        "tests/test_smoke.py::test_run_and_submit_use_experiment_operation_lock",
+    ),
+    "project_config_schema_and_saved_failures": (
+        "tests/test_runner_local.py::test_project_config_schema_maps_runner_reward_and_env_edges",
+        "tests/test_runner_local.py::test_project_config_schema_validates_secret_env_shapes",
+        "tests/test_runner_local.py::test_project_config_schema_validates_policy_field_shapes",
+        "tests/test_runner_docker.py::test_docker_config_paths_must_stay_inside_workspace",
+        "tests/test_runner_docker.py::test_missing_dockerfile_and_context_are_saved_baseline_and_run_errors",
+        "tests/test_smoke.py::test_missing_runner_working_directory_is_saved_as_baseline_and_run_error",
+        "tests/test_smoke.py::test_missing_file_reward_is_saved_as_baseline_and_run_failure",
+    ),
+    "local_runner_and_rewards": (
+        "tests/test_runner_local.py::test_local_runner_warns_when_secret_values_and_artifact_globs_are_configured",
+        "tests/test_runner_local.py::test_local_runner_timeout_terminates_child_process_group",
+        "tests/test_runner_local.py::test_stdout_regex_reward_uses_redacted_and_truncated_stdout",
+        "tests/test_runner_local.py::test_local_runner_shell_mode_runs_through_sh",
+        "tests/test_runner_local.py::test_exit_code_reward_parses_zero_and_nonzero_exits",
+        "tests/test_runner_local.py::test_file_reward_parses_json_and_enforces_limit_and_finite_values",
+        "tests/test_cli_contract.py::test_run_reward_parse_failures_cover_nonfinite_and_nonzero_exit",
+    ),
+    "docker_runner_fake_default": (
+        "tests/test_runner_docker.py::test_docker_build_cache_key_respects_dockerignore",
+        "tests/test_runner_docker.py::test_docker_build_cache_key_ignores_run_time_fields",
+        "tests/test_runner_docker.py::test_docker_runner_pulls_missing_image_and_uses_default_network_without_visible_setup",
+        "tests/test_runner_docker.py::test_docker_runner_contract_with_fake_docker",
+        "tests/test_runner_docker.py::test_docker_runner_shell_uses_container_sh",
+        "tests/test_runner_docker.py::test_config_validate_refreshes_docker_capability_cache",
+        "tests/test_runner_docker.py::test_project_init_rejects_unsupported_docker_resource_limit",
+        "tests/test_runner_docker.py::test_project_init_records_docker_unavailable_baseline_error",
+        "tests/test_runner_docker.py::test_docker_setup_pull_and_build_failures_are_saved_result_failures",
+    ),
+    "artifact_and_log_lifecycle": (
+        "tests/test_runner_local.py::test_artifact_capture_ignores_symlink_escape_with_sibling_prefix",
+        "tests/test_runner_local.py::test_artifact_capture_expands_directories_sorts_and_deduplicates",
+        "tests/test_smoke.py::test_artifact_capture_errors_are_warning_codes_for_validations_and_runs",
+        "tests/test_smoke.py::test_oversized_artifacts_are_skipped_without_failing_validation_or_run",
+        "tests/test_smoke.py::test_artifact_bytes_not_redacted_warning_is_persisted_and_rendered",
+        "tests/test_smoke.py::test_log_secret_redaction_happens_before_truncation",
+        "tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash",
+        "tests/test_smoke.py::test_shared_log_file_reference_counting",
+    ),
+    "harbor_adapter_fake_default": (
+        "tests/test_runner_harbor.py::test_harbor_shared_verifier_runs_with_hidden_logs_and_secret_redaction",
+        "tests/test_runner_harbor.py::test_harbor_separate_verifier_image_runs_with_hidden_logs",
+        "tests/test_runner_harbor.py::test_harbor_separate_tests_dockerfile_builds_image_cache",
+        "tests/test_runner_harbor.py::test_harbor_timeout_removes_named_container_and_keeps_output_hidden",
+        "tests/test_runner_harbor.py::test_harbor_task_rejects_unsupported_fields",
+        "tests/test_smoke.py::test_harbor_project_init_uses_declared_source_and_excludes_private_assets",
+        "tests/test_smoke.py::test_harbor_baseline_records_reward_and_hidden_logs",
+    ),
+    "skydiscover_catalog_source_and_evaluators": (
+        "tests/test_smoke.py::test_skydiscover_catalog_lifecycle",
+        "tests/test_smoke.py::test_skydiscover_catalog_ref_validation",
+        "tests/test_smoke.py::test_skydiscover_catalog_remove_blockers_unexpected_remote_and_history",
+        "tests/test_smoke.py::test_skydiscover_project_init_source_precedence_and_rejections",
+        "tests/test_runner_skydiscover.py::test_skydiscover_docker_runner_builds_hidden_bundle_and_parses_metrics",
+        "tests/test_runner_skydiscover.py::test_skydiscover_python_runner_materializes_hidden_bundle_and_metrics",
+        "tests/test_runner_skydiscover.py::test_skydiscover_python_runner_env_boundary_and_redaction",
+        "tests/test_runner_skydiscover.py::test_skydiscover_python_runner_reuses_uv_environment_cache",
+        "tests/test_smoke.py::test_skydiscover_python_dependency_failures_are_saved_results",
+        "tests/test_smoke.py::test_skydiscover_docker_baseline_records_metrics_and_hidden_logs",
+    ),
+    "real_environment_gates": (
+        "tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests",
+        "tests/test_real_docker.py::test_real_docker_runner_mount_env_and_reward",
+        "tests/test_real_docker.py::test_real_harbor_runner_shared_verifier",
+        "tests/test_real_docker.py::test_real_skydiscover_docker_runner_evaluator",
+        "tests/test_real_skydiscover_catalog.py::test_live_skydiscover_catalog_add_show_and_resolve_project_init",
+        "tests/test_real_skydiscover_python.py::test_real_skydiscover_python_uv_dependency_install_and_cache",
+    ),
+}
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SPEC_CLI_PATH = _REPO_ROOT / "docs" / "spec_cli.md"
 _SPEC_CLI_CN_PATH = _REPO_ROOT / "docs" / "spec_cli_cn.md"
@@ -3345,6 +3470,42 @@ def test_home_filesystem_and_path_registry_evidence_map_refs_stay_current() -> N
     _assert_evidence_refs_exist(
         ref
         for refs in _HOME_FILESYSTEM_EVIDENCE.values()
+        for ref in refs
+    )
+
+
+def test_source_public_experiment_evidence_map_refs_stay_current() -> None:
+    assert set(_SOURCE_PUBLIC_EXPERIMENT_EVIDENCE) == {
+        "canonical_source_storage_and_metadata",
+        "standalone_source_import_selectors_and_warnings",
+        "public_inline_source_import",
+        "public_from_exp_and_visibility",
+        "archived_source_and_source_ref",
+        "adapter_source_bootstrap",
+    }
+    assert all(refs for refs in _SOURCE_PUBLIC_EXPERIMENT_EVIDENCE.values())
+    _assert_evidence_refs_exist(
+        ref
+        for refs in _SOURCE_PUBLIC_EXPERIMENT_EVIDENCE.values()
+        for ref in refs
+    )
+
+
+def test_runner_adapter_evidence_map_refs_stay_current() -> None:
+    assert set(_RUNNER_ADAPTER_EVIDENCE) == {
+        "shared_runner_contract",
+        "project_config_schema_and_saved_failures",
+        "local_runner_and_rewards",
+        "docker_runner_fake_default",
+        "artifact_and_log_lifecycle",
+        "harbor_adapter_fake_default",
+        "skydiscover_catalog_source_and_evaluators",
+        "real_environment_gates",
+    }
+    assert all(refs for refs in _RUNNER_ADAPTER_EVIDENCE.values())
+    _assert_evidence_refs_exist(
+        ref
+        for refs in _RUNNER_ADAPTER_EVIDENCE.values()
         for ref in refs
     )
 

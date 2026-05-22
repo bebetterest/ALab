@@ -46,6 +46,8 @@
 
 ## 最近关闭
 
+- 2026-05-22：source/public experiment direction evidence map，覆盖 canonical source metadata、standalone import selectors/warnings、public inline imports、public `--from-exp`、archived source refs 和 adapter source bootstrap。
+- 2026-05-22：runner/adapter direction evidence map，覆盖 shared runner contracts、config schema/saved failures、local rewards、fake/default Docker、artifact/log lifecycle、Harbor、SkyDiscover 和 opt-in real-environment gates。
 - 2026-05-21：host-support policy proof，覆盖 macOS/Linux-only V1 host support、Windows exclusion、当前 Darwin default-suite host 和 opt-in real runner markers。
 - 2026-05-21：final default-suite closeout gate，覆盖 home/filesystem 与 host-support evidence-map batch 后的当前 worktree。
 - 2026-05-21：home/filesystem/path-registry evidence mapping，覆盖 home resolution/layout、path-registry hash/reuse、context marker conflict contracts，以及 worktree/checkout/repair paths。

@@ -7468,3 +7468,22 @@
 - `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md tests/test_cli_contract.py` 无匹配。
+
+## 2026-05-22 Source And Runner Direction Evidence Maps
+
+已实现：
+
+- 新增 `tests/test_cli_contract.py::test_source_public_experiment_evidence_map_refs_stay_current`。
+- 新增 `tests/test_cli_contract.py::test_runner_adapter_evidence_map_refs_stay_current`。
+- 将 source/public experiment direction row 重新归类为当前 default/local paths 已证明。
+- 将 runner/adapter direction row 重新归类为 default/fake paths 已证明，同时真实 Docker/network/native dependency gates 继续保持 `ENV-GATED`。
+- 更新 dashboard、pipeline 和 closed-gap guardrails，防止未来在没有 named edge 时重开这些宽泛 family。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_cli_contract.py::test_source_public_experiment_evidence_map_refs_stay_current tests/test_cli_contract.py::test_runner_adapter_evidence_map_refs_stay_current tests/test_cli_contract.py::test_home_filesystem_and_path_registry_evidence_map_refs_stay_current tests/test_cli_contract.py::test_lifecycle_archive_unarchive_and_remove_evidence_maps_cover_registered_surfaces tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" tests/test_cli_contract.py docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
