@@ -30,3 +30,6 @@ build/
 .cache/
 .uv-cache/
 coverage/
+
+# Local README/demo state
+.alab-demo/
