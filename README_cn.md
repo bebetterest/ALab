@@ -118,10 +118,15 @@ ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache uv run pytest -m live
 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run ruff check
 ```
 
+GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 pytest suite。该 workflow 会把默认 pytest suite 按文件组拆开，让较慢的 CLI contract 和 smoke suites 并行执行；真实 Docker、SkyDiscover Python dependency 和 live catalog gates 仍保留为手动 `workflow_dispatch` inputs。
+
 ## Repository Structure
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── docs/
 │   ├── blueprint.md
 │   ├── blueprint_cn.md

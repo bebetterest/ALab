@@ -118,10 +118,15 @@ Lint the current code with:
 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run ruff check
 ```
 
+GitHub Actions runs the default lint and pytest suite on pull requests and pushes to `main`. The workflow splits the default pytest suite into file groups so the slow CLI contract and smoke suites can run in parallel; real Docker, SkyDiscover Python dependency, and live catalog gates remain manual `workflow_dispatch` inputs.
+
 ## Repository Structure
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── docs/
 │   ├── blueprint.md
 │   ├── blueprint_cn.md

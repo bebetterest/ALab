@@ -1,0 +1,275 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      real_docker:
+        description: Run real Docker integration tests.
+        required: false
+        type: boolean
+        default: false
+      real_skydiscover_python:
+        description: Run real SkyDiscover Python local-wheel integration tests.
+        required: false
+        type: boolean
+        default: false
+      networked_skydiscover_python:
+        description: Run networked and native SkyDiscover Python dependency tests.
+        required: false
+        type: boolean
+        default: false
+      live_skydiscover_catalog:
+        description: Run live SkyDiscover catalog tests.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: .uv-cache
+          key: uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Show tool versions
+        run: |
+          python --version
+          uv --version
+
+      - name: Run ruff
+        run: uv run --locked ruff check
+
+  tests:
+    name: Pytest (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cli-contract
+            pytest_args: tests/test_cli_contract.py
+          - name: smoke
+            pytest_args: tests/test_smoke.py
+          - name: runners
+            pytest_args: tests/test_runner_docker.py tests/test_runner_harbor.py tests/test_runner_local.py tests/test_runner_skydiscover.py
+          - name: storage-auth-and-opt-in-skips
+            pytest_args: tests/test_auth.py tests/test_errors.py tests/test_ids.py tests/test_migrations.py tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py
+    env:
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: .uv-cache
+          key: uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Show tool versions
+        run: |
+          python --version
+          uv --version
+
+      - name: Run pytest group
+        run: uv run --locked pytest -q ${{ matrix.pytest_args }}
+
+  real-docker:
+    name: Real Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.real_docker }}
+    env:
+      ALAB_RUN_REAL_DOCKER: "1"
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: .uv-cache
+          key: uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Show Docker version
+        run: docker version
+
+      - name: Run real Docker tests
+        run: uv run --locked pytest -m real_docker -q
+
+  real-skydiscover-python:
+    name: Real SkyDiscover Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.real_skydiscover_python }}
+    env:
+      ALAB_RUN_REAL_SKYDISCOVER_PYTHON: "1"
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: .uv-cache
+          key: uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Run real SkyDiscover Python tests
+        run: uv run --locked pytest -m real_skydiscover_python -q
+
+  networked-skydiscover-python:
+    name: Networked SkyDiscover Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.networked_skydiscover_python }}
+    env:
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: .uv-cache
+          key: uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Run networked dependency tests
+        env:
+          ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON: "1"
+        run: uv run --locked pytest -m networked_skydiscover_python -q
+
+      - name: Run native dependency tests
+        env:
+          ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON: "1"
+        run: uv run --locked pytest -m native_skydiscover_python -q
+
+  live-skydiscover-catalog:
+    name: Live SkyDiscover Catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.live_skydiscover_catalog }}
+    env:
+      ALAB_RUN_LIVE_SKYDISCOVER_CATALOG: "1"
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/alab-pycache
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: .uv-cache
+          key: uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Run live catalog tests
+        run: uv run --locked pytest -m live_skydiscover_catalog -q -rs
