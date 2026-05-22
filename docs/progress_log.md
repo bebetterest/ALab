@@ -7567,3 +7567,24 @@ Validation:
 - `ALAB_RUN_REAL_DOCKER=1 UV_LOCKED=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest tests/test_real_docker.py::test_real_docker_cli_project_run_workflow -q`
 - `ALAB_RUN_REAL_DOCKER=1 UV_LOCKED=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run pytest -m real_docker -q`
 - Full default-suite/static checks are recorded in the P0 completion gate for this same closeout batch.
+
+## 2026-05-22 SkyDiscover Python Dependency Gate Closeout
+
+Implemented:
+
+- Reclassified SkyDiscover Python local-wheel/cache, networked dependency, and native dependency opt-in gates as proved on the current Darwin host.
+- Confirmed the live SkyDiscover catalog gate is still environment-gated because this environment cannot reach GitHub over SSL, not because of an ALab implementation failure.
+- Updated audit, dashboard, pipeline, and guardrails so the only remaining real-environment runner gate is live SkyDiscover catalog reachability.
+
+Validation:
+
+- `ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -m real_skydiscover_python -q` (`1 passed, 3 skipped`)
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked env ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 UV_DEFAULT_INDEX=https://pypi.org/simple pytest -m networked_skydiscover_python -q` (`2 passed`)
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked env ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_DEFAULT_INDEX=https://pypi.org/simple pytest -m native_skydiscover_python -q` (`1 passed`)
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked env ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 pytest -m live_skydiscover_catalog -q -rs` skipped because GitHub returned `LibreSSL SSL_connect: SSL_ERROR_SYSCALL`.
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- Focused docs sync: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache python3 -m compileall -q src tests`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.

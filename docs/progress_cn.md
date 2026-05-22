@@ -21,8 +21,8 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 当前 worktree 的 default/local runnable V1 implementation 正在 closeout。剩余项是 release/evidence hardening，而不是缺少 runnable core：
 
 - `docs/completion_audit.md` 中剩余 grouped 或 `PARTIAL` rows 仍需要 direct evidence、focused tests，或明确的 `ENV-GATED` scope。
-- 当前 worktree 的 latest full default-suite closeout gate 在 real-Docker closeout docs/test batch 后已经保持 current。
-- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior 在当前 Darwin/Docker Desktop worktree 已有 opt-in validation；live SkyDiscover catalog 与 SkyDiscover Python dependency/network/native gates 仍属于 opt-in release validation。
+- 当前 worktree 的 latest full default-suite closeout gate 在 SkyDiscover Python dependency gate closeout docs batch 后已经保持 current。
+- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior 和 SkyDiscover Python local-wheel/network/native dependency behavior 在当前 Darwin/Docker Desktop worktree 已有 opt-in validation；live SkyDiscover catalog 因当前环境无法通过 SSL 访问 GitHub，仍属于 opt-in release validation。
 - 最终 README/spec/local-notes/progress/audit consistency pass 已有当前 focused evidence；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后需要重跑。
 
 ## Gate 快照
@@ -33,7 +33,7 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 | Full default suite | `PASSED` | 任何后续 implementation/test change 后，以及任何 release claim 前重跑。 |
 | CLI contract completeness | `PARTIAL` | 当前 registered surfaces 的 lifecycle archive/unarchive/remove evidence 已映射；剩余 CLI work 是 long-tail command-specific rendering，以及 `docs/completion_audit.md` 点名的 future context variants。 |
 | Non-CLI hardening | `PARTIAL` | 完成 object relationship invariants 和剩余 collaboration hardening。 |
-| Real-environment runners | Docker-backed subset `PASSED`；remaining gates `ENV-GATED` | 如果 release-target Docker host 的 host/platform 变化，重跑 Docker-backed gates；live SkyDiscover catalog 与 SkyDiscover Python dependency/network/native gates 仍需要目标 prerequisites。 |
+| Real-environment runners | Docker-backed 与 SkyDiscover Python dependency subsets `PASSED`；live catalog `ENV-GATED` | 如果 release-target host/platform/Python environment 变化，重跑 Docker-backed/Python gates；live SkyDiscover catalog 仍需要能访问 GitHub 的网络。 |
 | Documentation consistency | `PASSED` | 当前 documentation set 的 focused docs/README/spec/local-notes checks 已通过；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后重跑。 |
 
 ## Do-Not-Reopen 摘要

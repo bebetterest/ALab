@@ -21,8 +21,8 @@ Current active focus, in summary only: the recently closed proof families are tr
 The default/local runnable V1 implementation is in closeout for this worktree. Remaining items are release/evidence hardening, not missing runnable core:
 
 - Remaining grouped or `PARTIAL` rows in `docs/completion_audit.md` still need direct evidence, focused tests, or explicit `ENV-GATED` scoping.
-- The latest full default-suite closeout gate is current for this worktree after the real-Docker closeout docs/test batch.
-- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior has current opt-in validation on this Darwin/Docker Desktop worktree; live SkyDiscover catalog and SkyDiscover Python dependency/network/native gates remain opt-in release validation.
+- The latest full default-suite closeout gate is current for this worktree after the SkyDiscover Python dependency gate closeout docs batch.
+- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior and SkyDiscover Python local-wheel/network/native dependency behavior have current opt-in validation on this Darwin/Docker Desktop worktree; live SkyDiscover catalog remains opt-in release validation because this environment cannot currently reach GitHub over SSL.
 - The final README/spec/local-notes/progress/audit consistency pass has current focused evidence; rerun it after future documentation, `.env.example`, `.gitignore`, or local-note changes.
 
 ## Gate Snapshot
@@ -33,7 +33,7 @@ The default/local runnable V1 implementation is in closeout for this worktree. R
 | Full default suite | `PASSED` | Re-run after any later implementation/test change and before any release claim. |
 | CLI contract completeness | `PARTIAL` | Lifecycle archive/unarchive/remove evidence is mapped for current registered surfaces; remaining CLI work is long-tail command-specific rendering plus future context variants named in `docs/completion_audit.md`. |
 | Non-CLI hardening | `PARTIAL` | Finish object relationship invariants and remaining collaboration hardening. |
-| Real-environment runners | Docker-backed subset `PASSED`; remaining gates `ENV-GATED` | Re-run Docker-backed gates on release-target Docker hosts if host/platform changes; live SkyDiscover catalog and SkyDiscover Python dependency/network/native gates still require target prerequisites. |
+| Real-environment runners | Docker-backed and SkyDiscover Python dependency subsets `PASSED`; live catalog `ENV-GATED` | Re-run Docker-backed/Python gates on release-target hosts if host/platform/Python environment changes; live SkyDiscover catalog still requires a network that can reach GitHub. |
 | Documentation consistency | `PASSED` | Focused docs/README/spec/local-notes checks passed for the current documentation set; rerun after future documentation, `.env.example`, `.gitignore`, or local-note changes. |
 
 ## Do-Not-Reopen Summary
