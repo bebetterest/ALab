@@ -15087,6 +15087,9 @@ primary_metric = "reward"
     baseline_commit = _git(["rev-parse", "HEAD"], moved)
     (moved / "main.py").write_text('print("inspection repair")\n', encoding="utf-8")
     _git(["add", "main.py"], moved)
+    _git(["config", "user.name", "ALab Test"], moved)
+    _git(["config", "user.email", "alab@example.test"], moved)
+    _git(["config", "commit.gpgsign", "false"], moved)
     _git(["commit", "-m", "inspection repair"], moved)
     pinned_commit = _git(["rev-parse", "HEAD"], moved)
 
