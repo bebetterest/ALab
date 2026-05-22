@@ -154,6 +154,8 @@ GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 
 │   ├── progress_closed_gaps_cn.md
 │   ├── progress_log.md
 │   └── progress_log_cn.md
+├── examples/
+│   └── skydiscover_circle_packing_codex/
 ├── src/
 │   └── alab/
 ├── tests/

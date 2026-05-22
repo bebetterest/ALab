@@ -1,0 +1,5 @@
+.run/
+worktrees/
+*.env
+*.log
+report.md

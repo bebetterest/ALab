@@ -1,0 +1,58 @@
+schema_version = 1
+
+[project]
+name = "SkyDiscover Circle Packing Codex"
+goal = "Use ALab and Codex agents to improve the SkyDiscover circle-packing initial program."
+task = """
+Improve the SkyDiscover circle_packing benchmark solution.
+
+The editable source is the benchmark initial program. Keep the public contract intact:
+`run_packing()` must return `(centers, radii, sum_radii)` for exactly 26 circles inside
+the unit square. Maximize the SkyDiscover `combined_score`, which is driven by the
+valid sum of radii relative to the target value 2.635.
+"""
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 100000
+max_total_bytes = 1073741824
+max_file_bytes = 104857600
+
+[mutable]
+include = ["initial_program.py"]
+exclude = []
+
+[visibility]
+scope = "same_project"
+experiment_ids = []
+
+[runner]
+type = "skydiscover_python"
+timeout_seconds = 900
+working_directory = "."
+skydiscover_task_ref = "skydiscover:benchmarks/math/circle_packing"
+program_path = "initial_program.py"
+
+[reward]
+type = "skydiscover"
+direction = "maximize"
+primary_metric = "combined_score"
+
+[artifacts]
+globs = []
+per_file_limit_bytes = 10485760
+per_run_limit_bytes = 104857600
+
+[logs]
+stdout_limit_bytes = 10485760
+stderr_limit_bytes = 10485760
+
+[git]
+author_name = "ALab Circle Packing Example"
+author_email = "alab-circle-example@local"
+
+[env]
+PYTHONUNBUFFERED = "1"
+
+[secret_env]
