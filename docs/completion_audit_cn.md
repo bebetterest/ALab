@@ -147,7 +147,7 @@
 
 ### Observe And Collaboration Requirement Evidence
 
-本表拆解 `docs/spec_observe_collaboration.md`。当前实现已有大量 smoke 和 CLI-contract coverage，但多数行在每个 filter/sort/visibility variant 映射到具体 assertion 或补 focused test 前，仍保持 `PARTIAL`。
+本表拆解 `docs/spec_observe_collaboration.md`。当前 default/local observe 与 collaboration rows 已由 smoke 和 CLI-contract coverage 证明；visibility、filter/sort、alias、annotation、public status、hidden-log 或 artifact/export semantics 变化时保持各行同步。
 
 | Spec area | Status | Direct evidence | Remaining action |
 | --- | --- | --- | --- |

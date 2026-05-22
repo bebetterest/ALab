@@ -147,7 +147,7 @@ This table starts decomposing `docs/spec_project_source_experiment.md` into requ
 
 ### Observe And Collaboration Requirement Evidence
 
-This table decomposes `docs/spec_observe_collaboration.md`. The implementation has substantial smoke and CLI-contract coverage, but most rows remain `PARTIAL` until every filter/sort/visibility variant is mapped to exact assertions or backed by a focused test.
+This table decomposes `docs/spec_observe_collaboration.md`. Current default/local observe and collaboration rows are proved by smoke and CLI-contract coverage; keep the rows synchronized when visibility, filter/sort, alias, annotation, public status, hidden-log, or artifact/export semantics change.
 
 | Spec area | Status | Direct evidence | Remaining action |
 | --- | --- | --- | --- |
