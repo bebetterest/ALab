@@ -59,6 +59,8 @@ Runner、reward、artifact、log、environment 和 secret 设置都来自 projec
 
 CLI help 是 context-aware 的。在只有 experiment token 的 worktree 中，`alab help` 聚焦当前可用 surface。Project/root management commands 默认隐藏；直接尝试使用 unavailable command 会在产生 side effect 前以 `COMMAND_UNAVAILABLE` 失败。显式 `--key` 或 `--key-stdin` 会解锁匹配的 admin/root surface；ambient `ALAB_KEY` 不扩展 help 或 token/public command surface。
 
+仓库还在 `skills/` 下提供 Codex-facing role skills。它们是通过 CLI 操作 ALab 的外部 runbooks，分别面向 experiment worker、project controller 和 global admin；它们不会给 ALab 增加内置 agent launcher。
+
 ## Setup
 
 通过 `uv` 安装和运行：
@@ -156,6 +158,10 @@ GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 
 │   └── progress_log_cn.md
 ├── examples/
 │   └── skydiscover_circle_packing_codex/
+├── skills/
+│   ├── alab-experiment-worker/
+│   ├── alab-project-controller/
+│   └── alab-global-admin/
 ├── src/
 │   └── alab/
 ├── tests/

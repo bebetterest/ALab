@@ -59,6 +59,8 @@ All runner, reward, artifact, log, environment, and secret settings come from th
 
 The CLI help is context-aware. In an experiment worktree with only its token, `alab help` focuses on the currently available surface. Project and root management commands are hidden by default and direct attempts to use unavailable commands fail before side effects with `COMMAND_UNAVAILABLE`. Explicit `--key` or `--key-stdin` unlocks the matching admin/root surface; ambient `ALAB_KEY` does not expand help or token/public command surfaces.
 
+The repository also includes Codex-facing role skills under `skills/`. They are external runbooks for operating ALab through the CLI as an experiment worker, project controller, or global admin; they do not add an embedded agent launcher to ALab.
+
 ## Setup
 
 Install and run through `uv`:
@@ -156,6 +158,10 @@ GitHub Actions runs the default lint and pytest suite on pull requests and pushe
 │   └── progress_log_cn.md
 ├── examples/
 │   └── skydiscover_circle_packing_codex/
+├── skills/
+│   ├── alab-experiment-worker/
+│   ├── alab-project-controller/
+│   └── alab-global-admin/
 ├── src/
 │   └── alab/
 ├── tests/

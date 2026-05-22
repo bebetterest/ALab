@@ -1,0 +1,158 @@
+# ALab Experiment Worker Commands
+
+## Allowed Surface
+
+Use these commands from inside an active experiment worktree:
+
+```text
+alab status
+alab help
+alab run --message "<message>"
+alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
+alab observe experiments list|search|show|best ...
+alab observe runs list|show ...
+alab observe artifacts list|show|export ...
+alab observe logs list|show|export ...
+alab observe annotations list|show ...
+alab annotate add|edit|archive|unarchive ...
+```
+
+Worker lifecycle permissions are intentionally narrow:
+
+- `run` and `submit` require the valid worktree token from the current experiment.
+- Observe commands show only records visible to the current token.
+- Hidden logs require root/admin and are outside this skill.
+- Worker annotation mutation is limited to visible targets and annotations created by the worker token.
+
+## Function Details
+
+Each entry lists the function, purpose, important parameters, and how to use the result.
+
+- **`alab status`**: Check the current experiment/project state and next action hint.
+  Parameters: Optional `--project <project_id>` only when explicitly provided by a controller; normally run without flags in the worktree.
+  Use the output for: Confirm context type, project id, experiment id, project status, experiment status, and whether work can continue.
+- **`alab help`**: Inspect the commands available to the current worktree token.
+  Parameters: `--all --explain` may show locked commands and safe reasons.
+  Use the output for: Avoid trying admin/root commands and identify available observe or annotation commands.
+- **`alab run`**: Evaluate the current candidate and save run evidence.
+  Parameters: Required `--message <text>`; keep it short and specific.
+  Use the output for: Run id, status, reward, parse status, warnings, previews, artifact count, and next action.
+- **`alab submit`**: Close the experiment with final summary and feedback after a supporting passed run.
+  Parameters: Required `--message`, one of `--summary`/`--summary-file`, one of `--feedback`/`--feedback-file`, and at least one `--ref`; optional `--rerun`.
+  Use the output for: Final run id, final commit, stored summary/feedback, experiment status, and submitted refs.
+- **`observe experiments list`**: See visible experiments in the project.
+  Parameters: Filters include `--status`, repeated `--tag`, `--source-id`, `--name-query`, reward bounds, config version, timestamps, and `--include-archived`; pagination uses `--limit`/`--offset`; sorting uses `--sort <field>:<asc|desc>`.
+  Use the output for: Find prior attempts, similar tags, source lineage, closed experiments, and possible refs.
+- **`observe experiments search`**: Search visible experiment corpus for ideas or prior failures.
+  Parameters: Required `--query <text>` plus the same main experiment filters as list.
+  Use the output for: Locate relevant summaries, feedback, task text, names, goals, tags, and latest annotation bodies.
+- **`observe experiments show`**: Inspect one visible experiment.
+  Parameters: Required `<exp_id>`.
+  Use the output for: Confirm source ref, latest/final/best commits, tags, status, and whether it should be cited as a ref.
+- **`observe experiments best`**: Find visible experiments ranked by reward policy.
+  Parameters: Optional experiment filters; no custom sort.
+  Use the output for: Identify strong baselines or inspiration candidates while respecting incomparable-run warnings.
+- **`observe runs list`**: Inspect visible run history.
+  Parameters: Filters include `--exp`, `--status`, `--config-version`, `--commit`, reward bounds, `--runner-type`, `--exit-code`, `--failure-reason-query`, timestamps, and `--include-archived`.
+  Use the output for: Compare candidate quality, find failure modes, or inspect current experiment runs.
+- **`observe runs show`**: Inspect one visible run.
+  Parameters: Required `<run_id>`.
+  Use the output for: Read reward, parse status, warning codes, stdout/stderr previews, artifact count, hidden-log availability, and timestamps.
+- **`observe artifacts list/show/export`**: Inspect or export visible captured artifacts.
+  Parameters: List filters include `--exp`, `--run`, `--validation`, `--root workspace|run`, `--status`, `--path-query`, `--content-hash`, size bounds, timestamps, and `--include-archived`; export requires `<artifact_id> --out <path>` and optional `--overwrite`/`--include-archived`.
+  Use the output for: Examine outputs, generated reports, or files that explain prior results.
+- **`observe logs list/show/export`**: Inspect or export visible logs.
+  Parameters: List filters include `--exp`, `--run`, `--validation`, `--stream stdout|stderr|hidden_stdout|hidden_stderr`, `--truncated`, timestamps, and archive flags. Worker tokens cannot use hidden logs.
+  Use the output for: Diagnose failures using visible stdout/stderr content and previews.
+- **`observe annotations list/show`**: Read visible notes and review comments.
+  Parameters: List filters include `--target-type`, `--target-id`, `--author`, `--created-by`, `--private`, `--query`, timestamps, and `--include-archived`; show accepts `<annotation_id>` and optional `--history`.
+  Use the output for: Capture prior guidance, known issues, and rationale attached to experiments, runs, or artifacts.
+- **`annotate add/edit/archive/unarchive`**: Add or maintain worker-visible notes.
+  Parameters: `add` requires `--target <target>` and one of `--body`/`--body-file`; optional `--author`, `--private`. `edit` requires `<annotation_id>` and one body input. Archive/unarchive require `<annotation_id>`.
+  Use the output for: Leave useful evidence for later workers without changing project configuration.
+
+## Visible History
+
+Workers may use ALab observe commands to study visible historical experiments before deciding what to change:
+
+```text
+alab observe experiments list
+alab observe experiments search --query "<keyword>"
+alab observe experiments best
+alab observe experiments show <exp_id>
+alab observe runs list --exp <exp_id>
+alab observe runs show <run_id>
+alab observe artifacts list --exp <exp_id>
+alab observe logs list --exp <exp_id>
+alab observe annotations list --target-type experiment --target-id <exp_id>
+```
+
+Use visible history as evidence and inspiration, not as permission expansion. Prefer high-reward passed runs, useful warning patterns, clear annotations, and comparable task/source lineage. If a prior experiment materially informed the final answer, include it as a submit ref.
+
+## Forbidden Surface
+
+Do not run these from the worker role:
+
+```text
+alab auth ...
+alab key ...
+alab project config ...
+alab project env ...
+alab project secret ...
+alab project validate ...
+alab project remove ...
+alab source remove ...
+alab catalog ...
+alab cache prune ...
+alab backup prune ...
+alab audit ...
+alab exp remove ...
+alab exp worktree remove|restore ...
+alab exp token ...
+```
+
+If one of these is necessary, report the need to a project controller or global admin.
+
+## Evaluation Pattern
+
+```text
+alab status
+alab run --message "try focused improvement"
+alab observe runs show <run_id>
+```
+
+Use visible stdout/stderr previews, warning codes, artifacts, and logs for diagnosis. Do not ask for hidden evaluator logs unless the user explicitly switches you into an admin role.
+
+## Submit Pattern
+
+Prepare summary and feedback in temporary files when they are more than one sentence:
+
+```text
+alab submit \
+  --message "final candidate" \
+  --summary-file /tmp/alab-summary.txt \
+  --feedback-file /tmp/alab-feedback.txt \
+  --ref none
+```
+
+Use `--ref none` only when no historical experiment materially influenced the result. If visible experiments did influence the result, repeat refs explicitly:
+
+```text
+alab submit \
+  --message "final candidate" \
+  --summary-file /tmp/alab-summary.txt \
+  --feedback-file /tmp/alab-feedback.txt \
+  --ref <exp_id_that_inspired_or_was_continued> \
+  --ref <another_relevant_exp_id>
+```
+
+The summary should describe the final change and supporting passed run. The feedback should include useful operational notes: key metrics, failure modes avoided, why each ref matters, and remaining risks. Do not include raw tokens, hidden-log content, or inaccessible experiment ids.
+
+The final worker response should include:
+
+- changed strategy or implementation area,
+- final run id and status,
+- reward and key metrics,
+- submit refs used, or `ref none` with a reason,
+- final commit if ALab rendered one,
+- remaining risks or known failures.
