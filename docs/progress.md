@@ -12,7 +12,7 @@ Default read order:
 
 The blueprint and subsystem specs remain the normative product contract.
 
-## Current Position - 2026-05-22
+## Current Position - 2026-05-23
 
 ALab has a broad runnable V1 implementation across the local CLI, SQLite home/auth/context foundations, project/source/experiment lifecycle, local/Docker/Harbor/SkyDiscover runners and adapters, observe/collaboration surfaces, audit, cleanup, and default contract tests.
 
@@ -21,7 +21,7 @@ Current active focus, in summary only: there is no open implementation or eviden
 The default/local runnable V1 implementation is closed for this worktree. Remaining work is conditional maintenance, not a current completion blocker:
 
 - `docs/completion_audit.md` has no active `PARTIAL`, `PENDING`, or `ENV-GATED` V1 requirement row outside the status legend and future-state instructions.
-- The latest full default-suite closeout gate is current for this worktree after the CLI audit summary closeout batch.
+- The latest full default-suite closeout gate is current for this worktree after the 2026-05-23 examples follow-up reward parser and single-worker Codex batch.
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior, real Docker capability refresh, SkyDiscover Python local-wheel/network/native dependency behavior, and live SkyDiscover catalog behavior have current opt-in validation on this Darwin/Docker Desktop worktree and current network.
 - The final README/spec/local-notes/progress/audit consistency pass has current focused evidence; rerun it after future documentation, `.env.example`, `.gitignore`, or local-note changes.
 

@@ -12,7 +12,7 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-05-22
+## 当前 Active Batch - 2026-05-23
 
 - Focus：当前 worktree 没有剩余 active implementation 或 evidence batch。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。

@@ -265,6 +265,8 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 ├── docs/
 │   ├── assets/
 │   │   └── readme-header.png
+│   ├── README.md
+│   ├── README_cn.md
 │   ├── blueprint.md
 │   ├── blueprint_cn.md
 │   ├── completion_audit.md
@@ -307,6 +309,7 @@ Local-only agent notes such as `AGENTS.md` and `CORE.md` are intentionally git-i
 
 - English documentation is canonical.
 - Synchronized Chinese documents use the `*_cn.md` naming pattern.
+- [docs/README.md](docs/README.md) explains the documentation structure and reading order.
 - [docs/blueprint.md](docs/blueprint.md) is the V1 product overview.
 - [docs/spec_cli.md](docs/spec_cli.md), [docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md), [docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md), [docs/spec_lifecycle.md](docs/spec_lifecycle.md), [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md), and [docs/spec_tests.md](docs/spec_tests.md) define subsystem contracts.
 - [docs/progress.md](docs/progress.md), [docs/progress_pipeline.md](docs/progress_pipeline.md), [docs/progress_closed_gaps.md](docs/progress_closed_gaps.md), and [docs/progress_log.md](docs/progress_log.md) track current state, active queues, closed gaps, and history.

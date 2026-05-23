@@ -7708,3 +7708,31 @@
   `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_runner_local.py::test_file_reward_parses_json_and_enforces_limit_and_finite_values tests/test_runner_harbor.py::test_harbor_reward_parser_handles_json_text_missing_and_invalid_values tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests tests/test_cli_contract.py::test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception -q`
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+
+## 2026-05-23 Full-Suite Evidence Sync
+
+已实现：
+
+- 更新 P0 full default-suite evidence row，使其指向最新的 2026-05-23 examples/reward-parser 后 full-suite run，而不是较早的 2026-05-22 CLI audit closeout run。
+- 更新 dashboard 和 active-pipeline 的日期/current wording，并同步中文 counterparts。
+- 明确本批次只调整文档措辞，没有新增 implementation 或 test changes，因此 2026-05-23 full-suite gate 仍是最新 implementation/test gate。
+
+验证：
+
+- Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-23 Docs Directory README
+
+已实现：
+
+- 新增 [docs/README.md](README.md) 作为 documentation directory guide，覆盖 default read order、document groups 和 update rules。
+- 新增同步的 [docs/README_cn.md](README_cn.md)。
+- 更新根 README/README_cn 的 repository tree 和 documentation section，指向 docs guide。
+
+验证：
+
+- Focused docs sync 和 README structure tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
+- `git diff --check`
+- `rg -n "[ \t]+$" README.md README_cn.md docs/README.md docs/README_cn.md docs/progress_log.md docs/progress_log_cn.md docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md` 无匹配。

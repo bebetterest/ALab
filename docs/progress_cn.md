@@ -12,7 +12,7 @@
 
 Blueprint 和 subsystem specs 仍是规范性产品契约。
 
-## 当前位置 - 2026-05-22
+## 当前位置 - 2026-05-23
 
 ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
@@ -21,7 +21,7 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 当前 worktree 的 default/local runnable V1 implementation 已完成 closeout。剩余工作是条件性维护，不是当前 completion blocker：
 
 - `docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- 当前 worktree 的 latest full default-suite closeout gate 在 CLI audit summary closeout batch 后已经保持 current。
+- 当前 worktree 的 latest full default-suite closeout gate 在 2026-05-23 examples 后续 reward parser 与单 Worker Codex 批次后已经保持 current。
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation。
 - 最终 README/spec/local-notes/progress/audit consistency pass 已有当前 focused evidence；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后需要重跑。
 

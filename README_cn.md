@@ -264,6 +264,8 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 ├── docs/
 │   ├── assets/
 │   │   └── readme-header.png
+│   ├── README.md
+│   ├── README_cn.md
 │   ├── blueprint.md
 │   ├── blueprint_cn.md
 │   ├── completion_audit.md
@@ -306,6 +308,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 
 - 英文文档是 canonical。
 - 中文同步文档使用 `*_cn.md` 命名。
+- [docs/README.md](docs/README.md) 说明文档结构和阅读顺序。
 - [docs/blueprint.md](docs/blueprint.md) 是 V1 product overview。
 - [docs/spec_cli.md](docs/spec_cli.md)、[docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md)、[docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md)、[docs/spec_lifecycle.md](docs/spec_lifecycle.md)、[docs/spec_runners_adapters.md](docs/spec_runners_adapters.md)、[docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md) 和 [docs/spec_tests.md](docs/spec_tests.md) 定义 subsystem contracts。
 - [docs/progress.md](docs/progress.md)、[docs/progress_pipeline.md](docs/progress_pipeline.md)、[docs/progress_closed_gaps.md](docs/progress_closed_gaps.md) 和 [docs/progress_log.md](docs/progress_log.md) 跟踪 current state、active queues、closed gaps 和 history。

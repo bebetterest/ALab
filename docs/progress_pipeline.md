@@ -12,7 +12,7 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 - Keep only the current queue and update policy here. Do not append stale backlog; rewrite or remove queue rows as evidence closes.
 - English docs are canonical. Update the synchronized `*_cn.md` file in the same change.
 
-## Current Active Batch - 2026-05-22
+## Current Active Batch - 2026-05-23
 
 - Focus: no active implementation or evidence batch remains for the current worktree.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
