@@ -7759,3 +7759,28 @@
 - All opt-in full suite：`ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs --junitxml=/private/tmp/alab-all-optin-pytest.xml`（JUnit `tests=389`、`skipped=0`、`failures=0`、`errors=0`）
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check src tests examples/templates`
 - `git diff --check`
+
+## 2026-05-23 Multi-Instance TSP 模板强化
+
+已实现：
+
+- 将所有 template 中单个 12-city TSP dataset 替换为 deterministic 15-instance benchmark：5 组 100-city、5 组 500-city、5 组 1000-city，总计 8000 个城市。
+- 将所有 template reward policy 改为最小化 `total_tour_length`，即所有实例 closed-tour length 之和；reward JSON metrics 保持 numeric-only，非法 route 用大的有限值惩罚。
+- 收紧 route validation，要求实际的非 bool integer indexes，不再把 strings 或 floats 强转成 integers。
+- starter `solution.py` 保持故意较弱，只返回 `list(range(len(cities)))`；demo scripts 改为启用 deterministic nearest-neighbor improvement，不再使用 naive 2-opt，确保 larger sizes 下 demo 仍然快速。
+- 新增 `examples/templates/reference_solution/solution.py`，使用 deterministic 多起点 nearest-neighbor 加 bounded 2-opt；新增 README/README_cn，记录 `total_tour_length <= 2650000` 的参考目标，并明确不声称全局最优。
+- 更新 local/Docker validators、Harbor verifier、SkyDiscover Python evaluator 和 SkyDiscover Docker evaluator，使它们遍历同一个 multi-instance contract，并把 route/details feedback 放在 reward JSON 外。
+- 更新 README pairs 和 contract tests，文档化并验证 15-instance benchmark、minimize reward direction、baseline 难度和 reference-solution target threshold。
+
+验证：
+
+- `bash -n examples/templates/scripts/check_templates.sh examples/templates/tsp_*/scripts/*.sh examples/templates/tsp_harbor/task/tests/test.sh examples/templates/tsp_skydiscover_docker/evaluator/evaluate.sh`
+- 直接 local starter validation：`ALAB_RUN_DIR=/private/tmp/alab-tsp-template-direct python examples/templates/tsp_local/source/validate_tsp.py`（`total_tour_length=42000612.353972`、`valid=1`）
+- 通过 local validator 直接验证 reference solution：`total_tour_length=2586654.146307`、`valid=1`
+- `ALAB_REPO_ROOT=/Users/hobeter/Desktop/code/ALab examples/templates/scripts/check_templates.sh`
+- Focused template/example contract tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_tsp_templates_are_complete_and_dry_run tests/test_cli_contract.py::test_tsp_reference_solution_meets_documented_threshold -q`
+- 从临时副本真实运行 local/SkyDiscover Python templates：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy -q`
+- Real Docker TSP template gate：`ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_real_docker.py::test_real_docker_tsp_templates_run_from_temp_copy -q -rs`
+- All opt-in full suite：`ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs --junitxml=/private/tmp/alab-all-optin-pytest.xml`（JUnit `tests=390`、`skipped=0`、`failures=0`、`errors=0`）
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py examples/templates`
+- `git diff --check`

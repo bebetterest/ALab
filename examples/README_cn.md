@@ -22,9 +22,9 @@
 - [skydiscover_circle_packing_codex](skydiscover_circle_packing_codex/) 是完整的
   Codex/SkyDiscover task：用隔离 worktree worker 改进 circle-packing benchmark，
   由 ALab 记录 runs、metrics、logs 和 reports。
-- [templates](templates/) 是模板库，不是单个 demo：可以复制其中一个 TSP 模板，
-  直接获得完整的 local、Docker、Harbor、SkyDiscover Python 或 SkyDiscover
-  Docker 项目骨架。
+- [templates](templates/) 是模板库，不是单个 demo：可以复制其中一个
+  multi-instance TSP 模板，直接获得完整的 local、Docker、Harbor、SkyDiscover
+  Python 或 SkyDiscover Docker 项目骨架。
 
 学习某个示例时建议先运行 `--dry-run`。它会打印 command shape 和 paths，而不会
 修改示例状态。
@@ -38,7 +38,7 @@
 | [harbor_verifier_minimal](harbor_verifier_minimal/) | 改进 incident-ticket urgency classifier，由 Harbor hidden verifier cases 评分。 | Harbor | Docker daemon | Harbor source import、private verifier assets、hidden verifier logs、Harbor reward | `scripts/setup_project.sh`、`scripts/run_demo.sh` |
 | [collaboration_observe_lifecycle](collaboration_observe_lifecycle/) | 协调两个 public incident-triage experiments，并从最佳 run 继续。 | local | ALab dev env 之外无额外要求 | public create、from-exp best、tags、annotations、inspection、remove dry-run | `scripts/setup_project.sh`、`scripts/run_demo.sh` |
 | [skydiscover_circle_packing_codex](skydiscover_circle_packing_codex/) | 用单个 Codex worker 改进 SkyDiscover circle-packing benchmark。 | SkyDiscover Python | Codex CLI、network、uv dependency install | SkyDiscover catalog、Python evaluator、隔离 worker protocol | `scripts/setup_project.sh`、`scripts/run_single_worker.sh` |
-| [templates](templates/) | 复制某个 runner family 的完整默认 TSP 模板。 | local、Docker、Harbor、SkyDiscover Python、SkyDiscover Docker | 只有 Docker-bound 模板需要 Docker | reusable project configs、validation scripts、starter solutions、setup/run scripts | `templates/<template>/scripts/setup_project.sh`、`templates/<template>/scripts/run_demo.sh` |
+| [templates](templates/) | 复制某个 runner family 的完整默认 multi-instance TSP 模板。 | local、Docker、Harbor、SkyDiscover Python、SkyDiscover Docker | 只有 Docker-bound 模板需要 Docker | reusable project configs、validation scripts、starter/reference solutions、setup/run scripts | `templates/<template>/scripts/setup_project.sh`、`templates/<template>/scripts/run_demo.sh` |
 
 ## 建议阅读路径
 

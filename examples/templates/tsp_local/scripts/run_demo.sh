@@ -13,8 +13,8 @@ for arg in "$@"; do
       cat <<'EOF'
 Usage: scripts/run_demo.sh [--dry-run]
 
-Creates one local TSP experiment, enables the 2-opt improvement, runs it, and
-submits the passed result.
+Creates one local TSP experiment, enables a nearest-neighbor improvement, runs
+it, and submits the passed result.
 EOF
       exit 0
       ;;
@@ -71,9 +71,9 @@ SUBMIT_LOG="$LOG_DIR/tsp-local-submit.log"
 run_alab exp create --project "$ALAB_PROJECT_ID" --name "$EXP_NAME" --path "$WORKTREE_ROOT/$EXP_NAME" | tee "$CREATE_LOG"
 WORKTREE_PATH="$(extract_field "worktree path" "$CREATE_LOG")"
 EXP_ID="$(extract_field "exp id" "$CREATE_LOG")"
-perl -0pi -e 's/IMPROVE_WITH_TWO_OPT = False/IMPROVE_WITH_TWO_OPT = True/' "$WORKTREE_PATH/solution.py"
-(cd "$WORKTREE_PATH" && run_alab run --message "tsp local 2-opt improvement") | tee "$RUN_LOG"
-(cd "$WORKTREE_PATH" && run_alab submit --message "tsp local submitted route" --summary "Enabled deterministic 2-opt route improvement." --feedback "The latest run passed with parsed file reward." --ref none) | tee "$SUBMIT_LOG"
+perl -0pi -e 's/IMPROVE_WITH_NEAREST_NEIGHBOR = False/IMPROVE_WITH_NEAREST_NEIGHBOR = True/' "$WORKTREE_PATH/solution.py"
+(cd "$WORKTREE_PATH" && run_alab run --message "tsp local nearest-neighbor improvement") | tee "$RUN_LOG"
+(cd "$WORKTREE_PATH" && run_alab submit --message "tsp local submitted route" --summary "Enabled deterministic nearest-neighbor route improvement." --feedback "The latest run passed with parsed minimize-direction file reward." --ref none) | tee "$SUBMIT_LOG"
 
 RUN_ID="$(extract_field "run id" "$RUN_LOG")"
 REWARD_VALUE="$(extract_field "reward value" "$RUN_LOG")"

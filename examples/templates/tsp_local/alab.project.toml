@@ -2,8 +2,8 @@ schema_version = 1
 
 [project]
 name = "TSP Local Template"
-task = "Improve a deterministic Traveling Salesperson route builder over a fixed city list."
-goal = "Show a minimal local-runner template with file reward parsing, route artifacts, and submit."
+task = "Improve a deterministic Traveling Salesperson route builder across 15 fixed generated instances."
+goal = "Show a minimal local-runner template with minimize-direction file reward parsing, route artifacts, and submit."
 allow_public_exp_create = true
 
 [public_source_import]
@@ -27,8 +27,8 @@ command = ["python", "validate_tsp.py"]
 
 [reward]
 type = "file"
-direction = "maximize"
-primary_metric = "score"
+direction = "minimize"
+primary_metric = "total_tour_length"
 path = "run:reward.json"
 
 [artifacts]

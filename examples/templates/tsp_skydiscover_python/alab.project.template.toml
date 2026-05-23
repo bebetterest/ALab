@@ -2,8 +2,8 @@ schema_version = 1
 
 [project]
 name = "TSP SkyDiscover Python Template"
-task = "Improve a deterministic Traveling Salesperson route builder evaluated by a local SkyDiscover Python evaluator."
-goal = "Show a self-contained SkyDiscover Python template with no dependency install or remote catalog requirement."
+task = "Improve a deterministic Traveling Salesperson route builder across 15 fixed generated instances evaluated by a local SkyDiscover Python evaluator."
+goal = "Show a self-contained SkyDiscover Python template with minimize-direction scoring and no dependency install or remote catalog requirement."
 allow_public_exp_create = true
 
 [public_source_import]
@@ -27,8 +27,8 @@ program_path = "."
 
 [reward]
 type = "skydiscover"
-direction = "maximize"
-primary_metric = "combined_score"
+direction = "minimize"
+primary_metric = "total_tour_length"
 
 [logs]
 stdout_limit_bytes = 20000

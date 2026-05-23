@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-IMPROVE_WITH_TWO_OPT = False
+IMPROVE_WITH_NEAREST_NEIGHBOR = False
 
 
 def _distance(a: dict[str, object], b: dict[str, object]) -> float:
@@ -9,31 +9,20 @@ def _distance(a: dict[str, object], b: dict[str, object]) -> float:
     return ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
 
 
-def _route_length(route: list[int], cities: list[dict[str, object]]) -> float:
-    if not route:
-        return 0.0
-    return sum(_distance(cities[a], cities[b]) for a, b in zip(route, route[1:] + route[:1], strict=True))
-
-
-def _two_opt(route: list[int], cities: list[dict[str, object]]) -> list[int]:
-    best = route[:]
-    improved = True
-    while improved:
-        improved = False
-        for start in range(1, len(best) - 2):
-            for end in range(start + 2, len(best) + 1):
-                candidate = best[:start] + list(reversed(best[start:end])) + best[end:]
-                if _route_length(candidate, cities) + 1e-12 < _route_length(best, cities):
-                    best = candidate
-                    improved = True
-                    break
-            if improved:
-                break
-    return best
+def _nearest_neighbor(cities: list[dict[str, object]]) -> list[int]:
+    if not cities:
+        return []
+    route = [0]
+    unvisited = set(range(1, len(cities)))
+    while unvisited:
+        current = route[-1]
+        next_city = min(unvisited, key=lambda city: (_distance(cities[current], cities[city]), city))
+        route.append(next_city)
+        unvisited.remove(next_city)
+    return route
 
 
 def build_route(cities: list[dict[str, object]]) -> list[int]:
-    route = list(range(len(cities)))
-    if IMPROVE_WITH_TWO_OPT:
-        return _two_opt(route, cities)
-    return route
+    if IMPROVE_WITH_NEAREST_NEIGHBOR:
+        return _nearest_neighbor(cities)
+    return list(range(len(cities)))

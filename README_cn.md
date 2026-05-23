@@ -213,8 +213,9 @@ Project behavior 由 TOML config 控制：
 local scoring loop、带 artifact export 的 Dockerized 诊所订单履约计划器、Harbor
 hidden-verifier incident classifier、协作式 incident triage lifecycle workflow，
 以及 SkyDiscover circle-packing Codex single-worker protocol。同一区域还包含
-`examples/templates/`，这是可复制的 TSP template library，覆盖 local、Docker、
-Harbor、SkyDiscover Python 和 SkyDiscover Docker runner projects。
+`examples/templates/`，这是可复制的 multi-instance TSP template library，覆盖
+local、Docker、Harbor、SkyDiscover Python 和 SkyDiscover Docker runner
+projects。
 
 仓库还在 [skills](skills/) 下提供 Codex-facing role skills。它们是通过 CLI 操作 ALab 的外部 runbooks，分别面向 experiment worker、project controller 和 global admin；它们不会给 ALab 增加内置 agent launcher。
 

@@ -2,8 +2,8 @@ schema_version = 1
 
 [project]
 name = "TSP Harbor Template"
-task = "Improve a deterministic Traveling Salesperson route builder while a Harbor verifier scores the route."
-goal = "Show a Harbor template with public starter source, hidden verifier logs, and numeric-only Harbor reward metrics."
+task = "Improve a deterministic Traveling Salesperson route builder across 15 fixed generated instances while a Harbor verifier scores the routes."
+goal = "Show a Harbor template with public starter source, hidden verifier logs, and numeric-only minimize-direction Harbor reward metrics."
 allow_public_exp_create = true
 
 [mutable]
@@ -21,8 +21,8 @@ network = "none"
 
 [reward]
 type = "harbor"
-direction = "maximize"
-primary_metric = "reward"
+direction = "minimize"
+primary_metric = "total_tour_length"
 
 [logs]
 stdout_limit_bytes = 20000

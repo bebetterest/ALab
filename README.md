@@ -214,8 +214,9 @@ cover a local scoring loop, a Dockerized clinic-order fulfillment planner with
 artifact export, a Harbor hidden-verifier incident classifier, a collaborative
 incident triage lifecycle workflow, and the SkyDiscover circle-packing Codex
 single-worker protocol. The same examples area also includes
-`examples/templates/`, a copyable TSP template library for local, Docker,
-Harbor, SkyDiscover Python, and SkyDiscover Docker runner projects.
+`examples/templates/`, a copyable multi-instance TSP template library for
+local, Docker, Harbor, SkyDiscover Python, and SkyDiscover Docker runner
+projects.
 
 The repository also includes Codex-facing role skills under [skills](skills/). They are external runbooks for operating ALab through the CLI as an experiment worker, project controller, or global admin; they do not add an embedded agent launcher to ALab.
 

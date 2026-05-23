@@ -7765,3 +7765,28 @@ Validation:
 - All opt-in full suite: `ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs --junitxml=/private/tmp/alab-all-optin-pytest.xml` (JUnit `tests=389`, `skipped=0`, `failures=0`, `errors=0`)
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check src tests examples/templates`
 - `git diff --check`
+
+## 2026-05-23 Multi-Instance TSP Template Hardening
+
+Implemented:
+
+- Replaced the single 12-city TSP dataset in every template with a deterministic 15-instance benchmark: five 100-city instances, five 500-city instances, and five 1000-city instances, for 8000 total cities.
+- Changed all template reward policies to minimize `total_tour_length`, the sum of all per-instance closed-tour lengths, while keeping reward JSON metrics numeric-only and invalid routes penalized with large finite values.
+- Tightened route validation to require actual non-bool integer indexes instead of coercing strings or floats into integers.
+- Kept starter `solution.py` intentionally weak with `list(range(len(cities)))`; changed demo scripts to enable deterministic nearest-neighbor improvement instead of naive 2-opt so demos remain fast at the larger sizes.
+- Added `examples/templates/reference_solution/solution.py` with deterministic multi-start nearest-neighbor plus bounded 2-opt, plus README/README_cn target documentation requiring `total_tour_length <= 2650000` while explicitly not claiming global optimality.
+- Updated local/Docker validators, Harbor verifier, SkyDiscover Python evaluator, and SkyDiscover Docker evaluator to loop over the same multi-instance contract and emit route/details feedback outside reward JSON.
+- Updated README pairs and contract tests to document and verify the 15-instance benchmark, minimize reward direction, baseline difficulty, and reference-solution target threshold.
+
+Validation:
+
+- `bash -n examples/templates/scripts/check_templates.sh examples/templates/tsp_*/scripts/*.sh examples/templates/tsp_harbor/task/tests/test.sh examples/templates/tsp_skydiscover_docker/evaluator/evaluate.sh`
+- Direct local starter validation: `ALAB_RUN_DIR=/private/tmp/alab-tsp-template-direct python examples/templates/tsp_local/source/validate_tsp.py` (`total_tour_length=42000612.353972`, `valid=1`)
+- Direct reference-solution validation through the local validator: `total_tour_length=2586654.146307`, `valid=1`
+- `ALAB_REPO_ROOT=/Users/hobeter/Desktop/code/ALab examples/templates/scripts/check_templates.sh`
+- Focused template/example contract tests: `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_tsp_templates_are_complete_and_dry_run tests/test_cli_contract.py::test_tsp_reference_solution_meets_documented_threshold -q`
+- Local/SkyDiscover Python template real runs from a temp copy: `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy -q`
+- Real Docker TSP template gate: `ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_real_docker.py::test_real_docker_tsp_templates_run_from_temp_copy -q -rs`
+- All opt-in full suite: `ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs --junitxml=/private/tmp/alab-all-optin-pytest.xml` (JUnit `tests=390`, `skipped=0`, `failures=0`, `errors=0`)
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py examples/templates`
+- `git diff --check`

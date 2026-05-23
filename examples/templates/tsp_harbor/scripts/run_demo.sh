@@ -13,8 +13,8 @@ for arg in "$@"; do
       cat <<'EOF'
 Usage: scripts/run_demo.sh [--dry-run]
 
-Creates one Harbor TSP experiment, enables the 2-opt improvement, runs it, and
-submits the passed result.
+Creates one Harbor TSP experiment, enables a nearest-neighbor improvement, runs
+it, and submits the passed result.
 EOF
       exit 0
       ;;
@@ -76,9 +76,9 @@ LOGS_LOG="$LOG_DIR/tsp-harbor-logs-list.log"
 run_alab exp create --project "$ALAB_PROJECT_ID" --name "$EXP_NAME" --path "$WORKTREE_ROOT/$EXP_NAME" | tee "$CREATE_LOG"
 WORKTREE_PATH="$(extract_field "worktree path" "$CREATE_LOG")"
 EXP_ID="$(extract_field "exp id" "$CREATE_LOG")"
-perl -0pi -e 's/IMPROVE_WITH_TWO_OPT = False/IMPROVE_WITH_TWO_OPT = True/' "$WORKTREE_PATH/solution.py"
-(cd "$WORKTREE_PATH" && run_alab run --message "tsp harbor 2-opt improvement") | tee "$RUN_LOG"
-(cd "$WORKTREE_PATH" && run_alab submit --message "tsp harbor submitted route" --summary "Enabled deterministic 2-opt route improvement." --feedback "The latest Harbor run passed with hidden verifier reward." --ref none) | tee "$SUBMIT_LOG"
+perl -0pi -e 's/IMPROVE_WITH_NEAREST_NEIGHBOR = False/IMPROVE_WITH_NEAREST_NEIGHBOR = True/' "$WORKTREE_PATH/solution.py"
+(cd "$WORKTREE_PATH" && run_alab run --message "tsp harbor nearest-neighbor improvement") | tee "$RUN_LOG"
+(cd "$WORKTREE_PATH" && run_alab submit --message "tsp harbor submitted route" --summary "Enabled deterministic nearest-neighbor route improvement." --feedback "The latest Harbor run passed with hidden minimize-direction verifier reward." --ref none) | tee "$SUBMIT_LOG"
 run_alab --key "$ALAB_PROJECT_KEY" logs list --project "$ALAB_PROJECT_ID" --include-hidden | tee "$LOGS_LOG"
 
 RUN_ID="$(extract_field "run id" "$RUN_LOG")"

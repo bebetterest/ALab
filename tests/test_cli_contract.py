@@ -20634,24 +20634,32 @@ def test_examples_are_task_shaped_demos() -> None:
         ],
         "templates": [
             "tsp_local/alab.project.toml",
+            "tsp_local/source/instances.json",
             "tsp_local/source/solution.py",
             "tsp_local/source/validate_tsp.py",
             "tsp_docker/alab.project.toml",
             "tsp_docker/source/Dockerfile",
+            "tsp_docker/source/instances.json",
             "tsp_docker/source/solution.py",
             "tsp_docker/source/validate_tsp.py",
             "tsp_harbor/alab.project.template.toml",
             "tsp_harbor/task/task.toml",
+            "tsp_harbor/task/starter/instances.json",
             "tsp_harbor/task/starter/solution.py",
             "tsp_harbor/task/tests/test.sh",
             "tsp_skydiscover_python/alab.project.template.toml",
+            "tsp_skydiscover_python/source/instances.json",
             "tsp_skydiscover_python/source/solution.py",
             "tsp_skydiscover_python/evaluator/evaluator.py",
             "tsp_skydiscover_docker/alab.project.template.toml",
+            "tsp_skydiscover_docker/source/instances.json",
             "tsp_skydiscover_docker/source/solution.py",
             "tsp_skydiscover_docker/evaluator/Dockerfile",
             "tsp_skydiscover_docker/evaluator/evaluate.sh",
             "tsp_skydiscover_docker/evaluator/evaluator.py",
+            "reference_solution/README.md",
+            "reference_solution/README_cn.md",
+            "reference_solution/solution.py",
             "scripts/check_templates.sh",
         ],
     }
@@ -20686,13 +20694,56 @@ def test_tsp_templates_are_complete_and_dry_run() -> None:
     assert actual_templates == template_names
     assert "## Template Matrix" in readme
     assert "## 模板矩阵" in readme_cn
+    assert "100-city" in readme
+    assert "500-city" in readme
+    assert "1000-city" in readme
+    assert "total_tour_length <= 2650000" in readme
+    assert "100-city" in readme_cn
+    assert "500-city" in readme_cn
+    assert "1000-city" in readme_cn
+    assert "total_tour_length <= 2650000" in readme_cn
     assert shell_scripts
+    assert "not a claim of global optimality" in readme
+    assert "不表示全局最优保证" in readme_cn
+    assert (templates_root / "reference_solution" / "solution.py").is_file()
+    assert (templates_root / "reference_solution" / "README.md").is_file()
+    assert (templates_root / "reference_solution" / "README_cn.md").is_file()
     for name in sorted(template_names):
         assert f"[{name}]({name}/)" in readme
         assert f"[{name}]({name}/)" in readme_cn
         assert (templates_root / name / ".gitignore").read_text(encoding="utf-8").strip() == ".run/"
         assert (templates_root / name / "scripts" / "setup_project.sh").is_file()
         assert (templates_root / name / "scripts" / "run_demo.sh").is_file()
+
+    template_sources = {
+        "tsp_local": templates_root / "tsp_local" / "source",
+        "tsp_docker": templates_root / "tsp_docker" / "source",
+        "tsp_harbor": templates_root / "tsp_harbor" / "task" / "starter",
+        "tsp_skydiscover_python": templates_root / "tsp_skydiscover_python" / "source",
+        "tsp_skydiscover_docker": templates_root / "tsp_skydiscover_docker" / "source",
+    }
+    template_configs = {
+        "tsp_local": templates_root / "tsp_local" / "alab.project.toml",
+        "tsp_docker": templates_root / "tsp_docker" / "alab.project.toml",
+        "tsp_harbor": templates_root / "tsp_harbor" / "alab.project.template.toml",
+        "tsp_skydiscover_python": templates_root / "tsp_skydiscover_python" / "alab.project.template.toml",
+        "tsp_skydiscover_docker": templates_root / "tsp_skydiscover_docker" / "alab.project.template.toml",
+    }
+    for name in sorted(template_names):
+        source_dir = template_sources[name]
+        payload = json.loads((source_dir / "instances.json").read_text(encoding="utf-8"))
+        counts: dict[int, int] = defaultdict(int)
+        for instance in payload["instances"]:
+            counts[int(instance["city_count"])] += 1
+        assert dict(counts) == {100: 5, 500: 5, 1000: 5}
+        assert sum(int(instance["city_count"]) for instance in payload["instances"]) == 8000
+        assert not (source_dir / "cities.json").exists()
+        starter = (source_dir / "solution.py").read_text(encoding="utf-8")
+        assert "IMPROVE_WITH_NEAREST_NEIGHBOR = False" in starter
+        assert "return list(range(len(cities)))" in starter
+        config = tomllib.loads(template_configs[name].read_text(encoding="utf-8"))
+        assert config["reward"]["direction"] == "minimize"
+        assert config["reward"]["primary_metric"] == "total_tour_length"
 
     for script in shell_scripts:
         completed = subprocess.run(
@@ -20720,6 +20771,54 @@ def test_tsp_templates_are_complete_and_dry_run() -> None:
                 check=False,
             )
             assert completed.returncode == 0, f"{script}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+
+
+def test_tsp_reference_solution_meets_documented_threshold(tmp_path: Path) -> None:
+    templates_root = _EXAMPLES_ROOT / "templates"
+
+    def run_validator(source: Path, run_dir: Path) -> dict[str, float]:
+        env = os.environ.copy()
+        env["ALAB_RUN_DIR"] = str(run_dir)
+        completed = subprocess.run(
+            [sys.executable, str(source / "validate_tsp.py")],
+            cwd=source,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        assert completed.returncode == 0, f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+        return json.loads((run_dir / "reward.json").read_text(encoding="utf-8"))
+
+    baseline_source = tmp_path / "baseline"
+    shutil.copytree(templates_root / "tsp_local" / "source", baseline_source)
+    baseline_metrics = run_validator(baseline_source, tmp_path / "baseline-run")
+
+    reference_source = tmp_path / "reference"
+    shutil.copytree(templates_root / "tsp_local" / "source", reference_source)
+    shutil.copy2(templates_root / "reference_solution" / "solution.py", reference_source / "solution.py")
+    reference_metrics = run_validator(reference_source, tmp_path / "reference-run")
+
+    invalid_source = tmp_path / "invalid"
+    shutil.copytree(templates_root / "tsp_local" / "source", invalid_source)
+    (invalid_source / "solution.py").write_text(
+        "def build_route(cities):\n    return [str(index) for index in range(len(cities))]\n",
+        encoding="utf-8",
+    )
+    invalid_metrics = run_validator(invalid_source, tmp_path / "invalid-run")
+
+    assert baseline_metrics["valid"] == 1.0
+    assert baseline_metrics["instance_count"] == 15.0
+    assert baseline_metrics["city_count"] == 8000.0
+    assert baseline_metrics["total_tour_length"] > 40_000_000
+    assert reference_metrics["valid"] == 1.0
+    assert reference_metrics["instance_count"] == 15.0
+    assert reference_metrics["city_count"] == 8000.0
+    assert reference_metrics["total_tour_length"] <= 2_650_000
+    assert invalid_metrics["valid"] == 0.0
+    assert invalid_metrics["valid_instance_count"] == 0.0
+    assert invalid_metrics["total_tour_length"] > 15_000_000_000
 
 
 def test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy(tmp_path: Path) -> None:
