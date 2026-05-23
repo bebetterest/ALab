@@ -7689,3 +7689,22 @@
 - `docker_file_reward_artifacts` 在 Docker Desktop 上真实 setup/run 通过；改进 run reward `0.899235`，捕获 3 个 artifacts。
 - `harbor_verifier_minimal` 在把 non-numeric verifier details 移出 `reward.json` 后，真实 Harbor setup/run 通过；改进 run reward `0.92625`。
 - Focused examples contract 和 ruff checks 通过。
+
+## 2026-05-23 Examples 后续：Reward 诊断与单 Worker Codex
+
+已实现：
+
+- 收紧 file 和 Harbor reward 的 JSON 解析，使 reward files 必须是 string-to-finite-number map。非法 JSON metric shape 会在 runner 阶段变成 reward parse error，再写入 run record 之前被拦截，避免用户 reward 文件问题落到泛化 storage failure。
+- 删除 SkyDiscover controller/multi-worker 示例路径，使 SkyDiscover demo 聚焦为单个隔离 Codex worker。
+- 为 Codex worker 增加 unsafe worktree path 和 secret side directory 预检，并明确额外加入的 ALab home/cache/shared directories 是 CLI state，不是 editable source。
+- 将 `UV_DEFAULT_INDEX=https://pypi.org/simple` 贯穿 example scripts 和 README commands，并为 Docker、Harbor、SkyDiscover、Codex 和 uv-backed flows 增加本地依赖排障说明。
+- 更新 runner specs、examples 文档和 role skills，补充 numeric-only reward JSON 规则，以及 worker source-vs-state 边界说明。
+
+验证：
+
+- `bash -n examples/*/scripts/*.sh`
+- 所有 example scripts 的 dry-run 检查。
+- Focused reward parser 和 examples contract tests：
+  `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_runner_local.py::test_file_reward_parses_json_and_enforces_limit_and_finite_values tests/test_runner_harbor.py::test_harbor_reward_parser_handles_json_text_missing_and_invalid_values tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests tests/test_cli_contract.py::test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`

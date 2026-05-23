@@ -34,14 +34,15 @@ REPORT_DIR="$RUN_DIR/reports"
 WORKTREE_ROOT="$RUN_DIR/worktrees"
 ALAB_EXAMPLE_HOME="${ALAB_EXAMPLE_HOME:-$RUN_DIR/alab-home}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-$RUN_DIR/uv-cache}"
+UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
 PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$RUN_DIR/pycache}"
 ALAB_BIN="${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
-ALAB_CMD_PREFIX="UV_CACHE_DIR=$UV_CACHE_DIR PYTHONPYCACHEPREFIX=$PYTHONPYCACHEPREFIX $ALAB_BIN --home $ALAB_EXAMPLE_HOME"
+ALAB_CMD_PREFIX="UV_CACHE_DIR=$UV_CACHE_DIR UV_DEFAULT_INDEX=$UV_DEFAULT_INDEX PYTHONPYCACHEPREFIX=$PYTHONPYCACHEPREFIX $ALAB_BIN --home $ALAB_EXAMPLE_HOME"
 PROJECT_ENV="$SECRET_DIR/project.env"
 
 read -r -a ALAB_CMD <<< "$ALAB_BIN"
 run_alab() {
-  UV_CACHE_DIR="$UV_CACHE_DIR" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
+  UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
 }
 extract_field_text() {
   local label="$1"
@@ -55,6 +56,7 @@ Would initialize the Docker file-reward example.
 ALAB home:    $ALAB_EXAMPLE_HOME
 Project env:  $PROJECT_ENV
 Dockerfile:   $EXAMPLE_DIR/source/Dockerfile
+uv index:     $UV_DEFAULT_INDEX
 EOF
   exit 0
 fi
@@ -67,6 +69,14 @@ if [[ -f "$PROJECT_ENV" ]]; then
   echo "Existing project env found: $PROJECT_ENV"
   echo "Use --reset to recreate the example from scratch."
   exit 0
+fi
+if [[ "$ALAB_BIN" == uv\ * ]] && ! command -v uv >/dev/null 2>&1; then
+  echo "missing uv CLI; install uv or set ALAB_BIN to an installed alab command" >&2
+  exit 1
+fi
+if ! command -v docker >/dev/null 2>&1; then
+  echo "missing docker CLI; install/start Docker before running this example" >&2
+  exit 1
 fi
 
 AUTH_OUTPUT="$(run_alab auth init)"
@@ -96,6 +106,7 @@ fi
   printf 'export ALAB_BIN=%q\n' "$ALAB_BIN"
   printf 'export ALAB_CMD_PREFIX=%q\n' "$ALAB_CMD_PREFIX"
   printf 'export UV_CACHE_DIR=%q\n' "$UV_CACHE_DIR"
+  printf 'export UV_DEFAULT_INDEX=%q\n' "$UV_DEFAULT_INDEX"
   printf 'export PYTHONPYCACHEPREFIX=%q\n' "$PYTHONPYCACHEPREFIX"
   printf 'export ALAB_REPORT_DIR=%q\n' "$REPORT_DIR"
   printf 'export ALAB_EXAMPLE_WORKTREE_ROOT=%q\n' "$WORKTREE_ROOT"

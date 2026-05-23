@@ -55,6 +55,9 @@ only in `.run/secrets/project.env`; Codex workers are not given that directory.
 
 ## Isolation Notes
 
-The Codex worker command uses the experiment worktree as `-C` and adds only
-ALab home/cache plus `.run/shared` as writable side directories. It does not add
-the repository root, the whole `.run/` directory, or `.run/secrets`.
+The Codex worker command uses the experiment worktree as `-C`; that worktree is
+the only editable source surface. The script preflights that the worktree is not
+the repository root, `.run`, or `.run/secrets`, then adds only ALab home, uv
+cache, pycache, and `.run/shared` as writable CLI state directories. It does not
+add the repository root, the whole `.run/` directory, `.run/secrets`, or
+`project.env`.

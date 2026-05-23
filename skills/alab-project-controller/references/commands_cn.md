@@ -180,6 +180,7 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
 ```
 
 不要把 repository root 作为 worker 的 `-C`。不要通过 argv、stdin prompt text、copied files、inherited environment、`--add-dir "$RUN_DIR"`、`.run/secrets` 或 `project.env` 传递 project admin key。
+启动前解析 worktree path，并拒绝 repo root、整个 `.run` 目录或任何 secret/control path。告知 workers：加入的 ALab home/cache/shared directories 只是 CLI state，不是 source-editing surface。
 
 ## Closeout Report
 

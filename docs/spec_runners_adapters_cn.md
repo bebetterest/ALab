@@ -201,7 +201,7 @@ File reward：
 - Path resolution 使用 artifact root escape checks。
 - Reward file read limit 复用 `artifacts.per_file_limit_bytes`。
 - Plain text 按 stripped finite float 解析。
-- JSON reward file 必须是 top-level object。
+- JSON reward file 必须是 top-level string-to-finite-number object。
 - JSON reward metrics 只支持 top-level keys；V1 不支持 nested path。
 - ALab 读取 top-level object 中的 `reward.primary_metric`。
 
@@ -215,9 +215,9 @@ Stdout regex reward：
 Harbor reward：
 
 - 读取 `run:/logs/verifier/reward.txt` 或 `run:/logs/verifier/reward.json`。
-- `reward.json` 必须是 top-level object。
+- `reward.json` 必须是 top-level string-to-finite-number object。
 - 默认读取 `reward.primary_metric = reward`。
-- Missing 或 non-finite numeric value 使 reward parsing 失败。
+- Missing、non-finite 或 non-numeric metric value 都会使 reward parsing 失败。详细 verifier diagnostics 必须写入单独 logs 或 artifacts，不能写入 reward metrics object。
 
 SkyDiscover reward：
 

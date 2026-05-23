@@ -1501,6 +1501,18 @@ def _finite_number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _reward_metric_map(value: Any) -> dict[str, float] | None:
+    if not isinstance(value, dict):
+        return None
+    metrics: dict[str, float] = {}
+    for key, metric in value.items():
+        number = _finite_number(metric)
+        if not isinstance(key, str) or number is None:
+            return None
+        metrics[key] = number
+    return metrics
+
+
 def _parse_text_reward_number(value: str) -> float:
     number = float(value)
     if not math.isfinite(number):
@@ -1548,13 +1560,12 @@ def _parse_harbor_reward(config: ProjectConfig, run_dir: Path) -> tuple[float | 
             value = json.loads(reward_json.read_text(encoding="utf-8"))
         except Exception:
             return None, "invalid", {}
-        if not isinstance(value, dict):
+        metrics = _reward_metric_map(value)
+        if metrics is None:
             return None, "invalid", {}
-        metrics = dict(value)
         if primary not in metrics:
             return None, "missing", metrics
-        number = _finite_number(metrics.get(primary))
-        return (number, "parsed", metrics) if number is not None else (None, "invalid", metrics)
+        return metrics[primary], "parsed", metrics
     if reward_txt.is_file():
         try:
             number = float(reward_txt.read_text(encoding="utf-8").strip())
@@ -1716,7 +1727,11 @@ def run_harbor_runner(
         status = "error"
     else:
         status = "failed"
-    failure = "Harbor reward metric missing" if status == "error" and parse_status != "parsed" else None
+    failure = None
+    if status == "error" and parse_status == "missing":
+        failure = "Harbor reward metric missing"
+    elif status == "error" and parse_status == "invalid":
+        failure = "Harbor reward metrics invalid"
     stdout = _harbor_visible_stdout(
         ref=task_ref,
         pinned_commit=resolved.get("pinned_commit"),
@@ -2158,10 +2173,12 @@ def parse_reward(config: ProjectConfig, exit_code: int, stdout: bytes, workspace
             text = data.decode("utf-8").strip()
             if path.suffix.lower() == ".json":
                 value = json.loads(text)
-                if not isinstance(value, dict):
+                metrics = _reward_metric_map(value)
+                if metrics is None:
                     return None, "invalid"
-                number = _finite_number(value.get(reward.primary_metric))
-                return (number, "parsed") if number is not None else (None, "missing")
+                if reward.primary_metric not in metrics:
+                    return None, "missing"
+                return metrics[reward.primary_metric], "parsed"
             return _parse_text_reward_number(text), "parsed"
     except Exception:
         return None, "invalid"

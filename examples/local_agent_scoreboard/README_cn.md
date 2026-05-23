@@ -51,6 +51,8 @@ examples/local_agent_scoreboard/scripts/run_codex_worker.sh
 
 ## 隔离说明
 
-Codex worker 命令以 experiment worktree 作为 `-C`，只额外加入 ALab home/cache
-和 `.run/shared` 作为可写目录。它不会加入 repository root、整个 `.run/` 或
-`.run/secrets`。
+Codex worker 命令以 experiment worktree 作为 `-C`；该 worktree 是唯一可编辑
+source surface。脚本会预检 worktree 不是 repository root、`.run` 或
+`.run/secrets`，然后只额外加入 ALab home、uv cache、pycache 和 `.run/shared`
+作为可写 CLI state directories。它不会加入 repository root、整个 `.run/`、
+`.run/secrets` 或 `project.env`。

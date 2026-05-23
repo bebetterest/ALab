@@ -35,8 +35,9 @@ CODEX_MODEL="${CODEX_MODEL:-}"
 ALAB_BIN="${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
 ALAB_EXAMPLE_HOME="${ALAB_EXAMPLE_HOME:-$RUN_DIR/alab-home}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-$RUN_DIR/uv-cache}"
+UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
 PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$RUN_DIR/pycache}"
-ALAB_CMD_PREFIX="${ALAB_CMD_PREFIX:-UV_CACHE_DIR=$UV_CACHE_DIR PYTHONPYCACHEPREFIX=$PYTHONPYCACHEPREFIX $ALAB_BIN --home $ALAB_EXAMPLE_HOME}"
+ALAB_CMD_PREFIX="${ALAB_CMD_PREFIX:-UV_CACHE_DIR=$UV_CACHE_DIR UV_DEFAULT_INDEX=$UV_DEFAULT_INDEX PYTHONPYCACHEPREFIX=$PYTHONPYCACHEPREFIX $ALAB_BIN --home $ALAB_EXAMPLE_HOME}"
 
 if [[ "$DRY_RUN" == "1" ]]; then
   cat <<EOF
@@ -46,11 +47,23 @@ Project env:   $PROJECT_ENV
 Experiment:    $EXP_NAME
 Worktree root: $WORKTREE_ROOT
 Codex model:   ${CODEX_MODEL:-<codex default>}
+Writable dirs:
+  - <worktree> (Codex -C)
+  - \$ALAB_EXAMPLE_HOME
+  - \$UV_CACHE_DIR
+  - \$PYTHONPYCACHEPREFIX
+  - $SHARED_DIR
+Forbidden dirs:
+  - $REPO_ROOT
+  - $RUN_DIR
+  - $RUN_DIR/secrets
+Unset credentials: ALAB_PROJECT_KEY, ALAB_ROOT_KEY, ALAB_KEY
+uv index:      $UV_DEFAULT_INDEX
 
 Commands:
   source $PROJECT_ENV
   eval "\$ALAB_CMD_PREFIX exp create --project \$ALAB_PROJECT_ID --name $EXP_NAME --path $WORKTREE_ROOT/$EXP_NAME"
-  env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY ALAB_CMD_PREFIX="\$ALAB_CMD_PREFIX" codex exec -C <worktree> --add-dir \$ALAB_EXAMPLE_HOME --add-dir \$UV_CACHE_DIR --add-dir \$PYTHONPYCACHEPREFIX --add-dir $SHARED_DIR ${CODEX_MODEL:+-m "$CODEX_MODEL"} --sandbox workspace-write - < $EXAMPLE_DIR/prompts/worker.md
+  env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY ALAB_CMD_PREFIX="\$ALAB_CMD_PREFIX" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" codex exec -C <worktree> --add-dir \$ALAB_EXAMPLE_HOME --add-dir \$UV_CACHE_DIR --add-dir \$PYTHONPYCACHEPREFIX --add-dir $SHARED_DIR ${CODEX_MODEL:+-m "$CODEX_MODEL"} --sandbox workspace-write - < $EXAMPLE_DIR/prompts/worker.md
 EOF
   exit 0
 fi
@@ -67,7 +80,46 @@ mkdir -p "$WORKTREE_ROOT" "$SHARED_DIR" "$LOG_DIR" "$UV_CACHE_DIR" "$PYTHONPYCAC
 read -r -a ALAB_CMD <<< "$ALAB_BIN"
 
 run_alab() {
-  UV_CACHE_DIR="$UV_CACHE_DIR" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
+  UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
+}
+
+canonical_dir() {
+  (cd "$1" && pwd -P)
+}
+
+same_or_child() {
+  local child="$1"
+  local parent="$2"
+  [[ "$child" == "$parent" || "$child" == "$parent"/* ]]
+}
+
+preflight_codex_worker() {
+  if ! command -v codex >/dev/null 2>&1; then
+    echo "missing codex CLI; install/login to Codex before running this worker" >&2
+    exit 1
+  fi
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "missing uv CLI; this example uses uv for ALab and evaluator dependencies" >&2
+    exit 1
+  fi
+  local worktree_abs repo_abs run_abs secrets_abs dir_abs
+  worktree_abs="$(canonical_dir "$WORKTREE_PATH")"
+  repo_abs="$(canonical_dir "$REPO_ROOT")"
+  run_abs="$(canonical_dir "$RUN_DIR")"
+  secrets_abs="$(canonical_dir "$RUN_DIR/secrets")"
+  if [[ "$worktree_abs" == "$repo_abs" || "$worktree_abs" == "$run_abs" ]] || same_or_child "$worktree_abs" "$secrets_abs"; then
+    echo "refusing unsafe Codex worktree: $worktree_abs" >&2
+    exit 1
+  fi
+  for dir in "$ALAB_EXAMPLE_HOME" "$UV_CACHE_DIR" "$PYTHONPYCACHEPREFIX" "$SHARED_DIR"; do
+    mkdir -p "$dir"
+    dir_abs="$(canonical_dir "$dir")"
+    if same_or_child "$dir_abs" "$secrets_abs"; then
+      echo "refusing to add secret directory to Codex sandbox: $dir_abs" >&2
+      exit 1
+    fi
+  done
+  echo "Codex worker preflight passed: worktree=$worktree_abs"
 }
 
 extract_field() {
@@ -91,11 +143,13 @@ if [[ -z "$WORKTREE_PATH" || -z "$EXP_ID" ]]; then
   echo "failed to parse experiment output from $CREATE_LOG" >&2
   exit 1
 fi
+preflight_codex_worker
 
 env -u ALAB_PROJECT_KEY \
   -u ALAB_ROOT_KEY \
   -u ALAB_KEY \
   ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
+  UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" \
   codex exec -C "$WORKTREE_PATH" \
   --add-dir "$ALAB_EXAMPLE_HOME" \
   --add-dir "$UV_CACHE_DIR" \

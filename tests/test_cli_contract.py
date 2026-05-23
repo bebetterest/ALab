@@ -20561,7 +20561,6 @@ def test_examples_are_task_shaped_demos() -> None:
         ],
         "skydiscover_circle_packing_codex": [
             "alab.project.toml",
-            "prompts/controller.md",
             "prompts/worker.md",
         ],
     }
@@ -20574,6 +20573,9 @@ def test_examples_are_task_shaped_demos() -> None:
         assert "## Demo 任务" in readme_cn
         for path in paths:
             assert (example_dir / path).is_file()
+    skydiscover = _EXAMPLES_ROOT / "skydiscover_circle_packing_codex"
+    assert not (skydiscover / "prompts" / "controller.md").exists()
+    assert not (skydiscover / "scripts" / "run_controller.sh").exists()
 
 
 def test_example_codex_launches_use_narrow_worktree_sandboxes() -> None:

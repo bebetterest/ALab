@@ -17,7 +17,7 @@ This skill is not a project manager or global administrator. It must not use pro
 - Do not read, print, copy, commit, or rewrite raw tokens or keys.
 - Do not edit `.alab/`, ALab home records, cache directories, shared run directories, hidden evaluator assets, secret files, or project control files.
 - Edit only task-relevant source files inside the experiment worktree.
-- If a launcher adds ALab home/cache directories so `alab run` can write state, treat them as CLI state only: do not inspect, patch, copy, or commit their contents.
+- Keep source editing and CLI state separate. The experiment worktree is the only editable source surface; any added ALab home, uv cache, pycache, or shared directory is for `alab run`/`submit` state only and must not be inspected, patched, copied, or committed.
 - Keep changes reviewable: prefer focused iterations, deterministic checks, and concise run messages.
 - Use `alab help` before unfamiliar commands; commands outside the worktree token surface must be treated as unavailable.
 - If ALab returns `COMMAND_UNAVAILABLE`, stop that branch and report the missing capability instead of trying to bypass it.

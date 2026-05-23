@@ -201,7 +201,7 @@ File reward:
 - Path resolution follows artifact root escape checks.
 - The reward file read limit reuses `artifacts.per_file_limit_bytes`.
 - Plain text is parsed as a stripped finite float.
-- JSON reward files must contain a top-level object.
+- JSON reward files must contain a top-level string-to-finite-number object.
 - JSON reward metrics are top-level keys only. Nested paths are not supported in V1.
 - ALab reads `reward.primary_metric` from the top-level object.
 
@@ -216,9 +216,9 @@ Stdout regex reward:
 Harbor reward:
 
 - Reads `run:/logs/verifier/reward.txt` or `run:/logs/verifier/reward.json`.
-- `reward.json` must be a top-level object.
+- `reward.json` must be a top-level string-to-finite-number object.
 - ALab reads `reward.primary_metric`, default `reward`.
-- Missing or non-finite numeric values fail reward parsing.
+- Missing, non-finite, or non-numeric metric values fail reward parsing. Detailed verifier diagnostics must be written to separate logs or artifacts, not to the reward metrics object.
 
 SkyDiscover reward:
 

@@ -2,9 +2,7 @@
 
 This example demonstrates an ALab agent-first workflow: initialize a
 SkyDiscover project with ALab, let Codex edit code, run evaluation, and observe
-results inside an ALab experiment worktree, then let a Codex controller use the
-project admin key to create 3 consecutive experiments and launch workers for
-iteration.
+results inside an ALab experiment worktree.
 
 The example task is the official SkyDiscover Quick Start
 `benchmarks/math/circle_packing` benchmark. The goal is to place 26
@@ -16,9 +14,7 @@ The official target value is `2.635`; ALab uses the SkyDiscover evaluator's
 
 Improve the SkyDiscover circle-packing initial program while preserving the
 public `run_packing()` contract. The single-worker script launches one Codex
-worker in a token-scoped experiment worktree. The controller script demonstrates
-a higher-level project-admin agent that creates experiments and dispatches
-workers without passing the admin key to them.
+worker in a token-scoped experiment worktree.
 
 Task shape:
 
@@ -30,6 +26,8 @@ Task shape:
   relative to the target value `2.635`.
 - Worker boundary: Codex workers edit only the experiment worktree and use the
   worktree token for `alab run`; they do not receive project admin keys.
+  ALab home, uv cache, pycache, and `.run/shared` are added only as CLI state
+  directories, not as editable source.
 - Report output: `collect_report.sh` reads local ALab records and summarizes
   baseline/run metrics into `.run/reports/report.md`.
 
@@ -55,8 +53,6 @@ external agent. This example validates how they compose:
 - the Codex worker edits only `initial_program.py` inside the ALab worktree;
 - the worker calls `alab run` with the worktree token and does not need the
   project key;
-- the Codex controller uses the project admin key to create 3 experiments and
-  dispatch workers into their directories;
 - ALab records the baseline, runs, metrics, reward, logs, and best result;
 - `collect_report.sh` generates a small local report at `.run/reports/report.md`.
 
@@ -83,10 +79,8 @@ Real key handling rules:
 - the `root key` is used only for setup and is not written to
   `.run/secrets/project.env`;
 - the `project admin key` is written to ignored `.run/secrets/project.env`;
-- the controller uses the project admin key through the `ALAB_PROJECT_KEY`
-  environment variable;
 - the worker runs with the worktree token, and scripts remove the admin key with
-  `env -u ALAB_PROJECT_KEY`;
+  `env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY`;
 - README files, reports, and redacted logs do not record real keys.
 
 ## 3. Files
@@ -95,12 +89,10 @@ Real key handling rules:
 examples/skydiscover_circle_packing_codex/
 ├── alab.project.toml
 ├── prompts/
-│   ├── controller.md
 │   └── worker.md
 ├── scripts/
 │   ├── setup_project.sh
 │   ├── run_single_worker.sh
-│   ├── run_controller.sh
 │   └── collect_report.sh
 ├── README.md
 └── README_cn.md
@@ -111,7 +103,6 @@ Running the example creates ignored `.run/` data:
 ```text
 .run/
 ├── alab-home/
-├── controller-workspace/
 ├── logs/
 ├── reports/
 ├── secrets/
@@ -218,6 +209,11 @@ The script will:
 eval "$ALAB_CMD_PREFIX run --message 'codex circle-packing worker improvement'"
 ```
 
+Before launch, the script refuses unsafe `codex exec -C` paths such as the
+repository root, the whole `.run` directory, or `.run/secrets`, runs Codex with
+`--sandbox workspace-write`, and checks that added writable side directories are
+non-secret CLI state directories.
+
 Inspect the result:
 
 ```sh
@@ -226,48 +222,9 @@ eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" runs list --project \"\$ALAB
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" exp best --project \"\$ALAB_PROJECT_ID\""
 ```
 
-## 7. 3-Step Codex Controller Protocol
+## 7. Generate the Report
 
-First run a dry-run:
-
-```sh
-examples/skydiscover_circle_packing_codex/scripts/run_controller.sh --dry-run
-```
-
-Run the real controller:
-
-```sh
-examples/skydiscover_circle_packing_codex/scripts/run_controller.sh
-```
-
-The controller uses this fixed protocol:
-
-| Step | Experiment | Source | Worker action | Observe |
-|---:|---|---|---|---|
-| 1 | `codex-circle-step-1` | project default source | improve `initial_program.py`, run once | inspect run and reward |
-| 2 | `codex-circle-step-2` | Step 1 `best` commit | continue from best, run once | compare against Step 1 |
-| 3 | `codex-circle-step-3` | Step 2 `best` commit | continue from best, run once | collect final best |
-
-The controller uses the project admin key to create experiments, but worker
-child processes do not inherit that key:
-
-```sh
-env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
-  ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
-  codex exec -C "<worktree>" \
-  --add-dir "$ALAB_EXAMPLE_HOME" \
-  --add-dir "$UV_CACHE_DIR" \
-  --add-dir "$PYTHONPYCACHEPREFIX" \
-  --add-dir "$ALAB_SHARED_DIR" \
-  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
-  --sandbox workspace-write \
-  - < examples/skydiscover_circle_packing_codex/prompts/worker.md
-```
-
-## 8. Generate the Report
-
-The controller calls the report collector at the end. You can also run it
-manually:
+Run the report collector after setup or worker runs:
 
 ```sh
 examples/skydiscover_circle_packing_codex/scripts/collect_report.sh
@@ -292,9 +249,7 @@ Result table template:
 | phase | name | status | reward | sum_radii | target_ratio | validity | eval_time | run id | commit |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
 | baseline | `<validation_id>` | `<passed>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` |  |  |
-| run | `codex-circle-step-1` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
-| run | `codex-circle-step-2` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
-| run | `codex-circle-step-3` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
+| run | `codex-circle-single` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
 
 Do not hand-write or guess results. Before a real run, keep placeholders in the
 table; after a real run, treat `.run/reports/report.md` and ALab records as the source
@@ -312,7 +267,7 @@ experiment worktree, then wrote records into local `.run/alab-home` through the
 real SkyDiscover Python evaluator. The exact run id, commit, and log paths are
 local and should be read from `.run/reports/report.md`.
 
-## 9. What to Check When Recording Results
+## 8. What to Check When Recording Results
 
 Core metrics:
 
@@ -324,13 +279,12 @@ Core metrics:
 
 Judgment criteria:
 
-- whether Step 1 beats the baseline;
-- whether Step 2 can continue improving from the Step 1 best commit;
-- whether Step 3 continues improving or at least remains valid;
+- whether the worker run beats the baseline;
+- whether the worker keeps the circle-packing constraints valid;
 - whether failed/error runs still have explainable logs;
-- whether the best result comes from a later step.
+- whether the best result is supported by ALab records rather than agent claims.
 
-## 10. Logs and Troubleshooting
+## 9. Logs and Troubleshooting
 
 Main logs:
 
@@ -339,20 +293,22 @@ Main logs:
 .run/logs/02-catalog-add.log
 .run/logs/03-project-init.redacted.log
 .run/logs/single-worker.log
-.run/logs/controller.log
 .run/logs/report-runs-list.log
 .run/logs/report-best.log
 ```
 
 Common issues:
 
+- ALab setup/config errors: inspect `.run/logs/03-project-init.redacted.log`
+  and rerun `setup_project.sh --reset` only when the project state is disposable.
 - `active SkyDiscover catalog not found`: rerun `setup_project.sh`.
-- GitHub is unreachable: check network or proxy configuration; catalog clone is
-  required.
+- GitHub/network errors: check network or proxy configuration; catalog clone is
+  required and is separate from ALab runner correctness.
 - Dependency install fails: confirm that `uv` can access the Python package
-  index.
+  index. The examples default to `UV_DEFAULT_INDEX=https://pypi.org/simple`.
 - Codex is not logged in: run `codex login` first or repair the local Codex
-  configuration.
+  configuration. Codex login or network failures are external agent runtime
+  issues, not ALab evaluator failures.
 - `alab help` inside the worker shows `context type: none`: confirm that the
   worker `codex exec` command adds `$ALAB_EXAMPLE_HOME`, `$UV_CACHE_DIR`, and
   `$PYTHONPYCACHEPREFIX`; do not add the whole `.run/` directory or
@@ -362,7 +318,7 @@ Common issues:
 - The worker prints a key: stop the run, delete `.run/`, rerun setup, and audit
   the prompt/logs.
 
-## 11. Cleanup
+## 10. Cleanup
 
 Delete all local run data for this example:
 

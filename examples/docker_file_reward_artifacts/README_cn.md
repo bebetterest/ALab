@@ -24,7 +24,8 @@ baseline 使用简单 FIFO strategy。`scripts/run_demo.sh` 会在 worktree cand
 - Demo improvement：priority-aware allocation、compact splits，并为 critical
   orders 预留 express stock。
 - Reward source：`run:reward.json`，包含 `weighted_fill`、`completed_weight`、
-  `cold_chain_success` 和 `compactness` 等 numeric metrics。
+  `cold_chain_success` 和 `compactness` 等 numeric metrics。该文件只能是
+  string-to-finite-number map；解释和 case details 应写入 `summary.md` 等 artifact。
 - Captured evidence：`manifest.json` 表示 allocation plan，`summary.md` 是
   human-readable digest，`reward.json` 用于 file reward 解析。
 
@@ -44,9 +45,16 @@ examples/docker_file_reward_artifacts/scripts/setup_project.sh
 examples/docker_file_reward_artifacts/scripts/run_demo.sh
 ```
 
-如果 Docker 不可用，setup 或 run 会记录正常的 ALab runner failure，或在示例
-logs 中保留 Docker setup output。应把这种环境结果记录到 `潜在问题.md`，不要
-误判为示例源码失败。
+排障分层：
+
+- ALab config/runner error：检查 `.run/logs/` 下的 redacted setup log，并确认
+  `alab.project.toml` 仍指向 `run:reward.json`。
+- Docker daemon 或 image error：先运行 `docker version`；Docker 可用性和 image
+  pull/build 是环境前提，不是源码任务失败。
+- Reward parse error：保持 `reward.json` 只包含 numeric metrics。诊断说明放入
+  `summary.md` 或其他 captured artifact。
+- uv/dependency error：脚本默认使用 `UV_DEFAULT_INDEX=https://pypi.org/simple`；
+  先检查本地 package index 访问，再判断示例任务是否失败。
 
 ## 覆盖内容
 

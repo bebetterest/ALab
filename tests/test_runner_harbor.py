@@ -272,6 +272,50 @@ raise SystemExit(2)
     assert "ALAB_HARBOR_TASK_DIR=/user-harbor" not in env_values
 
 
+def test_harbor_runner_reports_invalid_reward_metrics_without_storage_error(tmp_path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    run_dir = tmp_path / "run"
+    hidden_dir = tmp_path / "hidden"
+    task_dir = tmp_path / "harbor-invalid-reward-task"
+    workspace.mkdir()
+    (workspace / "main.py").write_text("print('candidate')\n", encoding="utf-8")
+    _write_harbor_task(
+        task_dir,
+        """
+[environment]
+image = "harbor-env:latest"
+""",
+    )
+
+    def fake_docker(args, timeout=None):
+        if args[:2] == ["image", "inspect"]:
+            return subprocess.CompletedProcess(["docker", *args], 0, b"", b"")
+        if args and args[0] == "run":
+            reward_dir = run_dir / "logs" / "verifier"
+            reward_dir.mkdir(parents=True, exist_ok=True)
+            (reward_dir / "reward.json").write_text(json.dumps({"reward": 1.0, "details": []}), encoding="utf-8")
+            return subprocess.CompletedProcess(["docker", *args], 0, b"", b"")
+        raise AssertionError(args)
+
+    monkeypatch.setattr("alab.runner._run_docker_cli", fake_docker)
+    result = run_configured_runner(
+        config=_harbor_config("harbor-invalid-reward"),
+        workspace=workspace,
+        run_dir=run_dir,
+        operation_id="run-harbor-invalid-reward",
+        secrets={},
+        hidden_dir=hidden_dir,
+        adapter_resolver=_resolver(task_dir),
+    )
+
+    assert result.status == "error"
+    assert result.exit_code == 0
+    assert result.reward is None
+    assert result.reward_parse_status == "invalid"
+    assert result.failure_reason == "Harbor reward metrics invalid"
+    assert result.metrics == {}
+
+
 def test_harbor_separate_verifier_image_runs_with_hidden_logs(tmp_path, monkeypatch) -> None:
     workspace = tmp_path / "workspace"
     run_dir = tmp_path / "run"
@@ -470,13 +514,16 @@ def test_harbor_reward_parser_handles_json_text_missing_and_invalid_values(tmp_p
     assert write_reward("json-nonnumeric-primary", "reward.json", '{"reward": "bad"}') == (
         None,
         "invalid",
-        {"reward": "bad"},
+        {},
     )
     number, status, metrics = write_reward("json-nonfinite-primary", "reward.json", '{"reward": NaN}')
     assert number is None
     assert status == "invalid"
-    assert "reward" in metrics
+    assert metrics == {}
     assert write_reward("json-non-object", "reward.json", "[5]") == (None, "invalid", {})
+    assert write_reward("json-bool-metric", "reward.json", '{"reward": true}') == (None, "invalid", {})
+    assert write_reward("json-array-metric", "reward.json", '{"reward": 1, "cases": []}') == (None, "invalid", {})
+    assert write_reward("json-object-metric", "reward.json", '{"reward": 1, "cases": {}}') == (None, "invalid", {})
     assert write_reward("text-parsed", "reward.txt", "6.25\n") == (6.25, "parsed", {"reward": 6.25})
     assert write_reward("text-nonfinite", "reward.txt", "Infinity\n") == (None, "invalid", {})
     assert write_reward("text-nonnumeric", "reward.txt", "not-a-number\n") == (None, "invalid", {})

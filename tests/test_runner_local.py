@@ -1069,6 +1069,8 @@ def test_file_reward_parses_json_and_enforces_limit_and_finite_values(tmp_path) 
     workspace.mkdir()
     run_dir.mkdir()
     (workspace / "score.json").write_text('{"score": 2.5, "other": 1}\n', encoding="utf-8")
+    (workspace / "bad-extra.json").write_text('{"score": 2.5, "details": []}\n', encoding="utf-8")
+    (workspace / "bad-bool.json").write_text('{"score": true}\n', encoding="utf-8")
     (workspace / "nan.txt").write_text("NaN\n", encoding="utf-8")
     (run_dir / "score.txt").write_text("3.25\n", encoding="utf-8")
 
@@ -1087,6 +1089,12 @@ def test_file_reward_parses_json_and_enforces_limit_and_finite_values(tmp_path) 
 
     json_reward = ProjectConfig.model_validate(base)
     assert parse_reward(json_reward, 0, b"", workspace, run_dir) == (2.5, "parsed")
+
+    bad_extra = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "path": "workspace:bad-extra.json"}})
+    assert parse_reward(bad_extra, 0, b"", workspace, run_dir) == (None, "invalid")
+
+    bad_bool = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "path": "workspace:bad-bool.json"}})
+    assert parse_reward(bad_bool, 0, b"", workspace, run_dir) == (None, "invalid")
 
     run_reward = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "primary_metric": "reward", "path": "run:score.txt"}})
     assert parse_reward(run_reward, 0, b"", workspace, run_dir) == (3.25, "parsed")

@@ -7695,3 +7695,22 @@ Validation:
 - `docker_file_reward_artifacts` real Docker setup and run passed on Docker Desktop; improved run reward `0.899235` and captured 3 artifacts.
 - `harbor_verifier_minimal` real Harbor setup and run passed after moving non-numeric verifier details out of `reward.json`; improved run reward `0.92625`.
 - Focused examples contract and ruff checks passed.
+
+## 2026-05-23 Examples Follow-Up: Reward Diagnostics and Single-Worker Codex
+
+Implemented:
+
+- Tightened JSON reward parsing for file and Harbor rewards so reward files must be string-to-finite-number maps. Invalid JSON metric shapes now fail as reward parse errors before run records are stored, avoiding generic storage failures for user-authored reward files.
+- Removed the SkyDiscover controller/multi-worker example path and kept the SkyDiscover demo focused on a single isolated Codex worker.
+- Added Codex worker preflights for unsafe worktree paths and secret side directories, and clarified that added ALab home/cache/shared directories are CLI state rather than editable source.
+- Propagated `UV_DEFAULT_INDEX=https://pypi.org/simple` through example scripts and README commands, and added local dependency troubleshooting for Docker, Harbor, SkyDiscover, Codex, and uv-backed flows.
+- Updated runner specs, examples documentation, and role skills with numeric-only reward JSON guidance and source-vs-state worker boundary guidance.
+
+Validation:
+
+- `bash -n examples/*/scripts/*.sh`
+- Dry-run checks for all example scripts.
+- Focused reward parser and examples contract tests:
+  `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_runner_local.py::test_file_reward_parses_json_and_enforces_limit_and_finite_values tests/test_runner_harbor.py::test_harbor_reward_parser_handles_json_text_missing_and_invalid_values tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests tests/test_cli_contract.py::test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`

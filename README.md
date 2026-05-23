@@ -213,7 +213,7 @@ See [examples](examples/) for the runnable example matrix. The current examples
 cover a local scoring loop, a Dockerized clinic-order fulfillment planner with
 artifact export, a Harbor hidden-verifier incident classifier, a collaborative
 incident triage lifecycle workflow, and the SkyDiscover circle-packing Codex
-protocol.
+single-worker protocol.
 
 The repository also includes Codex-facing role skills under [skills](skills/). They are external runbooks for operating ALab through the CLI as an experiment worker, project controller, or global admin; they do not add an embedded agent launcher to ALab.
 
@@ -230,10 +230,10 @@ Opt-in integration gates are excluded from the default suite:
 
 ```sh
 ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m real_docker
-ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache uv run pytest -m real_skydiscover_python
+ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m real_skydiscover_python
 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m networked_skydiscover_python
 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m native_skydiscover_python
-ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache uv run pytest -m live_skydiscover_catalog
+ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m live_skydiscover_catalog
 ```
 
 Notes:

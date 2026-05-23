@@ -17,12 +17,13 @@ elif [[ -z "${ALAB_PROJECT_ID:-}" || -z "${ALAB_PROJECT_KEY:-}" || -z "${ALAB_EX
   echo "missing $PROJECT_ENV and required ALAB_PROJECT_ID/ALAB_PROJECT_KEY/ALAB_EXAMPLE_HOME environment; run scripts/setup_project.sh first" >&2
   exit 1
 fi
+UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
 
 mkdir -p "$LOG_DIR" "$REPORT_DIR"
 read -r -a ALAB_CMD <<< "${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
 
 run_alab() {
-  UV_CACHE_DIR="$UV_CACHE_DIR" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
+  UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
 }
 
 run_alab --key "$ALAB_PROJECT_KEY" project show --project "$ALAB_PROJECT_ID" > "$LOG_DIR/report-project-show.log" 2>&1 || true

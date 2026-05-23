@@ -31,6 +31,7 @@ LOG_DIR="$RUN_DIR/logs"
 REPORT_DIR="${ALAB_REPORT_DIR:-$RUN_DIR/reports}"
 WORKTREE_ROOT="${ALAB_EXAMPLE_WORKTREE_ROOT:-$RUN_DIR/worktrees}"
 EXP_NAME="${EXP_NAME:-harbor-verifier-demo}"
+UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
 
 if [[ "$DRY_RUN" == "1" ]]; then
   cat <<EOF
@@ -39,6 +40,7 @@ Would run the Harbor verifier demo.
 Project env: $PROJECT_ENV
 Experiment:  $EXP_NAME
 Worktree:    $WORKTREE_ROOT/$EXP_NAME
+uv index:    $UV_DEFAULT_INDEX
 EOF
   exit 0
 fi
@@ -50,10 +52,14 @@ fi
 
 # shellcheck disable=SC1090
 source "$PROJECT_ENV"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "missing docker CLI; install/start Docker before running this example" >&2
+  exit 1
+fi
 mkdir -p "$LOG_DIR" "$REPORT_DIR" "$WORKTREE_ROOT"
 read -r -a ALAB_CMD <<< "${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
 run_alab() {
-  UV_CACHE_DIR="$UV_CACHE_DIR" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
+  UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
 }
 extract_field() {
   local label="$1"

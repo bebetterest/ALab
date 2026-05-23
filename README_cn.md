@@ -212,7 +212,7 @@ Project behavior 由 TOML config 控制：
 参见 [examples](examples/) 中的 runnable example matrix。当前 examples 覆盖
 local scoring loop、带 artifact export 的 Dockerized 诊所订单履约计划器、Harbor
 hidden-verifier incident classifier、协作式 incident triage lifecycle workflow，
-以及 SkyDiscover circle-packing Codex protocol。
+以及 SkyDiscover circle-packing Codex single-worker protocol。
 
 仓库还在 [skills](skills/) 下提供 Codex-facing role skills。它们是通过 CLI 操作 ALab 的外部 runbooks，分别面向 experiment worker、project controller 和 global admin；它们不会给 ALab 增加内置 agent launcher。
 
@@ -229,10 +229,10 @@ Opt-in integration gates 不属于默认 suite：
 
 ```sh
 ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m real_docker
-ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache uv run pytest -m real_skydiscover_python
+ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m real_skydiscover_python
 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m networked_skydiscover_python
 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m native_skydiscover_python
-ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache uv run pytest -m live_skydiscover_catalog
+ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run pytest -m live_skydiscover_catalog
 ```
 
 说明：

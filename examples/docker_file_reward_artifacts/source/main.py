@@ -128,15 +128,9 @@ def main() -> None:
 
     manifest = [allocate_order(order, warehouses) for order in orders]
     metrics = score_manifest(manifest)
-    reward = {
-        **metrics,
-        "strategy": STRATEGY,
-        "reserve_express_stock": RESERVE_EXPRESS_STOCK,
-        "max_split_warehouses": MAX_SPLIT_WAREHOUSES,
-    }
 
     (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (run_dir / "reward.json").write_text(json.dumps(reward, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (run_dir / "reward.json").write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (run_dir / "summary.md").write_text(
         "\n".join(
             [

@@ -26,6 +26,8 @@ Task shape:
   stock reservation for critical orders.
 - Reward source: `run:reward.json`, with numeric metrics such as
   `weighted_fill`, `completed_weight`, `cold_chain_success`, and `compactness`.
+  Keep this file as a string-to-finite-number map only; write explanations or
+  case details to artifacts such as `summary.md`.
 - Captured evidence: `manifest.json` for the allocation plan, `summary.md` for
   a human-readable digest, and `reward.json` for the parsed file reward.
 
@@ -46,9 +48,17 @@ examples/docker_file_reward_artifacts/scripts/setup_project.sh
 examples/docker_file_reward_artifacts/scripts/run_demo.sh
 ```
 
-If Docker is unavailable, setup or run will save a normal ALab runner failure
-or exit with Docker setup output in the example logs. Record that environment
-result in `潜在问题.md` instead of treating it as a source-code failure.
+Troubleshooting layers:
+
+- ALab config/runner errors: inspect the redacted setup log under `.run/logs/`
+  and confirm `alab.project.toml` still points to `run:reward.json`.
+- Docker daemon or image errors: run `docker version`; Docker availability and
+  image pulls/builds are environment prerequisites, not source-code failures.
+- Reward parse errors: keep `reward.json` numeric-only. Put diagnostics in
+  `summary.md` or another captured artifact.
+- uv/dependency errors: the scripts default to
+  `UV_DEFAULT_INDEX=https://pypi.org/simple`; check local package-index access
+  before treating the example task as failed.
 
 ## What It Covers
 

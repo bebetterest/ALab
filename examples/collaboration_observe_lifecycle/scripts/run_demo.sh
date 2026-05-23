@@ -32,6 +32,7 @@ LOG_DIR="$RUN_DIR/logs"
 REPORT_DIR="${ALAB_REPORT_DIR:-$RUN_DIR/reports}"
 WORKTREE_ROOT="${ALAB_EXAMPLE_WORKTREE_ROOT:-$RUN_DIR/worktrees}"
 INSPECTION_ROOT="${ALAB_INSPECTION_ROOT:-$RUN_DIR/inspection}"
+UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
 
 if [[ "$DRY_RUN" == "1" ]]; then
   cat <<EOF
@@ -40,6 +41,7 @@ Would run collaboration/observe/lifecycle demo.
 Project env: $PROJECT_ENV
 Worktrees:   $WORKTREE_ROOT
 Inspection:  $INSPECTION_ROOT
+uv index:    $UV_DEFAULT_INDEX
 EOF
   exit 0
 fi
@@ -54,7 +56,7 @@ source "$PROJECT_ENV"
 mkdir -p "$LOG_DIR" "$REPORT_DIR" "$WORKTREE_ROOT" "$INSPECTION_ROOT"
 read -r -a ALAB_CMD <<< "${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
 run_alab() {
-  UV_CACHE_DIR="$UV_CACHE_DIR" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
+  UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
 }
 extract_field() {
   local label="$1"

@@ -17,7 +17,7 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 - 不读取、打印、复制、提交或重写 raw token/key。
 - 不编辑 `.alab/`、ALab home records、cache directories、shared run directories、hidden evaluator assets、secret files 或 project control files。
 - 只修改 experiment worktree 内与任务相关的 source files。
-- 如果 launcher 为了让 `alab run` 写入状态而加入 ALab home/cache directories，只把它们当作 CLI state：不要检查、patch、复制或提交其中内容。
+- 明确分离 source editing 和 CLI state。Experiment worktree 是唯一可编辑 source surface；任何额外加入的 ALab home、uv cache、pycache 或 shared directory 只供 `alab run`/`submit` 写状态，不得检查、patch、复制或提交其中内容。
 - 保持改动可审查：优先小步、聚焦、可复现的 iteration，并使用简洁 run message。
 - 不熟悉 command 时先运行 `alab help`；worktree token surface 之外的 command 应视为不可用。
 - 如果 ALab 返回 `COMMAND_UNAVAILABLE`，停止该分支并报告缺失能力，不尝试绕过。

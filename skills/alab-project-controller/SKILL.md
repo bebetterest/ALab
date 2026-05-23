@@ -23,7 +23,7 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
   codex exec -C "$WORKTREE_PATH" --sandbox workspace-write - < "$WORKER_PROMPT"
 ```
 
-- If a worker needs ALab CLI state writes, add only the specific ALab home/cache directories required for `alab run` or `submit`; do not add the repository root, the whole `.run/` directory, `.run/secrets`, `project.env`, or any directory containing admin/root keys.
+- If a worker needs ALab CLI state writes, add only the specific ALab home/cache/shared directories required for `alab run` or `submit`; do not add the repository root, the whole `.run` directory, `.run/secrets`, `project.env`, or any directory containing admin/root keys. Preflight the worker path before launch and refuse repo root, `.run`, or secret paths as `codex exec -C`.
 
 ## Capabilities
 
@@ -32,7 +32,7 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Inspect project state with `alab project show`, `alab project config show`, `alab status`, and project-scoped audit or observe commands.
 - Create new experiments from the project default source, explicit sources, or visible predecessor experiments when continuation is useful.
 - Coordinate experiment lineage by recording experiment ids, worktree paths, source refs, tags, from-experiment choices, and selected commits such as `best`, `final`, or `latest`.
-- Launch worker agents in experiment worktrees without project admin or root credentials. Provide task instructions and non-secret helper variables only; let workers use their worktree tokens for `alab run` and `alab submit`, and keep writable side directories as narrow as possible.
+- Launch worker agents in experiment worktrees without project admin or root credentials. Provide task instructions and non-secret helper variables only; let workers use their worktree tokens for `alab run` and `alab submit`, keep writable side directories as narrow as possible, and describe added directories as CLI state rather than editable source.
 - Observe project-visible evidence across experiments, runs, artifacts, logs, and annotations. Prefer reward, parse status, warning codes, metrics, best/final commits, and submitted refs over free-form worker claims.
 - Treat reward parse failures as contract failures first. For file or Harbor rewards, check that reward JSON contains only finite numeric metrics and move detailed diagnostics to artifacts or hidden/visible logs as appropriate.
 - Manage project-scoped configuration, environment variables, secrets, validation, sources, tags, and lifecycle state only when they are part of the requested project objective.

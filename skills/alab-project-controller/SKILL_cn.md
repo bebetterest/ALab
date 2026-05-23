@@ -23,7 +23,7 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
   codex exec -C "$WORKTREE_PATH" --sandbox workspace-write - < "$WORKER_PROMPT"
 ```
 
-- 如果 worker 需要 ALab CLI state writes，只加入 `alab run` 或 `submit` 必需的具体 ALab home/cache directories；不要加入 repository root、整个 `.run/`、`.run/secrets`、`project.env`，或任何包含 admin/root keys 的目录。
+- 如果 worker 需要 ALab CLI state writes，只加入 `alab run` 或 `submit` 必需的具体 ALab home/cache/shared directories；不要加入 repository root、整个 `.run`、`.run/secrets`、`project.env`，或任何包含 admin/root keys 的目录。启动前预检 worker path，并拒绝把 repo root、`.run` 或 secret paths 作为 `codex exec -C`。
 
 ## 功能说明
 
@@ -32,7 +32,7 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
 - 用 `alab project show`、`alab project config show`、`alab status` 以及 project-scoped audit/observe commands 检查 project state。
 - 在 default source、explicit sources 或可见 predecessor experiments 基础上创建新 experiments；需要延续时再使用 from-experiment。
 - 记录 experiment ids、worktree paths、source refs、tags、from-experiment choices，以及 `best`、`final`、`latest` 等 selected commits，保持 experiment lineage 清楚。
-- 在 experiment worktrees 中启动 worker agents，但不传递 project admin 或 root credentials。只提供任务说明和非 secret helper variables；让 worker 使用自己的 worktree token 执行 `alab run` 和 `alab submit`，并尽量收窄 writable side directories。
+- 在 experiment worktrees 中启动 worker agents，但不传递 project admin 或 root credentials。只提供任务说明和非 secret helper variables；让 worker 使用自己的 worktree token 执行 `alab run` 和 `alab submit`，尽量收窄 writable side directories，并说明额外目录是 CLI state 而不是 editable source。
 - 跨 experiments、runs、artifacts、logs 和 annotations 观察 project-visible evidence。优先依据 reward、parse status、warning codes、metrics、best/final commits 和 submitted refs，而不是 free-form worker claims。
 - 先把 reward parse failures 当作 contract failures 处理。对于 file 或 Harbor rewards，检查 reward JSON 是否只包含 finite numeric metrics，并把详细 diagnostics 放到 artifacts 或 hidden/visible logs 中。
 - 只有 requested project objective 需要时，才管理 project-scoped config、environment variables、secrets、validation、sources、tags 和 lifecycle state。

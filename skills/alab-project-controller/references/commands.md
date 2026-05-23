@@ -180,6 +180,7 @@ If the worker must run ALab from a sandbox and ALab home/cache are outside the w
 ```
 
 Do not use the repository root as `-C` for a worker. Do not pass the project admin key through argv, stdin prompt text, copied files, inherited environment, `--add-dir "$RUN_DIR"`, `.run/secrets`, or `project.env`.
+Before launching, resolve the worktree path and refuse repo root, the whole `.run` directory, or any secret/control path. Tell workers that added ALab home/cache/shared directories are CLI state only, not source-editing surfaces.
 
 ## Closeout Report
 

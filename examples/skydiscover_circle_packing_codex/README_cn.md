@@ -2,8 +2,7 @@
 
 这个示例展示 ALab 的 agent-first workflow：先用 ALab 初始化一个
 SkyDiscover 项目，再让 Codex 在 ALab experiment worktree 中改代码、运行评估、
-观察结果，最后让一个 Codex controller 持 project admin key 自主创建 3 个连续
-experiment 并启动 worker 迭代。
+观察结果。
 
 示例任务选用官方 SkyDiscover Quick Start 里的
 `benchmarks/math/circle_packing`。任务目标是在单位正方形中放置 26 个不重叠圆，
@@ -14,8 +13,7 @@ experiment 并启动 worker 迭代。
 
 改进 SkyDiscover circle-packing initial program，同时保持公开的 `run_packing()`
 contract。single-worker 脚本会在 token-scoped experiment worktree 中启动一个
-Codex worker。controller 脚本则展示更高层的 project-admin agent 如何创建
-experiments 并派发 workers，同时不把 admin key 传给它们。
+Codex worker。
 
 任务形态：
 
@@ -27,6 +25,8 @@ experiments 并派发 workers，同时不把 admin key 传给它们。
   value `2.635` 决定。
 - Worker boundary：Codex workers 只编辑 experiment worktree，并使用 worktree
   token 执行 `alab run`；它们不会收到 project admin key。
+  ALab home、uv cache、pycache 和 `.run/shared` 只作为 CLI state directories
+  加入，不是 editable source。
 - Report output：`collect_report.sh` 读取本地 ALab records，并把 baseline/run
   metrics 汇总到 `.run/reports/report.md`。
 
@@ -49,7 +49,6 @@ runner、records 和 visibility；Codex 是外部 agent。这个示例验证的�
 - ALab 从 SkyDiscover benchmark 的 initial program 创建 editable source；
 - Codex worker 在 ALab worktree 中只编辑 `initial_program.py`；
 - worker 用 worktree token 调用 `alab run`，不需要 project key；
-- Codex controller 持 project admin key，创建 3 个实验并把 worker 派到各自目录；
 - ALab 记录 baseline、runs、metrics、reward、logs 和 best result；
 - `collect_report.sh` 生成本地小报告 `.run/reports/report.md`。
 
@@ -75,8 +74,8 @@ git --version
 
 - `root key` 只用于 setup，不写入 `.run/secrets/project.env`；
 - `project admin key` 写入 ignored `.run/secrets/project.env`；
-- controller 通过环境变量 `ALAB_PROJECT_KEY` 使用 project admin key；
-- worker 通过 worktree token 运行，脚本用 `env -u ALAB_PROJECT_KEY` 移除 admin key；
+- worker 通过 worktree token 运行，脚本用
+  `env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY` 移除 admin/root keys；
 - README、报告和 redacted log 不记录真实 key。
 
 ## 3. 文件说明
@@ -85,12 +84,10 @@ git --version
 examples/skydiscover_circle_packing_codex/
 ├── alab.project.toml
 ├── prompts/
-│   ├── controller.md
 │   └── worker.md
 ├── scripts/
 │   ├── setup_project.sh
 │   ├── run_single_worker.sh
-│   ├── run_controller.sh
 │   └── collect_report.sh
 ├── README.md
 └── README_cn.md
@@ -101,7 +98,6 @@ examples/skydiscover_circle_packing_codex/
 ```text
 .run/
 ├── alab-home/
-├── controller-workspace/
 ├── logs/
 ├── reports/
 ├── secrets/
@@ -206,6 +202,10 @@ examples/skydiscover_circle_packing_codex/scripts/run_single_worker.sh
 eval "$ALAB_CMD_PREFIX run --message 'codex circle-packing worker improvement'"
 ```
 
+启动前，脚本会拒绝 repository root、整个 `.run` 目录或 `.run/secrets` 等不安全
+的 `codex exec -C` path，以 `--sandbox workspace-write` 运行 Codex，并检查额外
+加入的 writable side directories 都是非秘密 CLI state directories。
+
 观察结果：
 
 ```sh
@@ -214,46 +214,9 @@ eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" runs list --project \"\$ALAB
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" exp best --project \"\$ALAB_PROJECT_ID\""
 ```
 
-## 7. 3-step Codex controller protocol
+## 7. 生成报告
 
-先做 dry-run：
-
-```sh
-examples/skydiscover_circle_packing_codex/scripts/run_controller.sh --dry-run
-```
-
-真实运行：
-
-```sh
-examples/skydiscover_circle_packing_codex/scripts/run_controller.sh
-```
-
-controller 的固定 protocol：
-
-| Step | Experiment | Source | Worker action | Observe |
-|---:|---|---|---|---|
-| 1 | `codex-circle-step-1` | project default source | improve `initial_program.py`, run once | inspect run and reward |
-| 2 | `codex-circle-step-2` | Step 1 `best` commit | continue from best, run once | compare against Step 1 |
-| 3 | `codex-circle-step-3` | Step 2 `best` commit | continue from best, run once | collect final best |
-
-controller 使用 project admin key 创建 experiment，但 worker 子进程不继承该 key：
-
-```sh
-env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
-  ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
-  codex exec -C "<worktree>" \
-  --add-dir "$ALAB_EXAMPLE_HOME" \
-  --add-dir "$UV_CACHE_DIR" \
-  --add-dir "$PYTHONPYCACHEPREFIX" \
-  --add-dir "$ALAB_SHARED_DIR" \
-  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
-  --sandbox workspace-write \
-  - < examples/skydiscover_circle_packing_codex/prompts/worker.md
-```
-
-## 8. 生成报告
-
-controller 最后会调用 report collector。也可以手动运行：
+setup 或 worker run 之后运行 report collector：
 
 ```sh
 examples/skydiscover_circle_packing_codex/scripts/collect_report.sh
@@ -278,9 +241,7 @@ examples/skydiscover_circle_packing_codex/.run/reports/report.md
 | phase | name | status | reward | sum_radii | target_ratio | validity | eval_time | run id | commit |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
 | baseline | `<validation_id>` | `<passed>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` |  |  |
-| run | `codex-circle-step-1` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
-| run | `codex-circle-step-2` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
-| run | `codex-circle-step-3` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
+| run | `codex-circle-single` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
 
 不要手写或猜测结果。未实跑时表格保留占位；实跑后以 `.run/reports/report.md`
 和 ALab records 为准。
@@ -296,7 +257,7 @@ examples/skydiscover_circle_packing_codex/.run/reports/report.md
 SkyDiscover Python evaluator 写入本地 `.run/alab-home` 记录。具体 run id、commit
 和 log 路径以本机 `.run/reports/report.md` 为准。
 
-## 9. 记录效果时看什么
+## 8. 记录效果时看什么
 
 核心指标：
 
@@ -308,13 +269,12 @@ SkyDiscover Python evaluator 写入本地 `.run/alab-home` 记录。具体 run i
 
 判断方式：
 
-- Step 1 是否超过 baseline；
-- Step 2 是否能利用 Step 1 best commit 继续提升；
-- Step 3 是否继续提升或至少保持有效；
+- worker run 是否超过 baseline；
+- worker 是否保持 circle-packing constraints 有效；
 - failed/error run 是否仍有可解释日志；
-- best result 是否来自较后 step。
+- best result 是否由 ALab records 支撑，而不是只来自 agent 自述。
 
-## 10. Log 和排障
+## 9. Log 和排障
 
 主要 log：
 
@@ -323,24 +283,28 @@ SkyDiscover Python evaluator 写入本地 `.run/alab-home` 记录。具体 run i
 .run/logs/02-catalog-add.log
 .run/logs/03-project-init.redacted.log
 .run/logs/single-worker.log
-.run/logs/controller.log
 .run/logs/report-runs-list.log
 .run/logs/report-best.log
 ```
 
 常见问题：
 
+- ALab setup/config error：检查 `.run/logs/03-project-init.redacted.log`；只有在
+  project state 可丢弃时才运行 `setup_project.sh --reset`。
 - `active SkyDiscover catalog not found`：重新运行 `setup_project.sh`。
-- GitHub 无法访问：检查网络或代理；catalog clone 是必需步骤。
-- dependency install 失败：确认 `uv` 可访问 Python package index。
+- GitHub/network error：检查网络或代理；catalog clone 是必需步骤，而且它和
+  ALab runner 正确性是两类问题。
+- dependency install 失败：确认 `uv` 可访问 Python package index。示例默认使用
+  `UV_DEFAULT_INDEX=https://pypi.org/simple`。
 - Codex 未登录：先运行 `codex login` 或修复本地 Codex 配置。
+  Codex 登录或网络失败是外部 agent runtime 问题，不是 ALab evaluator failure。
 - worker 中 `alab help` 显示 `context type: none`：确认 worker 的 `codex exec`
   命令加入了 `$ALAB_EXAMPLE_HOME`、`$UV_CACHE_DIR` 和
   `$PYTHONPYCACHEPREFIX`；不要加入整个 `.run/` 或 `.run/secrets`。
 - worker 修改了非 `initial_program.py` 文件：ALab mutable scope 会拒绝 run。
 - worker 输出 key：停止运行，删除 `.run/`，重新 setup，并检查 prompt/日志。
 
-## 11. 清理
+## 10. 清理
 
 删除本示例所有本地运行数据：
 

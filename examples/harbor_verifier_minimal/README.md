@@ -28,8 +28,8 @@ Task shape:
 - Demo improvement: adds those high-impact signals and lowers the urgency
   threshold for the private SLA cases.
 - Reward source: Harbor reads `logs/verifier/reward.json`; it must contain only
-  finite numeric metrics. Detailed case diagnostics are written as hidden
-  verifier log content instead.
+  finite numeric metrics in a string-to-finite-number map. Detailed case
+  diagnostics are written as hidden verifier log content instead.
 
 This example is useful for demonstrating why verifier assets and hidden logs
 must stay outside worker access. The worker can improve the public interface
@@ -46,6 +46,18 @@ examples/harbor_verifier_minimal/scripts/setup_project.sh --dry-run
 examples/harbor_verifier_minimal/scripts/setup_project.sh
 examples/harbor_verifier_minimal/scripts/run_demo.sh
 ```
+
+Troubleshooting layers:
+
+- ALab config/runner errors: inspect `.run/logs/02-project-init.redacted.log`
+  and confirm the generated config still points to the Harbor task directory.
+- Docker daemon or image errors: run `docker version`; Harbor uses Docker for
+  verifier execution, so Docker availability is an environment prerequisite.
+- Reward parse errors: keep `logs/verifier/reward.json` numeric-only. Arrays,
+  objects, booleans, `NaN`, and strings are invalid metrics; write details to
+  hidden verifier logs instead.
+- Hidden-log access errors: worker tokens cannot read hidden verifier logs; use
+  project admin/root `--include-hidden` only from the controller/admin surface.
 
 ## What It Covers
 
