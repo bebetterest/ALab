@@ -213,7 +213,9 @@ See [examples](examples/) for the runnable example matrix. The current examples
 cover a local scoring loop, a Dockerized clinic-order fulfillment planner with
 artifact export, a Harbor hidden-verifier incident classifier, a collaborative
 incident triage lifecycle workflow, and the SkyDiscover circle-packing Codex
-single-worker protocol.
+single-worker protocol. The same examples area also includes
+`examples/templates/`, a copyable TSP template library for local, Docker,
+Harbor, SkyDiscover Python, and SkyDiscover Docker runner projects.
 
 The repository also includes Codex-facing role skills under [skills](skills/). They are external runbooks for operating ALab through the CLI as an experiment worker, project controller, or global admin; they do not add an embedded agent launcher to ALab.
 
@@ -282,7 +284,8 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 │   ├── docker_file_reward_artifacts/
 │   ├── harbor_verifier_minimal/
 │   ├── local_agent_scoreboard/
-│   └── skydiscover_circle_packing_codex/
+│   ├── skydiscover_circle_packing_codex/
+│   └── templates/
 ├── skills/
 │   ├── alab-experiment-worker/
 │   ├── alab-project-controller/

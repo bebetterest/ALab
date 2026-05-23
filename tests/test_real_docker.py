@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -95,6 +97,48 @@ def _skydiscover_docker_resolver(evaluator_dir: Path):
         "pinned_commit": "d" * 40,
         "target_path": str(evaluator_dir),
     }
+
+
+def test_real_docker_tsp_templates_run_from_temp_copy(tmp_path) -> None:
+    _require_real_docker_image("python:3.11-alpine")
+    repo_root = Path(__file__).resolve().parents[1]
+    templates_copy = tmp_path / "templates"
+    shutil.copytree(repo_root / "examples" / "templates", templates_copy)
+    alab_wrapper = tmp_path / "alab_cli_wrapper.py"
+    alab_wrapper.write_text("from alab.cli import main\nmain()\n", encoding="utf-8")
+    env = os.environ.copy()
+    env.update(
+        {
+            "ALAB_REPO_ROOT": str(repo_root),
+            "ALAB_BIN": f"{sys.executable} {alab_wrapper}",
+            "PYTHONPYCACHEPREFIX": str(tmp_path / "pycache"),
+            "PYTHONPATH": str(repo_root / "src")
+            + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""),
+            "UV_CACHE_DIR": str(tmp_path / "uv-cache"),
+            "UV_DEFAULT_INDEX": "https://pypi.org/simple",
+        }
+    )
+
+    for name in ("tsp_docker", "tsp_harbor", "tsp_skydiscover_docker"):
+        template_dir = templates_copy / name
+        for command in (
+            [str(template_dir / "scripts" / "setup_project.sh"), "--reset"],
+            [str(template_dir / "scripts" / "run_demo.sh")],
+        ):
+            completed = subprocess.run(
+                command,
+                cwd=template_dir,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=600,
+                check=False,
+            )
+            assert completed.returncode == 0, (
+                f"{name}: {' '.join(command)}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+            )
+        report = template_dir / ".run" / "reports" / "report.md"
+        assert "Reward value:" in report.read_text(encoding="utf-8")
 
 
 def test_real_docker_config_validate_refreshes_capability_cache(tmp_path, capsys) -> None:

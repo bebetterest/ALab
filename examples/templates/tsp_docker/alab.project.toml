@@ -1,0 +1,47 @@
+schema_version = 1
+
+[project]
+name = "TSP Docker Template"
+task = "Improve a deterministic Traveling Salesperson route builder over a fixed city list."
+goal = "Show a Dockerfile-runner template with file reward parsing and exact route artifacts."
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 20
+max_total_bytes = 200000
+max_file_bytes = 50000
+
+[mutable]
+include = ["solution.py"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "docker"
+timeout_seconds = 120
+working_directory = "."
+dockerfile = "Dockerfile"
+context = "."
+network = "none"
+command = ["python", "validate_tsp.py"]
+
+[reward]
+type = "file"
+direction = "maximize"
+primary_metric = "score"
+path = "run:reward.json"
+
+[artifacts]
+globs = ["run:route.json", "run:summary.md", "run:reward.json"]
+per_file_limit_bytes = 200000
+per_run_limit_bytes = 500000
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab TSP Docker Template"
+author_email = "alab-tsp-docker-template@local"

@@ -1,0 +1,16 @@
+{
+  "cities": [
+    {"name": "depot", "x": 0.05, "y": 0.08},
+    {"name": "north clinic", "x": 0.18, "y": 0.91},
+    {"name": "east lab", "x": 0.87, "y": 0.24},
+    {"name": "west pharmacy", "x": 0.12, "y": 0.35},
+    {"name": "central hospital", "x": 0.48, "y": 0.52},
+    {"name": "south warehouse", "x": 0.74, "y": 0.11},
+    {"name": "imaging center", "x": 0.31, "y": 0.77},
+    {"name": "urgent care", "x": 0.93, "y": 0.82},
+    {"name": "rural clinic", "x": 0.22, "y": 0.18},
+    {"name": "blood bank", "x": 0.66, "y": 0.68},
+    {"name": "oncology wing", "x": 0.41, "y": 0.29},
+    {"name": "rehab center", "x": 0.79, "y": 0.46}
+  ]
+}

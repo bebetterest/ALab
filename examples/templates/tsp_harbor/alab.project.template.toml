@@ -1,0 +1,33 @@
+schema_version = 1
+
+[project]
+name = "TSP Harbor Template"
+task = "Improve a deterministic Traveling Salesperson route builder while a Harbor verifier scores the route."
+goal = "Show a Harbor template with public starter source, hidden verifier logs, and numeric-only Harbor reward metrics."
+allow_public_exp_create = true
+
+[mutable]
+include = ["solution.py"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "harbor"
+timeout_seconds = 120
+working_directory = "."
+harbor_task_ref = "@TASK_DIR@"
+network = "none"
+
+[reward]
+type = "harbor"
+direction = "maximize"
+primary_metric = "reward"
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab TSP Harbor Template"
+author_email = "alab-tsp-harbor-template@local"

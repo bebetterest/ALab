@@ -7736,3 +7736,26 @@
 - Focused docs sync 和 README structure tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - `git diff --check`
 - `rg -n "[ \t]+$" README.md README_cn.md docs/README.md docs/README_cn.md docs/progress_log.md docs/progress_log_cn.md docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md` 无匹配。
+
+## 2026-05-23 TSP 模板库
+
+已实现：
+
+- 新增 `examples/templates/` 作为可复制的默认 TSP template suite，覆盖 `tsp_local`、`tsp_docker`、`tsp_harbor`、`tsp_skydiscover_python` 和 `tsp_skydiscover_docker`。
+- 每个模板都包含完整 project config 或 generated-config template、starter `solution.py`、deterministic city data、validation/evaluator logic、`scripts/setup_project.sh`、`scripts/run_demo.sh` 和 ignored `.run/` state。
+- 统一 TSP contract：`build_route(cities) -> list[int]`、numeric-only reward metrics、deterministic 2-opt demo improvement、route artifacts/feedback、hidden Harbor verifier diagnostics，以及 adapter templates 的 local path injection。
+- 更新 root 与 examples README pairs，加入 template matrix 和使用路径。
+- 对齐 SkyDiscover adapter config preflight 与 runner resolution，使 local evaluator refs 不需要 SkyDiscover catalog checkout 也可工作。
+- 新增 contract tests，覆盖 template completeness、shell syntax、dry-run behavior、local SkyDiscover evaluator refs、从临时副本真实运行默认 local/SkyDiscover Python templates，以及 opt-in real Docker template runs。
+- 更新 completion audit 的 SkyDiscover project-init row，加入新的 local evaluator-ref evidence。
+
+验证：
+
+- `bash -n examples/templates/scripts/check_templates.sh examples/templates/tsp_*/scripts/*.sh examples/templates/tsp_harbor/task/tests/test.sh examples/templates/tsp_skydiscover_docker/evaluator/evaluate.sh`
+- `ALAB_REPO_ROOT=/Users/hobeter/Desktop/code/ALab examples/templates/scripts/check_templates.sh`
+- Focused template/example contract tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_project_init_skydiscover_accepts_local_evaluator_ref_without_catalog tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_tsp_templates_are_complete_and_dry_run tests/test_cli_contract.py::test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing -q`
+- Full default suite：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- Real Docker gate：`ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -m real_docker -q`（`11 passed`）
+- All opt-in full suite：`ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs --junitxml=/private/tmp/alab-all-optin-pytest.xml`（JUnit `tests=389`、`skipped=0`、`failures=0`、`errors=0`）
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check src tests examples/templates`
+- `git diff --check`

@@ -26,6 +26,9 @@ different task shape, runner boundary, and evidence workflow:
 - [skydiscover_circle_packing_codex](skydiscover_circle_packing_codex/) is the
   full Codex/SkyDiscover task: use an isolated worktree worker to improve the
   circle-packing benchmark while ALab records runs, metrics, logs, and reports.
+- [templates](templates/) is a template library rather than one demo: copy one
+  of its TSP templates to start from a complete local, Docker, Harbor,
+  SkyDiscover Python, or SkyDiscover Docker project skeleton.
 
 Use `--dry-run` first when learning an example. It prints the command shape and
 paths without mutating the example state.
@@ -39,6 +42,7 @@ paths without mutating the example state.
 | [harbor_verifier_minimal](harbor_verifier_minimal/) | Improve an incident-ticket urgency classifier scored by hidden Harbor verifier cases. | Harbor | Docker daemon | Harbor source import, private verifier assets, hidden verifier logs, Harbor reward | `scripts/setup_project.sh`, `scripts/run_demo.sh` |
 | [collaboration_observe_lifecycle](collaboration_observe_lifecycle/) | Coordinate two public incident-triage experiments and continue from the best run. | local | none beyond ALab dev env | public create, from-exp best, tags, annotations, inspection, remove dry-run | `scripts/setup_project.sh`, `scripts/run_demo.sh` |
 | [skydiscover_circle_packing_codex](skydiscover_circle_packing_codex/) | Improve the SkyDiscover circle-packing benchmark with one Codex worker. | SkyDiscover Python | Codex CLI, network, uv dependency install | SkyDiscover catalog, Python evaluator, isolated worker protocol | `scripts/setup_project.sh`, `scripts/run_single_worker.sh` |
+| [templates](templates/) | Copy a complete default TSP template for one runner family. | local, Docker, Harbor, SkyDiscover Python, SkyDiscover Docker | Docker only for Docker-bound templates | reusable project configs, validation scripts, starter solutions, setup/run scripts | `templates/<template>/scripts/setup_project.sh`, `templates/<template>/scripts/run_demo.sh` |
 
 ## Suggested Path
 
@@ -47,7 +51,8 @@ Then use `collaboration_observe_lifecycle` to understand experiment lineage and
 observe commands. Use `docker_file_reward_artifacts` and
 `harbor_verifier_minimal` when validating runner and verifier boundaries. Use
 `skydiscover_circle_packing_codex` when you need the full single-worker Codex
-and SkyDiscover flow.
+and SkyDiscover flow. Use `templates` when you want a copyable default project
+shape instead of a completed scenario walkthrough.
 
 ## Isolation Pattern
 

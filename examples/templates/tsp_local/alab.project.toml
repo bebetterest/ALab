@@ -1,0 +1,45 @@
+schema_version = 1
+
+[project]
+name = "TSP Local Template"
+task = "Improve a deterministic Traveling Salesperson route builder over a fixed city list."
+goal = "Show a minimal local-runner template with file reward parsing, route artifacts, and submit."
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 20
+max_total_bytes = 200000
+max_file_bytes = 50000
+
+[mutable]
+include = ["solution.py"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "local"
+timeout_seconds = 60
+working_directory = "."
+env_mode = "sanitized"
+command = ["python", "validate_tsp.py"]
+
+[reward]
+type = "file"
+direction = "maximize"
+primary_metric = "score"
+path = "run:reward.json"
+
+[artifacts]
+globs = ["run:route.json", "run:summary.md", "run:reward.json"]
+per_file_limit_bytes = 200000
+per_run_limit_bytes = 500000
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab TSP Local Template"
+author_email = "alab-tsp-local-template@local"

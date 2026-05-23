@@ -1,0 +1,40 @@
+schema_version = 1
+
+[project]
+name = "TSP SkyDiscover Docker Template"
+task = "Improve a deterministic Traveling Salesperson route builder evaluated by a local SkyDiscover Docker evaluator."
+goal = "Show a self-contained SkyDiscover Docker template with hidden evaluator bundle execution."
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 20
+max_total_bytes = 200000
+max_file_bytes = 50000
+
+[mutable]
+include = ["solution.py"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "skydiscover_docker"
+timeout_seconds = 120
+working_directory = "."
+network = "none"
+skydiscover_task_ref = "@EVALUATOR_DIR@"
+program_path = "."
+
+[reward]
+type = "skydiscover"
+direction = "maximize"
+primary_metric = "combined_score"
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab TSP SkyDiscover Docker Template"
+author_email = "alab-tsp-skydiscover-docker-template@local"

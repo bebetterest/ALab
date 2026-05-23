@@ -2944,14 +2944,12 @@ def _validate_adapter_config_refs(conn, config: ProjectConfig, *, allow_probe: b
             cpus_required=task.cpus is not None,
             memory_required=task.memory_mb is not None,
         )
-    if config.runner.skydiscover_task_ref and config.runner.skydiscover_task_ref.startswith("skydiscover:"):
-        resolved = _resolve_skydiscover_catalog_ref(conn, config.runner.skydiscover_task_ref)
+    if config.runner.skydiscover_task_ref:
+        resolved = _resolve_runner_adapter_ref(conn, config.runner.skydiscover_task_ref)
         if config.runner.type == "skydiscover_docker" and resolved["target_kind"] != "skydiscover_docker_evaluator":
             raise AlabError("CONFIG_INVALID", "runner.skydiscover_task_ref must resolve to a Docker evaluator")
         if config.runner.type == "skydiscover_python" and resolved["target_kind"] != "skydiscover_python_evaluator":
             raise AlabError("CONFIG_INVALID", "runner.skydiscover_task_ref must resolve to a Python evaluator")
-    elif config.runner.skydiscover_task_ref:
-        raise AlabError("CONFIG_INVALID", "runner.skydiscover_task_ref must use skydiscover:<path>")
 
 
 def _upsert_catalog(conn, *, origin_url: str, pinned_commit: str, local_path: Path, status: str) -> None:

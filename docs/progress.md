@@ -21,8 +21,8 @@ Current active focus, in summary only: there is no open implementation or eviden
 The default/local runnable V1 implementation is closed for this worktree. Remaining work is conditional maintenance, not a current completion blocker:
 
 - `docs/completion_audit.md` has no active `PARTIAL`, `PENDING`, or `ENV-GATED` V1 requirement row outside the status legend and future-state instructions.
-- The latest full default-suite closeout gate is current for this worktree after the 2026-05-23 examples follow-up reward parser and single-worker Codex batch.
-- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior, real Docker capability refresh, SkyDiscover Python local-wheel/network/native dependency behavior, and live SkyDiscover catalog behavior have current opt-in validation on this Darwin/Docker Desktop worktree and current network.
+- The latest full default-suite closeout gate is current for this worktree after the 2026-05-23 TSP template library batch.
+- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior, real Docker capability refresh, SkyDiscover Python local-wheel/network/native dependency behavior, and live SkyDiscover catalog behavior have current opt-in validation on this Darwin/Docker Desktop worktree and current network; the all-opt-in full suite passed with JUnit `tests=389`, `skipped=0`, `failures=0`, and `errors=0`.
 - The final README/spec/local-notes/progress/audit consistency pass has current focused evidence; rerun it after future documentation, `.env.example`, `.gitignore`, or local-note changes.
 
 ## Gate Snapshot
@@ -33,7 +33,7 @@ The default/local runnable V1 implementation is closed for this worktree. Remain
 | Full default suite | `PASSED` | Re-run after any later implementation/test change and before any release claim. |
 | CLI contract completeness | `PASSED` | Current registered CLI surfaces are proved by generated parser/capability/output matrices, docs-derived success schemas, saved result-failure/system-error checks, and the completion-audit consistency guard; rerun/update when commands or output variants change. |
 | Non-CLI hardening | default/local and current opt-in subsets `PASSED` | Reopen only if `docs/completion_audit.md` names a concrete non-CLI edge or a release target differs from the currently proved host/platform/upstream gates. |
-| Real-environment runners | Docker-backed, real Docker capability-refresh, live catalog, and SkyDiscover Python dependency subsets `PASSED` | Re-run opt-in gates on release-target hosts if host/platform/Python/network/upstream catalog behavior changes. |
+| Real-environment runners | Docker-backed, real Docker capability-refresh, live catalog, and SkyDiscover Python dependency subsets `PASSED` with `skipped=0` in the all-opt-in suite | Re-run opt-in gates on release-target hosts if host/platform/Python/network/upstream catalog behavior changes. |
 | Documentation consistency | `PASSED` | Focused docs/README/spec/local-notes checks passed for the current documentation set; rerun after future documentation, `.env.example`, `.gitignore`, or local-note changes. |
 
 ## Do-Not-Reopen Summary

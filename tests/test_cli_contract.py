@@ -5,7 +5,9 @@ import base64
 import inspect
 import io
 import json
+import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -6161,6 +6163,72 @@ primary_metric = "combined_score"
         "harbor": ("", expected_labels, "Harbor Init Contract", "skipped", 1, False),
         "skydiscover": ("", expected_labels, "SkyDiscover Init Contract", "skipped", 1, False),
     }
+
+
+def test_project_init_skydiscover_accepts_local_evaluator_ref_without_catalog(tmp_path: Path, capsys) -> None:
+    home = tmp_path / "home"
+    source = tmp_path / "source"
+    evaluator = tmp_path / "evaluator"
+    source.mkdir()
+    evaluator.mkdir()
+    (source / "solution.py").write_text("def build_route(cities):\n    return list(range(len(cities)))\n", encoding="utf-8")
+    (evaluator / "evaluator.py").write_text(
+        "def evaluate(program_path):\n    return {'combined_score': 1.0}\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "skydiscover-local-evaluator.project.toml"
+    config.write_text(
+        f"""
+schema_version = 1
+
+[project]
+name = "SkyDiscover Local Evaluator Init Contract"
+task = "Use a local evaluator ref"
+
+[runner]
+type = "skydiscover_python"
+timeout_seconds = 30
+working_directory = "."
+skydiscover_task_ref = {json.dumps(str(evaluator))}
+program_path = "."
+
+[reward]
+type = "skydiscover"
+direction = "maximize"
+primary_metric = "combined_score"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    root_key = _output_field_map(capsys.readouterr().out)["root key"]
+
+    assert (
+        cli.run(
+            [
+                "--home",
+                str(home),
+                "--key",
+                root_key,
+                "project",
+                "init",
+                "skydiscover",
+                "--config",
+                str(config),
+                "--source-path",
+                str(source),
+                "--skip-baseline-test",
+            ]
+        )
+        == 0
+    )
+    out = capsys.readouterr()
+    fields = _output_field_map(out.out)
+
+    assert out.err == ""
+    assert fields["project name"] == "SkyDiscover Local Evaluator Init Contract"
+    assert fields["validation status"] == "skipped"
 
 
 def test_project_config_show_export_never_render_raw_secret_values(tmp_path: Path, capsys) -> None:
@@ -20517,6 +20585,7 @@ def test_examples_matrix_paths_exist_and_document_current_examples() -> None:
         "harbor_verifier_minimal",
         "collaboration_observe_lifecycle",
         "skydiscover_circle_packing_codex",
+        "templates",
     }
     readme = (_EXAMPLES_ROOT / "README.md").read_text(encoding="utf-8")
     readme_cn = (_EXAMPLES_ROOT / "README_cn.md").read_text(encoding="utf-8")
@@ -20563,6 +20632,28 @@ def test_examples_are_task_shaped_demos() -> None:
             "alab.project.toml",
             "prompts/worker.md",
         ],
+        "templates": [
+            "tsp_local/alab.project.toml",
+            "tsp_local/source/solution.py",
+            "tsp_local/source/validate_tsp.py",
+            "tsp_docker/alab.project.toml",
+            "tsp_docker/source/Dockerfile",
+            "tsp_docker/source/solution.py",
+            "tsp_docker/source/validate_tsp.py",
+            "tsp_harbor/alab.project.template.toml",
+            "tsp_harbor/task/task.toml",
+            "tsp_harbor/task/starter/solution.py",
+            "tsp_harbor/task/tests/test.sh",
+            "tsp_skydiscover_python/alab.project.template.toml",
+            "tsp_skydiscover_python/source/solution.py",
+            "tsp_skydiscover_python/evaluator/evaluator.py",
+            "tsp_skydiscover_docker/alab.project.template.toml",
+            "tsp_skydiscover_docker/source/solution.py",
+            "tsp_skydiscover_docker/evaluator/Dockerfile",
+            "tsp_skydiscover_docker/evaluator/evaluate.sh",
+            "tsp_skydiscover_docker/evaluator/evaluator.py",
+            "scripts/check_templates.sh",
+        ],
     }
 
     for example, paths in required_paths.items():
@@ -20576,6 +20667,99 @@ def test_examples_are_task_shaped_demos() -> None:
     skydiscover = _EXAMPLES_ROOT / "skydiscover_circle_packing_codex"
     assert not (skydiscover / "prompts" / "controller.md").exists()
     assert not (skydiscover / "scripts" / "run_controller.sh").exists()
+
+
+def test_tsp_templates_are_complete_and_dry_run() -> None:
+    templates_root = _EXAMPLES_ROOT / "templates"
+    template_names = {
+        "tsp_local",
+        "tsp_docker",
+        "tsp_harbor",
+        "tsp_skydiscover_python",
+        "tsp_skydiscover_docker",
+    }
+    readme = (templates_root / "README.md").read_text(encoding="utf-8")
+    readme_cn = (templates_root / "README_cn.md").read_text(encoding="utf-8")
+    actual_templates = {path.name for path in templates_root.iterdir() if path.is_dir() and path.name.startswith("tsp_")}
+    shell_scripts = [path for path in sorted(templates_root.rglob("*.sh")) if ".run" not in path.parts]
+
+    assert actual_templates == template_names
+    assert "## Template Matrix" in readme
+    assert "## 模板矩阵" in readme_cn
+    assert shell_scripts
+    for name in sorted(template_names):
+        assert f"[{name}]({name}/)" in readme
+        assert f"[{name}]({name}/)" in readme_cn
+        assert (templates_root / name / ".gitignore").read_text(encoding="utf-8").strip() == ".run/"
+        assert (templates_root / name / "scripts" / "setup_project.sh").is_file()
+        assert (templates_root / name / "scripts" / "run_demo.sh").is_file()
+
+    for script in shell_scripts:
+        completed = subprocess.run(
+            ["bash", "-n", str(script)],
+            cwd=_REPO_ROOT,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        assert completed.returncode == 0, f"{script}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+
+    env = os.environ.copy()
+    env["ALAB_REPO_ROOT"] = str(_REPO_ROOT)
+    for name in sorted(template_names):
+        for script_name in ("setup_project.sh", "run_demo.sh"):
+            script = templates_root / name / "scripts" / script_name
+            completed = subprocess.run(
+                [str(script), "--dry-run"],
+                cwd=templates_root / name,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            assert completed.returncode == 0, f"{script}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+
+
+def test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy(tmp_path: Path) -> None:
+    templates_copy = tmp_path / "templates"
+    shutil.copytree(_EXAMPLES_ROOT / "templates", templates_copy)
+    alab_wrapper = tmp_path / "alab_cli_wrapper.py"
+    alab_wrapper.write_text("from alab.cli import main\nmain()\n", encoding="utf-8")
+    env = os.environ.copy()
+    env.update(
+        {
+            "ALAB_REPO_ROOT": str(_REPO_ROOT),
+            "ALAB_BIN": f"{sys.executable} {alab_wrapper}",
+            "PYTHONPYCACHEPREFIX": str(tmp_path / "pycache"),
+            "PYTHONPATH": str(_REPO_ROOT / "src")
+            + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""),
+            "UV_CACHE_DIR": str(tmp_path / "uv-cache"),
+            "UV_DEFAULT_INDEX": "https://pypi.org/simple",
+        }
+    )
+
+    for name in ("tsp_local", "tsp_skydiscover_python"):
+        template_dir = templates_copy / name
+        for command in (
+            [str(template_dir / "scripts" / "setup_project.sh"), "--reset"],
+            [str(template_dir / "scripts" / "run_demo.sh")],
+        ):
+            completed = subprocess.run(
+                command,
+                cwd=template_dir,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=180,
+                check=False,
+            )
+            assert completed.returncode == 0, (
+                f"{name}: {' '.join(command)}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+            )
+        report = template_dir / ".run" / "reports" / "report.md"
+        assert "Reward value:" in report.read_text(encoding="utf-8")
 
 
 def test_example_codex_launches_use_narrow_worktree_sandboxes() -> None:

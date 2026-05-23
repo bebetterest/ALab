@@ -21,8 +21,8 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 当前 worktree 的 default/local runnable V1 implementation 已完成 closeout。剩余工作是条件性维护，不是当前 completion blocker：
 
 - `docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- 当前 worktree 的 latest full default-suite closeout gate 在 2026-05-23 examples 后续 reward parser 与单 Worker Codex 批次后已经保持 current。
-- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation。
+- 当前 worktree 的 latest full default-suite closeout gate 在 2026-05-23 TSP template library 批次后已经保持 current。
+- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=389`、`skipped=0`、`failures=0`、`errors=0`。
 - 最终 README/spec/local-notes/progress/audit consistency pass 已有当前 focused evidence；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后需要重跑。
 
 ## Gate 快照
@@ -33,7 +33,7 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 | Full default suite | `PASSED` | 任何后续 implementation/test change 后，以及任何 release claim 前重跑。 |
 | CLI contract completeness | `PASSED` | 当前 registered CLI surfaces 已由 generated parser/capability/output matrices、docs-derived success schemas、saved result-failure/system-error checks 和 completion-audit consistency guard 证明；commands 或 output variants 变化时重跑/更新。 |
 | Non-CLI hardening | default/local 与当前 opt-in subsets `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |
-| Real-environment runners | Docker-backed、real Docker capability-refresh、live catalog 与 SkyDiscover Python dependency subsets `PASSED` | 如果 release-target host/platform/Python/network/upstream catalog behavior 变化，重跑 opt-in gates。 |
+| Real-environment runners | Docker-backed、real Docker capability-refresh、live catalog 与 SkyDiscover Python dependency subsets 在 all-opt-in suite 中 `PASSED` 且 `skipped=0` | 如果 release-target host/platform/Python/network/upstream catalog behavior 变化，重跑 opt-in gates。 |
 | Documentation consistency | `PASSED` | 当前 documentation set 的 focused docs/README/spec/local-notes checks 已通过；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后重跑。 |
 
 ## Do-Not-Reopen 摘要
