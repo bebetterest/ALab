@@ -16,7 +16,8 @@ description: 当需要使用 root key 管理 ALab home，包括 home bootstrap�
 - 将 root key 视为只渲染一次的本地 secret。
 - Root commands 优先使用 `--key-stdin`；避免在 logs 中出现 inline key arguments。
 - 不把 raw root/admin keys 存入 tracked files、prompts、commits、screenshots、reports 或 command transcripts。
-- 生成的 project admin keys 只保存到 ignored local files 或用户批准的安全位置。
+- 生成的 project admin keys 只保存到 ignored local secret files，例如 example-local `.run/secrets/` 目录，或用户批准的安全位置。
+- Handoff 后，root/admin keys 不应进入 worker prompts、worker sandboxes、shared run directories 或非 secret reports。
 - 如果 root key 丢失，ALab V1 无法恢复；不要尝试临时编辑 DB。
 
 ## 功能说明
@@ -26,7 +27,8 @@ description: 当需要使用 root key 管理 ALab home，包括 home bootstrap�
 - 只有 ALab home 不存在时才用 `alab auth init` bootstrap；用 `alab config show` 或 `alab config validate` 检查 home health。
 - 谨慎管理 root credentials。只有明确需要时才 rotate root，并把 replacement keys 视为只渲染一次的 secrets。
 - 为 project controllers 创建、列出和 revoke project admin keys。Revoke 前先识别 key id、project scope 和预期影响。
-- 使用 config files，从 local、Git、empty、Harbor 或 SkyDiscover sources 初始化 projects。只捕获一次 generated project admin key，并安全 handoff。
+- 使用 config files，从 local、Git、empty、Harbor 或 SkyDiscover sources 初始化 projects。只捕获一次 generated project admin key，只保存到 ignored secret 位置，并安全 handoff 给 project controller，而不是 worker。
+- 当 project initialization 在 baseline validation 阶段失败时，保留 redacted logs，并区分 environment/capability failures 与 reward-contract failures，例如 non-numeric reward metrics。
 - 管理 SkyDiscover catalog lifecycle，包括 exact commit pinning、不访问网络的 `show`、active-reference blockers，以及带 explicit confirmation 的 remove。
 - 使用 cache、trash 和 backup prune commands 维护 global non-authoritative state。
 - 查看 global 或 project audit records，验证敏感 lifecycle events、credential changes、catalog changes、cleanup 和 project initialization。

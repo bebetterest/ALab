@@ -17,7 +17,7 @@ Usage: scripts/setup_project.sh [--dry-run] [--reset]
 
 Initializes an isolated ALab home, pins the official SkyDiscover catalog, and
 creates the Circle Packing project. The generated project admin key is written
-only to ignored .run/project.env.
+only to ignored .run/secrets/project.env.
 EOF
       exit 0
       ;;
@@ -29,14 +29,18 @@ EOF
 done
 
 RUN_DIR="$EXAMPLE_DIR/.run"
+SECRET_DIR="$RUN_DIR/secrets"
+SHARED_DIR="$RUN_DIR/shared"
 LOG_DIR="$RUN_DIR/logs"
+REPORT_DIR="$RUN_DIR/reports"
+WORKTREE_ROOT="$RUN_DIR/worktrees"
 ALAB_EXAMPLE_HOME="${ALAB_EXAMPLE_HOME:-$RUN_DIR/alab-home}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-$RUN_DIR/uv-cache}"
 PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$RUN_DIR/pycache}"
 SKYDISCOVER_COMMIT="${SKYDISCOVER_COMMIT:-c0f6b704a05d883b61eff261023f61897cb45711}"
 ALAB_BIN="${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
 ALAB_CMD_PREFIX="UV_CACHE_DIR=$UV_CACHE_DIR PYTHONPYCACHEPREFIX=$PYTHONPYCACHEPREFIX $ALAB_BIN --home $ALAB_EXAMPLE_HOME"
-PROJECT_ENV="$RUN_DIR/project.env"
+PROJECT_ENV="$SECRET_DIR/project.env"
 CONFIG_PATH="$EXAMPLE_DIR/alab.project.toml"
 
 read -r -a ALAB_CMD <<< "$ALAB_BIN"
@@ -65,6 +69,7 @@ Commands:
   $ALAB_CMD_PREFIX --key <root-key> project init skydiscover --config $CONFIG_PATH
 
 Generated files stay under ignored .run/.
+Secrets stay under .run/secrets/ and are never added to worker sandboxes.
 EOF
   exit 0
 fi
@@ -73,7 +78,7 @@ if [[ "$RESET" == "1" ]]; then
   rm -rf "$RUN_DIR"
 fi
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$SECRET_DIR" "$SHARED_DIR" "$LOG_DIR" "$REPORT_DIR" "$WORKTREE_ROOT"
 
 if [[ -f "$PROJECT_ENV" ]]; then
   echo "Existing project env found: $PROJECT_ENV"
@@ -132,6 +137,9 @@ cat "$PROJECT_REDACTED_LOG"
   printf 'export PYTHONPYCACHEPREFIX=%q\n' "$PYTHONPYCACHEPREFIX"
   printf 'export SKYDISCOVER_COMMIT=%q\n' "$SKYDISCOVER_COMMIT"
   printf 'export ALAB_EXAMPLE_DIR=%q\n' "$EXAMPLE_DIR"
+  printf 'export ALAB_SHARED_DIR=%q\n' "$SHARED_DIR"
+  printf 'export ALAB_REPORT_DIR=%q\n' "$REPORT_DIR"
+  printf 'export ALAB_EXAMPLE_WORKTREE_ROOT=%q\n' "$WORKTREE_ROOT"
 } > "$PROJECT_ENV"
 chmod 600 "$PROJECT_ENV"
 
@@ -142,13 +150,13 @@ cat > "$RUN_DIR/setup-summary.md" <<EOF
 - Validation id: \`$VALIDATION_ID\`
 - Validation status: \`$VALIDATION_STATUS\`
 - SkyDiscover commit: \`$SKYDISCOVER_COMMIT\`
-- Project env: \`.run/project.env\` (contains the project admin key; ignored)
+- Project env: \`.run/secrets/project.env\` (contains the project admin key; ignored)
 - Redacted init log: \`.run/logs/03-project-init.redacted.log\`
 EOF
 
 echo "Project initialized: $PROJECT_ID"
 echo "Validation status: $VALIDATION_STATUS"
-echo "Source .run/project.env before running worker/controller scripts."
+echo "Source .run/secrets/project.env before running worker/controller scripts."
 if [[ "$PROJECT_STATUS" != "0" ]]; then
   echo "project init exited with status $PROJECT_STATUS; inspect $PROJECT_REDACTED_LOG" >&2
   exit "$PROJECT_STATUS"

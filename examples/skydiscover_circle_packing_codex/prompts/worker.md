@@ -9,7 +9,9 @@ Rules:
 - Edit only `initial_program.py`.
 - Keep the public contract: `run_packing()` returns `(centers, radii, sum_radii)`.
 - The solution must describe exactly 26 circles in the unit square.
-- Do not edit `.alab/`, do not print tokens, and do not use a project admin key.
+- Do not edit `.alab/`, ALab home/cache directories, shared run directories, or
+  project control files.
+- Do not print tokens, read secret files, or use a project admin key.
 - Prefer deterministic geometry changes over broad rewrites.
 - Keep the implementation readable enough for a later worker to continue from it.
 

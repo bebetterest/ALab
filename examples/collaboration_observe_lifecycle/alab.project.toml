@@ -1,0 +1,45 @@
+schema_version = 1
+
+[project]
+name = "Collaboration Observe Lifecycle"
+task = "Coordinate two public experiments that improve an incident triage scheduler over a shared synthetic operations dataset."
+goal = "Show how a controller can coordinate visible experiments, inherit from the best prior run, attach evidence, and exercise lifecycle commands without giving workers broader credentials than a worktree token."
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 20
+max_total_bytes = 200000
+max_file_bytes = 50000
+
+[mutable]
+include = ["solver.py"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "local"
+timeout_seconds = 60
+working_directory = "."
+env_mode = "sanitized"
+command = ["python", "solver.py"]
+
+[reward]
+type = "stdout_regex"
+direction = "maximize"
+primary_metric = "reward"
+pattern = "reward=([0-9.]+)"
+
+[artifacts]
+globs = ["run:result.json", "run:triage_plan.md"]
+per_file_limit_bytes = 200000
+per_run_limit_bytes = 500000
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab Collaboration Example"
+author_email = "alab-collaboration-example@local"

@@ -1,0 +1,64 @@
+{
+  "incidents": [
+    {
+      "id": "inc-001-dashboard-theme",
+      "created_seq": 1,
+      "category": "ux",
+      "severity": "low",
+      "affected_users": 40,
+      "sla_hours": 48,
+      "estimated_hours": 2.0,
+      "runbook_ready": true
+    },
+    {
+      "id": "inc-002-checkout-outage",
+      "created_seq": 2,
+      "category": "outage",
+      "severity": "critical",
+      "affected_users": 950,
+      "sla_hours": 4,
+      "estimated_hours": 3.5,
+      "runbook_ready": true
+    },
+    {
+      "id": "inc-003-latency-apac",
+      "created_seq": 3,
+      "category": "performance",
+      "severity": "high",
+      "affected_users": 420,
+      "sla_hours": 10,
+      "estimated_hours": 2.5,
+      "runbook_ready": false
+    },
+    {
+      "id": "inc-004-token-leak",
+      "created_seq": 4,
+      "category": "security",
+      "severity": "critical",
+      "affected_users": 180,
+      "sla_hours": 3,
+      "estimated_hours": 2.0,
+      "runbook_ready": true
+    },
+    {
+      "id": "inc-005-report-export",
+      "created_seq": 5,
+      "category": "data",
+      "severity": "medium",
+      "affected_users": 110,
+      "sla_hours": 24,
+      "estimated_hours": 1.5,
+      "runbook_ready": true
+    },
+    {
+      "id": "inc-006-billing-copy",
+      "created_seq": 6,
+      "category": "billing",
+      "severity": "low",
+      "affected_users": 20,
+      "sla_hours": 72,
+      "estimated_hours": 1.0,
+      "runbook_ready": false
+    }
+  ]
+}

@@ -26,8 +26,9 @@ EOF
 done
 
 RUN_DIR="$EXAMPLE_DIR/.run"
-PROJECT_ENV="$RUN_DIR/project.env"
+PROJECT_ENV="$RUN_DIR/secrets/project.env"
 WORKTREE_ROOT="${ALAB_EXAMPLE_WORKTREE_ROOT:-$RUN_DIR/worktrees}"
+SHARED_DIR="${ALAB_SHARED_DIR:-$RUN_DIR/shared}"
 LOG_DIR="$RUN_DIR/logs"
 EXP_NAME="${EXP_NAME:-codex-circle-single}"
 CODEX_MODEL="${CODEX_MODEL:-}"
@@ -49,7 +50,7 @@ Codex model:   ${CODEX_MODEL:-<codex default>}
 Commands:
   source $PROJECT_ENV
   eval "\$ALAB_CMD_PREFIX exp create --project \$ALAB_PROJECT_ID --name $EXP_NAME --path $WORKTREE_ROOT/$EXP_NAME"
-  env -u ALAB_PROJECT_KEY ALAB_CMD_PREFIX="\$ALAB_CMD_PREFIX" codex exec -C <worktree> --add-dir $RUN_DIR ${CODEX_MODEL:+-m "$CODEX_MODEL"} --sandbox workspace-write - < $EXAMPLE_DIR/prompts/worker.md
+  env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY ALAB_CMD_PREFIX="\$ALAB_CMD_PREFIX" codex exec -C <worktree> --add-dir \$ALAB_EXAMPLE_HOME --add-dir \$UV_CACHE_DIR --add-dir \$PYTHONPYCACHEPREFIX --add-dir $SHARED_DIR ${CODEX_MODEL:+-m "$CODEX_MODEL"} --sandbox workspace-write - < $EXAMPLE_DIR/prompts/worker.md
 EOF
   exit 0
 fi
@@ -62,7 +63,7 @@ fi
 # shellcheck disable=SC1090
 source "$PROJECT_ENV"
 
-mkdir -p "$WORKTREE_ROOT" "$LOG_DIR"
+mkdir -p "$WORKTREE_ROOT" "$SHARED_DIR" "$LOG_DIR" "$UV_CACHE_DIR" "$PYTHONPYCACHEPREFIX"
 read -r -a ALAB_CMD <<< "$ALAB_BIN"
 
 run_alab() {
@@ -92,10 +93,15 @@ if [[ -z "$WORKTREE_PATH" || -z "$EXP_ID" ]]; then
 fi
 
 env -u ALAB_PROJECT_KEY \
+  -u ALAB_ROOT_KEY \
+  -u ALAB_KEY \
   ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
   codex exec -C "$WORKTREE_PATH" \
-  --add-dir "$RUN_DIR" \
-  "${CODEX_MODEL_ARGS[@]}" \
+  --add-dir "$ALAB_EXAMPLE_HOME" \
+  --add-dir "$UV_CACHE_DIR" \
+  --add-dir "$PYTHONPYCACHEPREFIX" \
+  --add-dir "$SHARED_DIR" \
+  ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
   --sandbox workspace-write \
   - < "$EXAMPLE_DIR/prompts/worker.md" | tee "$WORKER_LOG"
 

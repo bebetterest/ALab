@@ -12,6 +12,31 @@ non-overlapping circles inside the unit square and maximize the sum of radii.
 The official target value is `2.635`; ALab uses the SkyDiscover evaluator's
 `combined_score` as the reward.
 
+## Demo Task
+
+Improve the SkyDiscover circle-packing initial program while preserving the
+public `run_packing()` contract. The single-worker script launches one Codex
+worker in a token-scoped experiment worktree. The controller script demonstrates
+a higher-level project-admin agent that creates experiments and dispatches
+workers without passing the admin key to them.
+
+Task shape:
+
+- Editable file: `initial_program.py` imported from the SkyDiscover benchmark.
+- Public contract: `run_packing()` must return `(centers, radii, sum_radii)` for
+  exactly 26 non-overlapping circles inside the unit square.
+- Evaluator: SkyDiscover Python evaluator from the pinned catalog bundle.
+- Reward source: SkyDiscover `combined_score`, driven by valid radius sum
+  relative to the target value `2.635`.
+- Worker boundary: Codex workers edit only the experiment worktree and use the
+  worktree token for `alab run`; they do not receive project admin keys.
+- Report output: `collect_report.sh` reads local ALab records and summarizes
+  baseline/run metrics into `.run/reports/report.md`.
+
+This example is the most complete demo of external-agent orchestration. It
+shows how ALab can record objective evaluation evidence while a separate agent
+does the code search inside a constrained worktree.
+
 Official sources:
 
 - SkyDiscover: https://github.com/skydiscover-ai/skydiscover
@@ -33,7 +58,7 @@ external agent. This example validates how they compose:
 - the Codex controller uses the project admin key to create 3 experiments and
   dispatch workers into their directories;
 - ALab records the baseline, runs, metrics, reward, logs, and best result;
-- `collect_report.sh` generates a small local report at `.run/report.md`.
+- `collect_report.sh` generates a small local report at `.run/reports/report.md`.
 
 ## 2. Environment Requirements
 
@@ -56,8 +81,8 @@ You also need:
 Real key handling rules:
 
 - the `root key` is used only for setup and is not written to
-  `.run/project.env`;
-- the `project admin key` is written to ignored `.run/project.env`;
+  `.run/secrets/project.env`;
+- the `project admin key` is written to ignored `.run/secrets/project.env`;
 - the controller uses the project admin key through the `ALAB_PROJECT_KEY`
   environment variable;
 - the worker runs with the worktree token, and scripts remove the admin key with
@@ -86,9 +111,12 @@ Running the example creates ignored `.run/` data:
 ```text
 .run/
 ├── alab-home/
+├── controller-workspace/
 ├── logs/
-├── project.env
-├── report.md
+├── reports/
+├── secrets/
+│   └── project.env
+├── shared/
 ├── setup-summary.md
 ├── uv-cache/
 └── worktrees/
@@ -144,7 +172,7 @@ alab project init skydiscover --config examples/skydiscover_circle_packing_codex
 After initialization succeeds, inspect the project:
 
 ```sh
-source examples/skydiscover_circle_packing_codex/.run/project.env
+source examples/skydiscover_circle_packing_codex/.run/secrets/project.env
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" project show --project \"\$ALAB_PROJECT_ID\""
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" project config show --project \"\$ALAB_PROJECT_ID\""
 ```
@@ -193,7 +221,7 @@ eval "$ALAB_CMD_PREFIX run --message 'codex circle-packing worker improvement'"
 Inspect the result:
 
 ```sh
-source examples/skydiscover_circle_packing_codex/.run/project.env
+source examples/skydiscover_circle_packing_codex/.run/secrets/project.env
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" runs list --project \"\$ALAB_PROJECT_ID\""
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" exp best --project \"\$ALAB_PROJECT_ID\""
 ```
@@ -224,10 +252,13 @@ The controller uses the project admin key to create experiments, but worker
 child processes do not inherit that key:
 
 ```sh
-env -u ALAB_PROJECT_KEY \
+env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
   ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
   codex exec -C "<worktree>" \
-  --add-dir "examples/skydiscover_circle_packing_codex/.run" \
+  --add-dir "$ALAB_EXAMPLE_HOME" \
+  --add-dir "$UV_CACHE_DIR" \
+  --add-dir "$PYTHONPYCACHEPREFIX" \
+  --add-dir "$ALAB_SHARED_DIR" \
   ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   --sandbox workspace-write \
   - < examples/skydiscover_circle_packing_codex/prompts/worker.md
@@ -245,7 +276,7 @@ examples/skydiscover_circle_packing_codex/scripts/collect_report.sh
 Output:
 
 ```text
-examples/skydiscover_circle_packing_codex/.run/report.md
+examples/skydiscover_circle_packing_codex/.run/reports/report.md
 ```
 
 The report includes:
@@ -266,7 +297,7 @@ Result table template:
 | run | `codex-circle-step-3` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
 
 Do not hand-write or guess results. Before a real run, keep placeholders in the
-table; after a real run, treat `.run/report.md` and ALab records as the source
+table; after a real run, treat `.run/reports/report.md` and ALab records as the source
 of truth.
 
 Local confirmation snapshot (2026-05-22, single worker flow):
@@ -279,7 +310,7 @@ Local confirmation snapshot (2026-05-22, single worker flow):
 That run was produced by a Codex worker that generated a fixed packing in the
 experiment worktree, then wrote records into local `.run/alab-home` through the
 real SkyDiscover Python evaluator. The exact run id, commit, and log paths are
-local and should be read from `.run/report.md`.
+local and should be read from `.run/reports/report.md`.
 
 ## 9. What to Check When Recording Results
 
@@ -323,10 +354,9 @@ Common issues:
 - Codex is not logged in: run `codex login` first or repair the local Codex
   configuration.
 - `alab help` inside the worker shows `context type: none`: confirm that the
-  worker `codex exec` command includes
-  `--add-dir examples/skydiscover_circle_packing_codex/.run`; otherwise the
-  Codex sandbox can make the ALab home read-only and the context resolver will
-  fall back to no context.
+  worker `codex exec` command adds `$ALAB_EXAMPLE_HOME`, `$UV_CACHE_DIR`, and
+  `$PYTHONPYCACHEPREFIX`; do not add the whole `.run/` directory or
+  `.run/secrets`.
 - The worker edits files other than `initial_program.py`: ALab mutable scope
   will reject the run.
 - The worker prints a key: stop the run, delete `.run/`, rerun setup, and audit

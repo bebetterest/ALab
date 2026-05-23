@@ -65,6 +65,7 @@ alab audit list|show --project <project_id> ...
 - **`project validate`**：运行 active project baseline validation。
   关键参数：可选 `--project <project_id>`。
   注意点：输出 validation id、status、reward、parse status、warning codes 和 project status。
+  注意点：对于 file 和 Harbor rewards，`reward.json` metrics 必须是 finite numbers。非 numeric details 应放入 artifacts 或 logs，而不是 reward metrics object。
 - **`project validation archive|unarchive|remove`**：维护 validation records 及其 dependent logs/artifacts。
   关键参数：必需 `<validation_id>`；remove 需要 `--dry-run` 或 `--force --confirm <validation_id>`，可选 `--cascade`、`--reason`、`--project`。
   注意点：Active validation 不能 archive；remove 前先 dry-run。
@@ -162,20 +163,23 @@ printf '%s\n' "$ALAB_PROJECT_KEY" | alab --key-stdin exp create \
 ## Worker Launch Pattern
 
 ```sh
-env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
+env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
   ALAB_CMD_PREFIX="${ALAB_CMD_PREFIX:-alab}" \
   codex exec -C "$WORKTREE_PATH" \
   --sandbox workspace-write \
   - < "$WORKER_PROMPT"
 ```
 
-如果 worker 必须读取 ignored example `.run` directory，可加：
+如果 worker 在 sandbox 中运行 ALab，且 ALab home/cache 位于 worktree 外，只加入必需的非 secret state directories：
 
 ```text
---add-dir "$RUN_DIR"
+--add-dir "$ALAB_EXAMPLE_HOME"
+--add-dir "$UV_CACHE_DIR"
+--add-dir "$PYTHONPYCACHEPREFIX"
+--add-dir "$ALAB_SHARED_DIR"
 ```
 
-不要通过 argv、stdin prompt text、copied files 或 inherited environment 传递 project admin key。
+不要把 repository root 作为 worker 的 `-C`。不要通过 argv、stdin prompt text、copied files、inherited environment、`--add-dir "$RUN_DIR"`、`.run/secrets` 或 `project.env` 传递 project admin key。
 
 ## Closeout Report
 

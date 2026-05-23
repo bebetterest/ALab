@@ -65,6 +65,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`project validate`**: Run the active project baseline validation.
   Parameters: Optional `--project <project_id>`.
   Notes: Produces validation id, status, reward, parse status, warning codes, and project status.
+  Notes: For file and Harbor rewards, `reward.json` metrics must be finite numbers. Non-numeric details belong in artifacts or logs, not the reward metrics object.
 - **`project validation archive|unarchive|remove`**: Maintain validation records and their dependent logs/artifacts.
   Parameters: Required `<validation_id>`; remove requires `--dry-run` or `--force --confirm <validation_id>`, optional `--cascade`, `--reason`, `--project`.
   Notes: Archive active validations is blocked; dry-run before remove.
@@ -162,20 +163,23 @@ printf '%s\n' "$ALAB_PROJECT_KEY" | alab --key-stdin exp create \
 ## Worker Launch Pattern
 
 ```sh
-env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
+env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
   ALAB_CMD_PREFIX="${ALAB_CMD_PREFIX:-alab}" \
   codex exec -C "$WORKTREE_PATH" \
   --sandbox workspace-write \
   - < "$WORKER_PROMPT"
 ```
 
-If the worker must read an ignored example `.run` directory, add:
+If the worker must run ALab from a sandbox and ALab home/cache are outside the worktree, add only the required non-secret state directories:
 
 ```text
---add-dir "$RUN_DIR"
+--add-dir "$ALAB_EXAMPLE_HOME"
+--add-dir "$UV_CACHE_DIR"
+--add-dir "$PYTHONPYCACHEPREFIX"
+--add-dir "$ALAB_SHARED_DIR"
 ```
 
-Do not pass the project admin key through argv, stdin prompt text, copied files, or inherited environment.
+Do not use the repository root as `-C` for a worker. Do not pass the project admin key through argv, stdin prompt text, copied files, inherited environment, `--add-dir "$RUN_DIR"`, `.run/secrets`, or `project.env`.
 
 ## Closeout Report
 

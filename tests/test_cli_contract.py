@@ -412,7 +412,9 @@ _GITIGNORE_PATH = _REPO_ROOT / ".gitignore"
 _ENV_EXAMPLE_PATH = _REPO_ROOT / ".env.example"
 _TESTS_ROOT = _REPO_ROOT / "tests"
 _SRC_ROOT = _REPO_ROOT / "src" / "alab"
+_EXAMPLES_ROOT = _REPO_ROOT / "examples"
 _PAIRED_MARKDOWN_ROOTS = (_REPO_ROOT, _REPO_ROOT / "docs")
+_MARKDOWN_PAIR_EXCEPTIONS = {"潜在问题.md"}
 _GLOBAL_CLI_OPTIONS = {"--home", "--key", "--key-stdin", "--output"}
 _BANNED_RUNTIME_DEPENDENCY_ROOTS = {
     # Hosted services / web UI frameworks are outside ALab V1.
@@ -1182,6 +1184,8 @@ def _project_markdown_pair_gaps() -> tuple[list[str], list[str]]:
     for root in _PAIRED_MARKDOWN_ROOTS:
         for path in sorted(root.glob("*.md")):
             rel = path.relative_to(_REPO_ROOT).as_posix()
+            if rel in _MARKDOWN_PAIR_EXCEPTIONS:
+                continue
             if path.stem.endswith("_cn"):
                 english = path.with_name(path.stem.removesuffix("_cn") + path.suffix)
                 if not english.is_file():
@@ -20496,6 +20500,120 @@ def test_root_and_docs_markdown_files_have_synchronized_chinese_pairs() -> None:
 
     assert missing_chinese == []
     assert orphan_chinese == []
+
+
+def test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception() -> None:
+    note = _REPO_ROOT / "潜在问题.md"
+
+    assert _MARKDOWN_PAIR_EXCEPTIONS == {"潜在问题.md"}
+    assert note.is_file()
+    assert "用户指定的中文单文件" in note.read_text(encoding="utf-8")
+
+
+def test_examples_matrix_paths_exist_and_document_current_examples() -> None:
+    expected_examples = {
+        "local_agent_scoreboard",
+        "docker_file_reward_artifacts",
+        "harbor_verifier_minimal",
+        "collaboration_observe_lifecycle",
+        "skydiscover_circle_packing_codex",
+    }
+    readme = (_EXAMPLES_ROOT / "README.md").read_text(encoding="utf-8")
+    readme_cn = (_EXAMPLES_ROOT / "README_cn.md").read_text(encoding="utf-8")
+    actual_examples = {path.name for path in _EXAMPLES_ROOT.iterdir() if path.is_dir() and not path.name.startswith(".")}
+
+    assert actual_examples == expected_examples
+    assert "## Overview" in readme
+    assert "## Example Matrix" in readme
+    assert "## Suggested Path" in readme
+    assert "## 总览" in readme_cn
+    assert "## 示例矩阵" in readme_cn
+    assert "## 建议阅读路径" in readme_cn
+    assert "| Example | Demo task |" in readme
+    assert "| 示例 | Demo 任务 |" in readme_cn
+    for example in sorted(expected_examples):
+        example_dir = _EXAMPLES_ROOT / example
+        assert f"[{example}]({example}/)" in readme
+        assert f"[{example}]({example}/)" in readme_cn
+        assert (example_dir / ".gitignore").is_file()
+        assert (example_dir / "README.md").is_file()
+        assert (example_dir / "README_cn.md").is_file()
+        assert (example_dir / "scripts").is_dir()
+        assert ".run/" in (example_dir / ".gitignore").read_text(encoding="utf-8")
+
+
+def test_examples_are_task_shaped_demos() -> None:
+    required_paths = {
+        "local_agent_scoreboard": ["source/solution.py", "prompts/worker.md"],
+        "docker_file_reward_artifacts": [
+            "source/main.py",
+            "source/data/orders.json",
+            "source/data/warehouses.json",
+        ],
+        "harbor_verifier_minimal": [
+            "task/instruction.md",
+            "task/starter/main.py",
+            "task/tests/test.sh",
+        ],
+        "collaboration_observe_lifecycle": [
+            "source/solver.py",
+            "source/data/incidents.json",
+        ],
+        "skydiscover_circle_packing_codex": [
+            "alab.project.toml",
+            "prompts/controller.md",
+            "prompts/worker.md",
+        ],
+    }
+
+    for example, paths in required_paths.items():
+        example_dir = _EXAMPLES_ROOT / example
+        readme = (example_dir / "README.md").read_text(encoding="utf-8")
+        readme_cn = (example_dir / "README_cn.md").read_text(encoding="utf-8")
+        assert "## Demo Task" in readme
+        assert "## Demo 任务" in readme_cn
+        for path in paths:
+            assert (example_dir / path).is_file()
+
+
+def test_example_codex_launches_use_narrow_worktree_sandboxes() -> None:
+    texts = {
+        path.relative_to(_REPO_ROOT).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(_EXAMPLES_ROOT.rglob("*"))
+        if ".run" not in path.parts
+        if path.is_file() and path.suffix in {".md", ".sh"}
+    }
+    combined = "\n".join(texts.values())
+
+    forbidden_fragments = [
+        'codex exec -C "$REPO_ROOT"',
+        "codex exec -C $REPO_ROOT",
+        "--add-dir \"$RUN_DIR\"",
+        "--add-dir $RUN_DIR",
+        "--add-dir \"$ALAB_EXAMPLE_DIR/.run\"",
+        "--add-dir \"examples/skydiscover_circle_packing_codex/.run\"",
+        "--add-dir \"$SECRET_DIR\"",
+        "--add-dir \"$PROJECT_ENV\"",
+        "--add-dir \".run/secrets\"",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in combined
+
+    worker_prompts = [path for path in texts if path.endswith("prompts/worker.md")]
+    assert worker_prompts
+    for path in worker_prompts:
+        text = texts[path]
+        assert "ALAB_PROJECT_KEY" not in text
+        assert "ALAB_ROOT_KEY" not in text
+        assert "project admin key" in text
+
+    codex_scripts = [path for path, text in texts.items() if "codex exec" in text]
+    assert codex_scripts
+    for path in codex_scripts:
+        text = texts[path]
+        assert "--sandbox workspace-write" in text
+        if "worker" in path:
+            assert '-C "$WORKTREE_PATH"' in text or '-C "<worktree>"' in text
 
 
 def test_readme_repository_structure_trees_are_synchronized_and_existing() -> None:

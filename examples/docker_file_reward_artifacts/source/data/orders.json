@@ -1,0 +1,63 @@
+{
+  "orders": [
+    {
+      "id": "clinic-aurora-critical",
+      "priority": "critical",
+      "sla_hours": 4,
+      "created_seq": 5,
+      "cold_chain": true,
+      "items": {
+        "sensor": 2,
+        "gel": 2,
+        "battery": 2
+      }
+    },
+    {
+      "id": "clinic-banyan-high",
+      "priority": "high",
+      "sla_hours": 8,
+      "created_seq": 2,
+      "cold_chain": false,
+      "items": {
+        "sensor": 2,
+        "case": 4,
+        "battery": 1
+      }
+    },
+    {
+      "id": "clinic-cedar-normal",
+      "priority": "normal",
+      "sla_hours": 24,
+      "created_seq": 1,
+      "cold_chain": false,
+      "items": {
+        "case": 5,
+        "charger": 2
+      }
+    },
+    {
+      "id": "clinic-delta-critical",
+      "priority": "critical",
+      "sla_hours": 6,
+      "created_seq": 4,
+      "cold_chain": true,
+      "items": {
+        "sensor": 3,
+        "gel": 1,
+        "battery": 1
+      }
+    },
+    {
+      "id": "clinic-ember-high",
+      "priority": "high",
+      "sla_hours": 10,
+      "created_seq": 3,
+      "cold_chain": false,
+      "items": {
+        "sensor": 1,
+        "case": 2,
+        "charger": 2
+      }
+    }
+  ]
+}

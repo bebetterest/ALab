@@ -16,7 +16,8 @@ This skill does not do experiment implementation. After creating a project or is
 - Treat the root key as a one-time-rendered local secret.
 - Prefer `--key-stdin` for root commands; avoid inline key arguments in logs.
 - Do not store raw root/admin keys in tracked files, prompts, commits, screenshots, reports, or command transcripts.
-- Store generated project admin keys only in ignored local files or a user-approved secure location.
+- Store generated project admin keys only in ignored local secret files, such as an example-local `.run/secrets/` directory, or a user-approved secure location.
+- After handoff, keep root/admin keys out of worker prompts, worker sandboxes, shared run directories, and non-secret reports.
 - If a root key is lost, ALab V1 cannot recover it; do not attempt ad hoc DB edits.
 
 ## Capabilities
@@ -26,7 +27,8 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Bootstrap an ALab home with `alab auth init` only when no home exists, and inspect home health with `alab config show` or `alab config validate`.
 - Manage root credentials deliberately. Rotate root only with explicit intent, and treat replacement keys as one-time-rendered secrets.
 - Create, list, and revoke project admin keys for project controllers. Revoke only after identifying the key id, project scope, and expected impact.
-- Initialize projects from local, Git, empty, Harbor, or SkyDiscover sources using config files. Capture the generated project admin key exactly once and hand it off securely.
+- Initialize projects from local, Git, empty, Harbor, or SkyDiscover sources using config files. Capture the generated project admin key exactly once, store it only in an ignored secret location, and hand it off securely to a project controller rather than a worker.
+- When project initialization fails during baseline validation, preserve the redacted logs and distinguish environment/capability failures from reward-contract failures such as non-numeric reward metrics.
 - Manage SkyDiscover catalog lifecycle with exact commit pinning, no-network `show`, active-reference blockers, and explicit remove confirmation.
 - Maintain global non-authoritative state with cache, trash, and backup prune commands.
 - Inspect global or project audit records to verify sensitive lifecycle events, credential changes, catalog changes, cleanup, and project initialization.

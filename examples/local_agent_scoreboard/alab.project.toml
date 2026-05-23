@@ -1,0 +1,45 @@
+schema_version = 1
+
+[project]
+name = "Local Agent Scoreboard"
+task = "Improve a tiny deterministic Python scorer and keep the ALab run evidence reproducible."
+goal = "Demonstrate local runner, token-scoped worker execution, stdout reward parsing, artifact capture, and submit."
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 20
+max_total_bytes = 200000
+max_file_bytes = 50000
+
+[mutable]
+include = ["solution.py"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "local"
+timeout_seconds = 60
+working_directory = "."
+env_mode = "sanitized"
+command = ["python", "solution.py"]
+
+[reward]
+type = "stdout_regex"
+direction = "maximize"
+primary_metric = "reward"
+pattern = "reward=([0-9.]+)"
+
+[artifacts]
+globs = ["run:score.json", "workspace:solution.py"]
+per_file_limit_bytes = 200000
+per_run_limit_bytes = 500000
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab Local Example"
+author_email = "alab-local-example@local"

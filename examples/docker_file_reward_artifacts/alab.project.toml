@@ -1,0 +1,38 @@
+schema_version = 1
+
+[project]
+name = "Docker Fulfillment Planner"
+task = "Build a containerized fulfillment planner that assigns clinic orders to regional warehouses under inventory, cold-chain, priority, and split-shipment constraints."
+goal = "Demonstrate Dockerfile runner setup, file reward parsing, exact artifact capture, and artifact export on a realistic container-only planning task."
+allow_public_exp_create = true
+
+[mutable]
+include = ["main.py"]
+
+[runner]
+type = "docker"
+timeout_seconds = 120
+working_directory = "."
+dockerfile = "Dockerfile"
+context = "."
+network = "none"
+command = ["python", "main.py"]
+
+[reward]
+type = "file"
+direction = "maximize"
+primary_metric = "score"
+path = "run:reward.json"
+
+[artifacts]
+globs = ["run:manifest.json", "run:summary.md", "run:reward.json"]
+per_file_limit_bytes = 200000
+per_run_limit_bytes = 500000
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab Docker Example"
+author_email = "alab-docker-example@local"

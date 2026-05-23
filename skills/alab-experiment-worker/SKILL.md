@@ -15,8 +15,9 @@ This skill is not a project manager or global administrator. It must not use pro
 
 - Trust only the current worktree context and its `.alab/token`.
 - Do not read, print, copy, commit, or rewrite raw tokens or keys.
-- Do not edit `.alab/`, ALab home records, hidden evaluator assets, or project control files.
+- Do not edit `.alab/`, ALab home records, cache directories, shared run directories, hidden evaluator assets, secret files, or project control files.
 - Edit only task-relevant source files inside the experiment worktree.
+- If a launcher adds ALab home/cache directories so `alab run` can write state, treat them as CLI state only: do not inspect, patch, copy, or commit their contents.
 - Keep changes reviewable: prefer focused iterations, deterministic checks, and concise run messages.
 - Use `alab help` before unfamiliar commands; commands outside the worktree token surface must be treated as unavailable.
 - If ALab returns `COMMAND_UNAVAILABLE`, stop that branch and report the missing capability instead of trying to bypass it.
@@ -28,8 +29,9 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Inspect current context with `alab status` and `alab help`.
 - Read task files and project instructions that are present in the worktree.
 - Inspect visible historical experiments with `alab observe experiments ...` and related visible runs, artifacts, logs, and annotations. Use this evidence to find promising approaches, avoid repeated failures, and understand prior best or final commits. Visibility is still enforced by ALab; do not try to access hidden or unavailable records.
-- When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, read its source code, and compare it with the current worktree. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, or project control files.
+- When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, read its source code, and compare it with the current worktree. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, secret files, ALab home/cache files, or project control files.
 - Change task-relevant source files in the worktree and keep the implementation understandable for later workers.
+- Keep runner outputs machine-parseable. If the task writes a reward file, put only the configured numeric metrics in that reward file; put case details, traces, or explanations in separate visible artifacts/logs when allowed.
 - Run local cheap checks when they exist, then run `alab run --message "<brief reason>"`.
 - Diagnose failed or weak runs using visible stdout/stderr previews, warning codes, artifacts, logs, metrics, and annotations.
 - When the intended changes are complete and the current worktree has a passed run supporting them, submit the result with a factual message, summary, feedback, and refs.

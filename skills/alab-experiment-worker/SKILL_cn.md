@@ -15,8 +15,9 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 
 - 只信任当前 worktree context 及其 `.alab/token`。
 - 不读取、打印、复制、提交或重写 raw token/key。
-- 不编辑 `.alab/`、ALab home records、hidden evaluator assets 或 project control files。
+- 不编辑 `.alab/`、ALab home records、cache directories、shared run directories、hidden evaluator assets、secret files 或 project control files。
 - 只修改 experiment worktree 内与任务相关的 source files。
+- 如果 launcher 为了让 `alab run` 写入状态而加入 ALab home/cache directories，只把它们当作 CLI state：不要检查、patch、复制或提交其中内容。
 - 保持改动可审查：优先小步、聚焦、可复现的 iteration，并使用简洁 run message。
 - 不熟悉 command 时先运行 `alab help`；worktree token surface 之外的 command 应视为不可用。
 - 如果 ALab 返回 `COMMAND_UNAVAILABLE`，停止该分支并报告缺失能力，不尝试绕过。
@@ -28,8 +29,9 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 - 用 `alab status` 和 `alab help` 检查当前 context。
 - 读取 worktree 中已有的任务文件和项目说明。
 - 用 `alab observe experiments ...` 以及相关的可见 runs、artifacts、logs、annotations 查看历史 experiments。可以用这些证据寻找有希望的方案、避免重复失败，并理解 prior best 或 final commits。可见性仍由 ALab 强制执行；不要尝试访问 hidden 或 unavailable records。
-- 当某个可见历史 experiment 看起来相关时，用 `alab exp checkout <exp_id> --path <dir> --commit best|final|latest` 创建 inspection checkout，阅读其源码，并与当前 worktree 对比。只有在确实有帮助时，才把任务相关的 source files 或 snippets 复制到当前 experiment worktree；绝不复制 `.alab/`、raw token、hidden assets 或 project control files。
+- 当某个可见历史 experiment 看起来相关时，用 `alab exp checkout <exp_id> --path <dir> --commit best|final|latest` 创建 inspection checkout，阅读其源码，并与当前 worktree 对比。只有在确实有帮助时，才把任务相关的 source files 或 snippets 复制到当前 experiment worktree；绝不复制 `.alab/`、raw token、hidden assets、secret files、ALab home/cache files 或 project control files。
 - 修改 worktree 内与任务相关的 source files，并保持实现足够清晰，方便后续 worker 延续。
+- 保持 runner outputs 可被机器解析。若任务写 reward file，只把配置要求的 numeric metrics 放入该 reward file；case details、trace 或 explanation 应在允许时放到单独的可见 artifact/log。
 - 若存在本地轻量检查，先运行这些检查，再用 `alab run --message "<brief reason>"` 运行 evaluation。
 - 使用可见 stdout/stderr preview、warning code、artifact、log、metric 和 annotation 诊断 failed 或 weak runs。
 - 当预期修改已经完成，并且当前 worktree 有一个 passed run 支撑结果时，使用事实性的 message、summary、feedback 和 refs 提交。

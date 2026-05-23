@@ -39,6 +39,7 @@ Worker lifecycle 权限有意保持很窄：
 - **`alab run`**：评估当前 candidate，并保存 run evidence。
   关键参数：必需 `--message <text>`；保持简短且具体。
   输出用途：获取 run id、status、reward、parse status、warnings、previews、artifact count 和 next action。
+  注意点：Reward files 应只包含 configured reward parser 期望的可解析 numeric metrics。解释性 details 应放在单独 artifacts 或可见 logs；worker tokens 不能查看 hidden verifier logs。
 - **`alab submit`**：在有 passed run 支撑后，提交最终 summary 和 feedback 并关闭 experiment。
   关键参数：必需 `--message`、`--summary`/`--summary-file` 二选一、`--feedback`/`--feedback-file` 二选一，以及至少一个 `--ref`；可选 `--rerun`。
   输出用途：获取 final run id、final commit、stored summary/feedback、experiment status 和 submitted refs。
@@ -100,7 +101,7 @@ alab observe annotations list --target-type experiment --target-id <exp_id>
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
 ```
 
-用 `best` 做 reward-led exploration，用 `final` 查看已提交 candidate，用 `latest` 查看当前 branch tip。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，在 submit 时用 `--ref <exp_id>` 保留引用。
+用 `best` 做 reward-led exploration，用 `final` 查看已提交 candidate，用 `latest` 查看当前 branch tip。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，在 submit 时用 `--ref <exp_id>` 保留引用。绝不复制 `.alab/`、token files、ALab home/cache files、hidden evaluator assets、secret files 或 project control files。
 
 ## 禁止的 Surface
 
@@ -123,6 +124,8 @@ alab exp remove ...
 alab exp worktree remove|restore ...
 alab exp token ...
 ```
+
+也不要直接编辑当前 experiment worktree 之外的文件。如果 launcher 为 CLI state 加入了 ALab home/cache directories，只通过 ALab commands 使用它们。
 
 如果确实需要其中某项能力，应报告给 project controller 或 global admin。
 

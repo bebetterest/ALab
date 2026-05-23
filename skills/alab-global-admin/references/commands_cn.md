@@ -130,7 +130,7 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
   --task "$TASK"
 ```
 
-`project init` 会在 project record 写入后只打印一次 generated project admin key。应将其捕获到 ignored local file 或已批准的 secret store，然后只把 project admin key 交给 project controllers。
+`project init` 会在 project record 写入后只打印一次 generated project admin key。应将其捕获到 ignored local secret file（例如 example `.run/secrets/project.env`）或已批准的 secret store，然后只把 project admin key 交给 project controllers，绝不交给 workers。
 
 ## Catalog Rules
 
@@ -161,7 +161,7 @@ Global admin handoff 应包含：
 
 - 可安全分享时的 ALab home path 和 home id；
 - project id、project name 和 active config version；
-- generated project admin key delivery path，或已完成 handoff 的确认；
+- generated project admin key delivery path，或已通过 ignored/secure secret 位置完成 handoff 的确认；
 - 如适用，catalog pinned commit；
 - validation id 和 validation status；
 - 已执行的 cleanup 或 audit actions。

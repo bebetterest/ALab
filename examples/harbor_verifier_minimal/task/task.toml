@@ -1,0 +1,5 @@
+source = "starter"
+
+[environment]
+image = "python:3.11-alpine"
+allow_internet = false

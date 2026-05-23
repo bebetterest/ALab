@@ -5,19 +5,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXAMPLE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$EXAMPLE_DIR/../.." && pwd)"
 RUN_DIR="$EXAMPLE_DIR/.run"
-PROJECT_ENV="$RUN_DIR/project.env"
+PROJECT_ENV="$RUN_DIR/secrets/project.env"
 LOG_DIR="$RUN_DIR/logs"
-REPORT_PATH="$RUN_DIR/report.md"
+REPORT_DIR="${ALAB_REPORT_DIR:-$RUN_DIR/reports}"
+REPORT_PATH="${ALAB_REPORT_PATH:-$REPORT_DIR/report.md}"
 
-if [[ ! -f "$PROJECT_ENV" ]]; then
-  echo "missing $PROJECT_ENV; run scripts/setup_project.sh first" >&2
+if [[ -f "$PROJECT_ENV" ]]; then
+  # shellcheck disable=SC1090
+  source "$PROJECT_ENV"
+elif [[ -z "${ALAB_PROJECT_ID:-}" || -z "${ALAB_PROJECT_KEY:-}" || -z "${ALAB_EXAMPLE_HOME:-}" ]]; then
+  echo "missing $PROJECT_ENV and required ALAB_PROJECT_ID/ALAB_PROJECT_KEY/ALAB_EXAMPLE_HOME environment; run scripts/setup_project.sh first" >&2
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$PROJECT_ENV"
-
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" "$REPORT_DIR"
 read -r -a ALAB_CMD <<< "${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
 
 run_alab() {

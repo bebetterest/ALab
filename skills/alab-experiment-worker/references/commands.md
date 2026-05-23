@@ -39,6 +39,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`alab run`**: Evaluate the current candidate and save run evidence.
   Parameters: Required `--message <text>`; keep it short and specific.
   Use the output for: Run id, status, reward, parse status, warnings, previews, artifact count, and next action.
+  Notes: Reward files should contain only parseable numeric metrics expected by the configured reward parser. Keep explanatory details in separate artifacts or visible logs; worker tokens cannot inspect hidden verifier logs.
 - **`alab submit`**: Close the experiment with final summary and feedback after a supporting passed run.
   Parameters: Required `--message`, one of `--summary`/`--summary-file`, one of `--feedback`/`--feedback-file`, and at least one `--ref`; optional `--rerun`.
   Use the output for: Final run id, final commit, stored summary/feedback, experiment status, and submitted refs.
@@ -100,7 +101,7 @@ When a visible experiment looks potentially useful, inspect its code directly in
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
 ```
 
-Use `best` for reward-led exploration, `final` to inspect a submitted candidate, and `latest` when the current branch tip is what matters. Read and compare the checkout before copying anything. Copy only source content that advances the current task, adapt it to the current worktree, and keep the copied influence visible in the final `--ref <exp_id>`.
+Use `best` for reward-led exploration, `final` to inspect a submitted candidate, and `latest` when the current branch tip is what matters. Read and compare the checkout before copying anything. Copy only source content that advances the current task, adapt it to the current worktree, and keep the copied influence visible in the final `--ref <exp_id>`. Never copy `.alab/`, token files, ALab home/cache files, hidden evaluator assets, secret files, or project control files.
 
 ## Forbidden Surface
 
@@ -123,6 +124,8 @@ alab exp remove ...
 alab exp worktree remove|restore ...
 alab exp token ...
 ```
+
+Also avoid direct file edits outside the current experiment worktree. If a launcher added ALab home/cache directories for CLI state, use them only through ALab commands.
 
 If one of these is necessary, report the need to a project controller or global admin.
 

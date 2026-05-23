@@ -1,0 +1,30 @@
+schema_version = 1
+
+[project]
+name = "Harbor Incident Priority Verifier"
+task = "Improve a deterministic incident-ticket priority scorer. Only starter/main.py is editable; the private verifier imports it and scores hidden SLA cases."
+goal = "Demonstrate Harbor editable source import, verifier-only hidden assets, hidden logs, and Harbor reward parsing with a realistic hidden-test task."
+allow_public_exp_create = true
+
+[mutable]
+include = ["main.py"]
+
+[runner]
+type = "harbor"
+timeout_seconds = 120
+working_directory = "."
+harbor_task_ref = "@TASK_DIR@"
+network = "none"
+
+[reward]
+type = "harbor"
+direction = "maximize"
+primary_metric = "reward"
+
+[logs]
+stdout_limit_bytes = 20000
+stderr_limit_bytes = 20000
+
+[git]
+author_name = "ALab Harbor Example"
+author_email = "alab-harbor-example@local"

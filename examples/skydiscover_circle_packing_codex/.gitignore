@@ -3,3 +3,4 @@ worktrees/
 *.env
 *.log
 report.md
+reports/

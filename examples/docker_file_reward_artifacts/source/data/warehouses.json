@@ -1,0 +1,41 @@
+[
+  {
+    "id": "west",
+    "created_seq": 1,
+    "distance_km": 80,
+    "cold_chain": false,
+    "express_lane": false,
+    "stock": {
+      "sensor": 2,
+      "case": 7,
+      "charger": 4,
+      "battery": 1
+    }
+  },
+  {
+    "id": "north",
+    "created_seq": 2,
+    "distance_km": 35,
+    "cold_chain": true,
+    "express_lane": true,
+    "stock": {
+      "sensor": 4,
+      "gel": 3,
+      "battery": 3,
+      "case": 1
+    }
+  },
+  {
+    "id": "south",
+    "created_seq": 3,
+    "distance_km": 55,
+    "cold_chain": true,
+    "express_lane": false,
+    "stock": {
+      "sensor": 3,
+      "gel": 2,
+      "battery": 2,
+      "charger": 1
+    }
+  }
+]

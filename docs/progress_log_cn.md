@@ -7648,3 +7648,44 @@
 - Focused docs sync：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` 无匹配。
+
+## 2026-05-22 Examples 与 Agent 隔离批次
+
+已实现：
+
+- 加固 SkyDiscover Codex 示例，使 controller 与 worker launch 使用窄工作区，不再使用仓库根目录或整个 `.run/`；project key 现在位于 ignored `.run/secrets/`，worker 只获得实验 worktree 以及非秘密 ALab home/cache/shared writable 目录。
+- 新增四个示例：`local_agent_scoreboard`、`docker_file_reward_artifacts`、`harbor_verifier_minimal` 和 `collaboration_observe_lifecycle`；新增中英文 examples 总矩阵。
+- 新增根目录中文单文件实践记录 `潜在问题.md`，并用显式 markdown-pair 测试例外记录该偏离；其中记录 Codex state 写入、Docker buildx 状态写入、`workspace-write` 读写边界、网络不稳定和 uv index 要求等实跑观察。
+- 更新 README/README_cn，以及 experiment-worker、project-controller、global-admin 三套 skills 和 command references，加入收窄后的 worker launch 模板和 secret surface 规则。
+- 新增 examples 矩阵、中文单文件例外、Codex launch 隔离片段的 contract tests。
+
+验证：
+
+- `bash -n examples/*/scripts/*.sh`
+- 五个 examples 的 dry-run 检查。
+- `local_agent_scoreboard` 与 `collaboration_observe_lifecycle` 的本地端到端运行。
+- `docker_file_reward_artifacts` 与 `harbor_verifier_minimal` 在 Docker Desktop `29.2.1 linux/arm64` 上真实运行；由于 Docker buildx 需要写宿主 `~/.docker/buildx/activity`，这些运行需要授权外部执行。
+- `skydiscover_circle_packing_codex` 的真实 SkyDiscover setup、单个真实 Codex worker、ALab evaluation 与 report collection 已跑通；controller 多 worker 未实跑，因为单 worker 已证明路径且消耗了大量 Codex 资源。
+- Focused example/docs contract tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+
+## 2026-05-23 完整 Examples 扩展
+
+已实现：
+
+- 将 `docker_file_reward_artifacts` 从 constant-score Docker 示例扩展为容器化诊所订单履约计划器，包含订单与仓库数据、cold-chain/priority 约束、manifest/summary/reward artifacts 和 artifact export。
+- 将 `harbor_verifier_minimal` 扩展为 Harbor hidden-verifier incident urgency classifier。editable starter 暴露 `score_ticket` 和 `classify_ticket`；private verifier cases 对 candidate 评分，并写入 numeric-only reward metrics。
+- 将 `collaboration_observe_lifecycle` 扩展为两阶段 incident triage 协作 demo：public step one 把 queue order 改为 severity-first，step two 从 `best` 继续并启用 SLA balancing、runbook shortcuts 和 security escalation。
+- 更新各 README 的任务说明和 examples matrix，使每个示例都有不同 demo task，而不是只有功能清单。
+- 新增 `tests/test_cli_contract.py::test_examples_are_task_shaped_demos`，防止示例任务 assets 和 README task sections 退化。
+- 将 Harbor 实跑得到的 reward-file 实践点更新到 role skills：reward JSON metrics 必须是 finite numbers；详细 diagnostics 应放入 artifacts 或 logs。
+
+验证：
+
+- 所有 example scripts 的 dry-run 检查。
+- `local_agent_scoreboard` setup 和 manual end-to-end run 通过。
+- `collaboration_observe_lifecycle` setup 和 end-to-end run 通过；step one reward `0.821505`，step two reward `1.0`。
+- `docker_file_reward_artifacts` 在 Docker Desktop 上真实 setup/run 通过；改进 run reward `0.899235`，捕获 3 个 artifacts。
+- `harbor_verifier_minimal` 在把 non-numeric verifier details 移出 `reward.json` 后，真实 Harbor setup/run 通过；改进 run reward `0.92625`。
+- Focused examples contract 和 ruff checks 通过。

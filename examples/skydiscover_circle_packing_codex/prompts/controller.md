@@ -8,8 +8,8 @@ final summaries.
 
 Required protocol:
 
-1. Source `examples/skydiscover_circle_packing_codex/.run/project.env` if the
-   helper variables are not already present.
+1. Use the `ALAB_*` helper variables already provided in the controller
+   environment. Do not read `.run/secrets/project.env` from inside Codex.
 2. Create `codex-circle-step-1` from the project default source.
 3. Launch one Codex worker in the Step 1 worktree using
    `examples/skydiscover_circle_packing_codex/prompts/worker.md`.
@@ -41,7 +41,10 @@ fi
 env -u ALAB_PROJECT_KEY \
   ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
   codex exec -C "<worktree>" \
-  --add-dir "$ALAB_EXAMPLE_DIR/.run" \
+  --add-dir "$ALAB_EXAMPLE_HOME" \
+  --add-dir "$UV_CACHE_DIR" \
+  --add-dir "$PYTHONPYCACHEPREFIX" \
+  --add-dir "$ALAB_SHARED_DIR" \
   "${CODEX_MODEL_ARGS[@]}" \
   --sandbox workspace-write \
   - < examples/skydiscover_circle_packing_codex/prompts/worker.md
@@ -50,6 +53,8 @@ env -u ALAB_PROJECT_KEY \
 Constraints:
 - Never expose `ALAB_PROJECT_KEY`.
 - Worker processes must run without `ALAB_PROJECT_KEY`.
+- Do not give workers the repository root, the whole `.run/` directory,
+  `.run/secrets`, or `project.env`.
 - Each worker should run one ALab evaluation.
 - If a step fails, record the failure in the report log and continue only when a
   safe next action is clear.

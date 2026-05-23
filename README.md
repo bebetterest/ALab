@@ -209,7 +209,11 @@ See [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_p
 
 ## Examples
 
-- [examples/skydiscover_circle_packing_codex](examples/skydiscover_circle_packing_codex/): complete SkyDiscover circle-packing example with setup, single Codex worker run, project-controller loop, report collection, and real-run notes.
+See [examples](examples/) for the runnable example matrix. The current examples
+cover a local scoring loop, a Dockerized clinic-order fulfillment planner with
+artifact export, a Harbor hidden-verifier incident classifier, a collaborative
+incident triage lifecycle workflow, and the SkyDiscover circle-packing Codex
+protocol.
 
 The repository also includes Codex-facing role skills under [skills](skills/). They are external runbooks for operating ALab through the CLI as an experiment worker, project controller, or global admin; they do not add an embedded agent launcher to ALab.
 
@@ -270,6 +274,12 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 │   ├── progress_pipeline.md
 │   └── progress_pipeline_cn.md
 ├── examples/
+│   ├── README.md
+│   ├── README_cn.md
+│   ├── collaboration_observe_lifecycle/
+│   ├── docker_file_reward_artifacts/
+│   ├── harbor_verifier_minimal/
+│   ├── local_agent_scoreboard/
 │   └── skydiscover_circle_packing_codex/
 ├── skills/
 │   ├── alab-experiment-worker/

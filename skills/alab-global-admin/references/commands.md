@@ -130,7 +130,7 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
   --task "$TASK"
 ```
 
-`project init` prints the generated project admin key exactly once after the project record is written. Capture it into an ignored local file or approved secret store, then pass only the project admin key to project controllers.
+`project init` prints the generated project admin key exactly once after the project record is written. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to project controllers, never to workers.
 
 ## Catalog Rules
 
@@ -161,7 +161,7 @@ A global admin handoff should include:
 
 - ALab home path and home id when safe,
 - project id, project name, and active config version,
-- generated project admin key delivery path or confirmation that it was handed off,
+- generated project admin key delivery path or confirmation that it was handed off through an ignored/secure secret location,
 - catalog pinned commit when applicable,
 - validation id and validation status,
 - cleanup or audit actions performed.

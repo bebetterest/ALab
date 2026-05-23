@@ -7654,3 +7654,44 @@ Validation:
 - Focused docs sync: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized -q`
 - `git diff --check`
 - `rg -n "[ \t]+$" docs/completion_audit.md docs/completion_audit_cn.md docs/progress.md docs/progress_cn.md docs/progress_pipeline.md docs/progress_pipeline_cn.md docs/progress_closed_gaps.md docs/progress_closed_gaps_cn.md docs/progress_log.md docs/progress_log_cn.md` returned no matches.
+
+## 2026-05-22 Examples and Agent Isolation Batch
+
+Implemented:
+
+- Hardened the SkyDiscover Codex example so controller and worker launches use narrow workspaces instead of the repository root or the whole `.run/` tree; project keys now live under ignored `.run/secrets/`, while workers receive only the experiment worktree plus non-secret ALab home/cache/shared writable directories.
+- Added four examples: `local_agent_scoreboard`, `docker_file_reward_artifacts`, `harbor_verifier_minimal`, and `collaboration_observe_lifecycle`; added the top-level examples matrix in English and Chinese.
+- Added the Chinese-only root practice note `潜在问题.md` with an explicit markdown-pair test exception, and captured real-run observations for Codex state writes, Docker buildx state writes, `workspace-write` read/write boundaries, network instability, and uv index requirements.
+- Updated README/README_cn and the experiment-worker, project-controller, and global-admin skills and command references with the narrowed worker launch pattern and secret-surface rules.
+- Added contract tests for the examples matrix, the Chinese-only note exception, and Codex launch isolation fragments.
+
+Validation:
+
+- `bash -n examples/*/scripts/*.sh`
+- Dry-run checks for all five examples.
+- End-to-end local runs for `local_agent_scoreboard` and `collaboration_observe_lifecycle`.
+- Real Docker runs for `docker_file_reward_artifacts` and `harbor_verifier_minimal` on Docker Desktop `29.2.1 linux/arm64`; these required elevated execution because Docker buildx writes host `~/.docker/buildx/activity`.
+- Real SkyDiscover setup, one real Codex worker, ALab evaluation, and report collection for `skydiscover_circle_packing_codex`; controller multi-worker execution was not run because the single worker already proved the path and consumed substantial Codex resources.
+- Focused example/docs contract tests: `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py::test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+
+## 2026-05-23 Complete Examples Expansion
+
+Implemented:
+
+- Expanded `docker_file_reward_artifacts` from a constant-score Docker example into a containerized clinic-order fulfillment planner with order and warehouse data, cold-chain and priority constraints, manifest/summary/reward artifacts, and artifact export.
+- Expanded `harbor_verifier_minimal` into a Harbor hidden-verifier incident urgency classifier. The editable starter exposes `score_ticket` and `classify_ticket`; private verifier cases now score the candidate and write numeric-only reward metrics.
+- Expanded `collaboration_observe_lifecycle` into a two-stage incident triage collaboration demo: public step one changes queue order to severity-first, and step two continues from `best` with SLA balancing, runbook shortcuts, and security escalation.
+- Added/updated README task descriptions and the examples matrix so each example has a distinct demo task, not just a feature checklist.
+- Added `tests/test_cli_contract.py::test_examples_are_task_shaped_demos` to keep example task assets and README task sections from regressing.
+- Updated role skills with the reward-file practice point learned from Harbor: reward JSON metrics must be finite numbers; detailed diagnostics belong in artifacts or logs.
+
+Validation:
+
+- Dry-run checks for all example scripts.
+- `local_agent_scoreboard` setup and manual end-to-end run passed.
+- `collaboration_observe_lifecycle` setup and end-to-end run passed; step one reward `0.821505`, step two reward `1.0`.
+- `docker_file_reward_artifacts` real Docker setup and run passed on Docker Desktop; improved run reward `0.899235` and captured 3 artifacts.
+- `harbor_verifier_minimal` real Harbor setup and run passed after moving non-numeric verifier details out of `reward.json`; improved run reward `0.92625`.
+- Focused examples contract and ruff checks passed.

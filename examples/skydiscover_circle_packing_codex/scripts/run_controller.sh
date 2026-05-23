@@ -27,8 +27,9 @@ EOF
 done
 
 RUN_DIR="$EXAMPLE_DIR/.run"
-PROJECT_ENV="$RUN_DIR/project.env"
+PROJECT_ENV="$RUN_DIR/secrets/project.env"
 LOG_DIR="$RUN_DIR/logs"
+CONTROLLER_WORKDIR="$RUN_DIR/controller-workspace"
 CODEX_MODEL="${CODEX_MODEL:-}"
 
 if [[ "$DRY_RUN" == "1" ]]; then
@@ -40,7 +41,7 @@ Codex model: ${CODEX_MODEL:-<codex default>}
 
 Command:
   source $PROJECT_ENV
-  ALAB_PROJECT_KEY=<project-admin-key> codex exec -C $REPO_ROOT ${CODEX_MODEL:+-m "$CODEX_MODEL"} --sandbox workspace-write - < $EXAMPLE_DIR/prompts/controller.md
+  ALAB_PROJECT_KEY=<project-admin-key> codex exec -C $CONTROLLER_WORKDIR --add-dir \$ALAB_EXAMPLE_HOME --add-dir \$ALAB_EXAMPLE_WORKTREE_ROOT --add-dir \$ALAB_SHARED_DIR --add-dir \$ALAB_REPORT_DIR --add-dir $LOG_DIR --add-dir \$UV_CACHE_DIR --add-dir \$PYTHONPYCACHEPREFIX ${CODEX_MODEL:+-m "$CODEX_MODEL"} --sandbox workspace-write - < $EXAMPLE_DIR/prompts/controller.md
 EOF
   exit 0
 fi
@@ -53,15 +54,22 @@ fi
 # shellcheck disable=SC1090
 source "$PROJECT_ENV"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" "$CONTROLLER_WORKDIR" "$ALAB_EXAMPLE_WORKTREE_ROOT" "$ALAB_SHARED_DIR" "$ALAB_REPORT_DIR" "$UV_CACHE_DIR" "$PYTHONPYCACHEPREFIX"
 CONTROLLER_LOG="$LOG_DIR/controller.log"
 CODEX_MODEL_ARGS=()
 if [[ -n "$CODEX_MODEL" ]]; then
   CODEX_MODEL_ARGS=(-m "$CODEX_MODEL")
 fi
 
-codex exec -C "$REPO_ROOT" \
-  "${CODEX_MODEL_ARGS[@]}" \
+codex exec -C "$CONTROLLER_WORKDIR" \
+  --add-dir "$ALAB_EXAMPLE_HOME" \
+  --add-dir "$ALAB_EXAMPLE_WORKTREE_ROOT" \
+  --add-dir "$ALAB_SHARED_DIR" \
+  --add-dir "$ALAB_REPORT_DIR" \
+  --add-dir "$LOG_DIR" \
+  --add-dir "$UV_CACHE_DIR" \
+  --add-dir "$PYTHONPYCACHEPREFIX" \
+  ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
   --sandbox workspace-write \
   - < "$EXAMPLE_DIR/prompts/controller.md" | tee "$CONTROLLER_LOG"
 

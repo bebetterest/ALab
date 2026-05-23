@@ -10,6 +10,29 @@ experiment 并启动 worker 迭代。
 最大化半径和。官方说明中的目标值是 `2.635`，ALab 使用 SkyDiscover evaluator
 返回的 `combined_score` 作为 reward。
 
+## Demo 任务
+
+改进 SkyDiscover circle-packing initial program，同时保持公开的 `run_packing()`
+contract。single-worker 脚本会在 token-scoped experiment worktree 中启动一个
+Codex worker。controller 脚本则展示更高层的 project-admin agent 如何创建
+experiments 并派发 workers，同时不把 admin key 传给它们。
+
+任务形态：
+
+- Editable file：从 SkyDiscover benchmark 导入的 `initial_program.py`。
+- Public contract：`run_packing()` 必须返回 `(centers, radii, sum_radii)`，表示
+  单位正方形内 exactly 26 个不重叠圆。
+- Evaluator：来自 pinned catalog bundle 的 SkyDiscover Python evaluator。
+- Reward source：SkyDiscover `combined_score`，由 valid radius sum 相对 target
+  value `2.635` 决定。
+- Worker boundary：Codex workers 只编辑 experiment worktree，并使用 worktree
+  token 执行 `alab run`；它们不会收到 project admin key。
+- Report output：`collect_report.sh` 读取本地 ALab records，并把 baseline/run
+  metrics 汇总到 `.run/reports/report.md`。
+
+这是最完整的 external-agent orchestration demo。它展示 ALab 如何记录客观
+evaluation evidence，同时让外部 agent 在受限 worktree 内搜索代码方案。
+
 官方来源：
 
 - SkyDiscover: https://github.com/skydiscover-ai/skydiscover
@@ -28,7 +51,7 @@ runner、records 和 visibility；Codex 是外部 agent。这个示例验证的�
 - worker 用 worktree token 调用 `alab run`，不需要 project key；
 - Codex controller 持 project admin key，创建 3 个实验并把 worker 派到各自目录；
 - ALab 记录 baseline、runs、metrics、reward、logs 和 best result；
-- `collect_report.sh` 生成本地小报告 `.run/report.md`。
+- `collect_report.sh` 生成本地小报告 `.run/reports/report.md`。
 
 ## 2. 环境要求
 
@@ -50,8 +73,8 @@ git --version
 
 真实 key 处理规则：
 
-- `root key` 只用于 setup，不写入 `.run/project.env`；
-- `project admin key` 写入 ignored `.run/project.env`；
+- `root key` 只用于 setup，不写入 `.run/secrets/project.env`；
+- `project admin key` 写入 ignored `.run/secrets/project.env`；
 - controller 通过环境变量 `ALAB_PROJECT_KEY` 使用 project admin key；
 - worker 通过 worktree token 运行，脚本用 `env -u ALAB_PROJECT_KEY` 移除 admin key；
 - README、报告和 redacted log 不记录真实 key。
@@ -78,9 +101,12 @@ examples/skydiscover_circle_packing_codex/
 ```text
 .run/
 ├── alab-home/
+├── controller-workspace/
 ├── logs/
-├── project.env
-├── report.md
+├── reports/
+├── secrets/
+│   └── project.env
+├── shared/
 ├── setup-summary.md
 ├── uv-cache/
 └── worktrees/
@@ -135,7 +161,7 @@ alab project init skydiscover --config examples/skydiscover_circle_packing_codex
 初始化成功后查看：
 
 ```sh
-source examples/skydiscover_circle_packing_codex/.run/project.env
+source examples/skydiscover_circle_packing_codex/.run/secrets/project.env
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" project show --project \"\$ALAB_PROJECT_ID\""
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" project config show --project \"\$ALAB_PROJECT_ID\""
 ```
@@ -183,7 +209,7 @@ eval "$ALAB_CMD_PREFIX run --message 'codex circle-packing worker improvement'"
 观察结果：
 
 ```sh
-source examples/skydiscover_circle_packing_codex/.run/project.env
+source examples/skydiscover_circle_packing_codex/.run/secrets/project.env
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" runs list --project \"\$ALAB_PROJECT_ID\""
 eval "$ALAB_CMD_PREFIX --key \"\$ALAB_PROJECT_KEY\" exp best --project \"\$ALAB_PROJECT_ID\""
 ```
@@ -213,10 +239,13 @@ controller 的固定 protocol：
 controller 使用 project admin key 创建 experiment，但 worker 子进程不继承该 key：
 
 ```sh
-env -u ALAB_PROJECT_KEY \
+env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
   ALAB_CMD_PREFIX="$ALAB_CMD_PREFIX" \
   codex exec -C "<worktree>" \
-  --add-dir "examples/skydiscover_circle_packing_codex/.run" \
+  --add-dir "$ALAB_EXAMPLE_HOME" \
+  --add-dir "$UV_CACHE_DIR" \
+  --add-dir "$PYTHONPYCACHEPREFIX" \
+  --add-dir "$ALAB_SHARED_DIR" \
   ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   --sandbox workspace-write \
   - < examples/skydiscover_circle_packing_codex/prompts/worker.md
@@ -233,7 +262,7 @@ examples/skydiscover_circle_packing_codex/scripts/collect_report.sh
 输出：
 
 ```text
-examples/skydiscover_circle_packing_codex/.run/report.md
+examples/skydiscover_circle_packing_codex/.run/reports/report.md
 ```
 
 报告包含：
@@ -253,7 +282,7 @@ examples/skydiscover_circle_packing_codex/.run/report.md
 | run | `codex-circle-step-2` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
 | run | `codex-circle-step-3` | `<passed/failed/error>` | `<combined_score>` | `<sum_radii>` | `<target_ratio>` | `<validity>` | `<seconds>` | `<run_id>` | `<commit>` |
 
-不要手写或猜测结果。未实跑时表格保留占位；实跑后以 `.run/report.md`
+不要手写或猜测结果。未实跑时表格保留占位；实跑后以 `.run/reports/report.md`
 和 ALab records 为准。
 
 本地确认快照（2026-05-22，单 worker 流程）：
@@ -265,7 +294,7 @@ examples/skydiscover_circle_packing_codex/.run/report.md
 
 该 run 由 Codex worker 先在实验 worktree 中生成固定 packing，再由真实
 SkyDiscover Python evaluator 写入本地 `.run/alab-home` 记录。具体 run id、commit
-和 log 路径以本机 `.run/report.md` 为准。
+和 log 路径以本机 `.run/reports/report.md` 为准。
 
 ## 9. 记录效果时看什么
 
@@ -306,8 +335,8 @@ SkyDiscover Python evaluator 写入本地 `.run/alab-home` 记录。具体 run i
 - dependency install 失败：确认 `uv` 可访问 Python package index。
 - Codex 未登录：先运行 `codex login` 或修复本地 Codex 配置。
 - worker 中 `alab help` 显示 `context type: none`：确认 worker 的 `codex exec`
-  命令包含 `--add-dir examples/skydiscover_circle_packing_codex/.run`，否则 Codex
-  sandbox 会让 ALab home 只读，context resolver 会退化为无上下文。
+  命令加入了 `$ALAB_EXAMPLE_HOME`、`$UV_CACHE_DIR` 和
+  `$PYTHONPYCACHEPREFIX`；不要加入整个 `.run/` 或 `.run/secrets`。
 - worker 修改了非 `initial_program.py` 文件：ALab mutable scope 会拒绝 run。
 - worker 输出 key：停止运行，删除 `.run/`，重新 setup，并检查 prompt/日志。
 
