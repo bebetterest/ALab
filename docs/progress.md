@@ -21,9 +21,9 @@ Current active focus, in summary only: there is no open implementation or eviden
 The default/local runnable V1 implementation is closed for this worktree. Remaining work is conditional maintenance, not a current completion blocker:
 
 - `docs/completion_audit.md` has no active `PARTIAL`, `PENDING`, or `ENV-GATED` V1 requirement row outside the status legend and future-state instructions.
-- The latest full default-suite closeout gate is current for this worktree after the 2026-05-23 multi-instance TSP template hardening batch.
+- The latest full default-suite closeout gate is current for this worktree after the 2026-05-23 TSP template usability polish batch.
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior, real Docker capability refresh, SkyDiscover Python local-wheel/network/native dependency behavior, and live SkyDiscover catalog behavior have current opt-in validation on this Darwin/Docker Desktop worktree and current network; the all-opt-in full suite passed with JUnit `tests=390`, `skipped=0`, `failures=0`, and `errors=0`.
-- The final README/spec/local-notes/progress/audit consistency pass has current focused evidence; rerun it after future documentation, `.env.example`, `.gitignore`, or local-note changes.
+- The final README/spec/local-notes/progress/audit consistency pass has current focused evidence through the TSP template usability polish batch; rerun it after future documentation, `.env.example`, `.gitignore`, or local-note changes.
 
 ## Gate Snapshot
 

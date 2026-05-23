@@ -32,6 +32,30 @@ REPORT_DIR="${ALAB_REPORT_DIR:-$RUN_DIR/reports}"
 WORKTREE_ROOT="${ALAB_EXAMPLE_WORKTREE_ROOT:-$RUN_DIR/worktrees}"
 EXP_NAME="${EXP_NAME:-tsp-skydiscover-python-demo}"
 UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
+ALAB_BIN="${ALAB_BIN:-}"
+
+quote_words() {
+  printf "%q " "$@"
+}
+set_alab_cmd() {
+  if ! declare -p ALAB_CMD >/dev/null 2>&1; then
+    if [[ -n "$ALAB_BIN" ]]; then
+      if [[ -x "$ALAB_BIN" ]]; then
+        ALAB_CMD=("$ALAB_BIN")
+      else
+        eval "ALAB_CMD=($ALAB_BIN)"
+      fi
+    else
+      ALAB_CMD=(uv run --frozen --project "$REPO_ROOT" alab)
+    fi
+  fi
+  if [[ "${#ALAB_CMD[@]}" -eq 0 ]]; then
+    echo "ALAB_BIN resolved to an empty command" >&2
+    exit 1
+  fi
+  ALAB_BIN="$(quote_words "${ALAB_CMD[@]}")"
+  ALAB_BIN="${ALAB_BIN% }"
+}
 
 if [[ "$DRY_RUN" == "1" ]]; then
   cat <<EOF
@@ -54,7 +78,7 @@ fi
 # shellcheck disable=SC1090
 source "$PROJECT_ENV"
 mkdir -p "$LOG_DIR" "$REPORT_DIR" "$WORKTREE_ROOT"
-read -r -a ALAB_CMD <<< "${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
+set_alab_cmd
 run_alab() {
   UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
 }

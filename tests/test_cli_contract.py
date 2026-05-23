@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -20634,24 +20635,34 @@ def test_examples_are_task_shaped_demos() -> None:
         ],
         "templates": [
             "tsp_local/alab.project.toml",
+            "tsp_local/README.md",
+            "tsp_local/README_cn.md",
             "tsp_local/source/instances.json",
             "tsp_local/source/solution.py",
             "tsp_local/source/validate_tsp.py",
             "tsp_docker/alab.project.toml",
+            "tsp_docker/README.md",
+            "tsp_docker/README_cn.md",
             "tsp_docker/source/Dockerfile",
             "tsp_docker/source/instances.json",
             "tsp_docker/source/solution.py",
             "tsp_docker/source/validate_tsp.py",
             "tsp_harbor/alab.project.template.toml",
+            "tsp_harbor/README.md",
+            "tsp_harbor/README_cn.md",
             "tsp_harbor/task/task.toml",
             "tsp_harbor/task/starter/instances.json",
             "tsp_harbor/task/starter/solution.py",
             "tsp_harbor/task/tests/test.sh",
             "tsp_skydiscover_python/alab.project.template.toml",
+            "tsp_skydiscover_python/README.md",
+            "tsp_skydiscover_python/README_cn.md",
             "tsp_skydiscover_python/source/instances.json",
             "tsp_skydiscover_python/source/solution.py",
             "tsp_skydiscover_python/evaluator/evaluator.py",
             "tsp_skydiscover_docker/alab.project.template.toml",
+            "tsp_skydiscover_docker/README.md",
+            "tsp_skydiscover_docker/README_cn.md",
             "tsp_skydiscover_docker/source/instances.json",
             "tsp_skydiscover_docker/source/solution.py",
             "tsp_skydiscover_docker/evaluator/Dockerfile",
@@ -20702,6 +20713,10 @@ def test_tsp_templates_are_complete_and_dry_run() -> None:
     assert "500-city" in readme_cn
     assert "1000-city" in readme_cn
     assert "total_tour_length <= 2650000" in readme_cn
+    assert "Each `tsp_*` directory has its own short README" in readme
+    assert "每个 `tsp_*` 目录都有自己的简短 README" in readme_cn
+    assert "shell-quoted command string" in readme
+    assert "shell-quoted command string" in readme_cn
     assert shell_scripts
     assert "not a claim of global optimality" in readme
     assert "不表示全局最优保证" in readme_cn
@@ -20711,6 +20726,16 @@ def test_tsp_templates_are_complete_and_dry_run() -> None:
     for name in sorted(template_names):
         assert f"[{name}]({name}/)" in readme
         assert f"[{name}]({name}/)" in readme_cn
+        assert (templates_root / name / "README.md").is_file()
+        assert (templates_root / name / "README_cn.md").is_file()
+        local_readme = (templates_root / name / "README.md").read_text(encoding="utf-8")
+        local_readme_cn = (templates_root / name / "README_cn.md").read_text(encoding="utf-8")
+        assert "scripts/setup_project.sh --dry-run" in local_readme
+        assert "scripts/run_demo.sh" in local_readme
+        assert "ALAB_BIN" in local_readme
+        assert "scripts/setup_project.sh --dry-run" in local_readme_cn
+        assert "scripts/run_demo.sh" in local_readme_cn
+        assert "ALAB_BIN" in local_readme_cn
         assert (templates_root / name / ".gitignore").read_text(encoding="utf-8").strip() == ".run/"
         assert (templates_root / name / "scripts" / "setup_project.sh").is_file()
         assert (templates_root / name / "scripts" / "run_demo.sh").is_file()
@@ -20822,15 +20847,15 @@ def test_tsp_reference_solution_meets_documented_threshold(tmp_path: Path) -> No
 
 
 def test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy(tmp_path: Path) -> None:
-    templates_copy = tmp_path / "templates"
+    templates_copy = tmp_path / "templates with spaces"
     shutil.copytree(_EXAMPLES_ROOT / "templates", templates_copy)
-    alab_wrapper = tmp_path / "alab_cli_wrapper.py"
+    alab_wrapper = tmp_path / "alab cli wrapper.py"
     alab_wrapper.write_text("from alab.cli import main\nmain()\n", encoding="utf-8")
     env = os.environ.copy()
     env.update(
         {
             "ALAB_REPO_ROOT": str(_REPO_ROOT),
-            "ALAB_BIN": f"{sys.executable} {alab_wrapper}",
+            "ALAB_BIN": f"{shlex.quote(sys.executable)} {shlex.quote(str(alab_wrapper))}",
             "PYTHONPYCACHEPREFIX": str(tmp_path / "pycache"),
             "PYTHONPATH": str(_REPO_ROOT / "src")
             + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""),

@@ -7784,3 +7784,22 @@
 - All opt-in full suite：`ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs --junitxml=/private/tmp/alab-all-optin-pytest.xml`（JUnit `tests=390`、`skipped=0`、`failures=0`、`errors=0`）
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py examples/templates`
 - `git diff --check`
+
+## 2026-05-23 TSP Template Usability Polish
+
+已实现：
+
+- 在每个 `examples/templates/tsp_*` 目录下新增 per-template README/README_cn，使只复制单个 template 时仍保留本地命令路径、可编辑文件表、runner requirements，以及 `.run/`/secret-state 约定。
+- 更新顶层 template README pair，说明 per-template README 文件以及 `ALAB_REPO_ROOT`/`ALAB_BIN` 的路径 quoting 行为。
+- 重写所有 TSP template setup/run scripts 的 ALab command 构造方式：默认命令使用 Bash array，并把生成的 command array 持久化到 `.run/secrets/project.env`，从而支持包含空格的 copied template path 和 custom wrapper path，不破坏参数边界。
+- 扩展 template contract tests，要求每个本地 README pair 存在，并在包含空格的 copied template path 和 `ALAB_BIN` wrapper path 下真实运行默认 local/SkyDiscover Python template demo。
+
+验证：
+
+- `bash -n examples/templates/scripts/check_templates.sh examples/templates/tsp_*/scripts/*.sh examples/templates/tsp_harbor/task/tests/test.sh examples/templates/tsp_skydiscover_docker/evaluator/evaluate.sh`
+- `examples/templates/scripts/check_templates.sh`
+- Focused template tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q tests/test_cli_contract.py::test_tsp_templates_are_complete_and_dry_run tests/test_cli_contract.py::test_tsp_reference_solution_meets_documented_threshold tests/test_cli_contract.py::test_tsp_local_and_skydiscover_python_templates_run_from_temp_copy`
+- Real Docker TSP template gate：`ALAB_RUN_REAL_DOCKER=1 UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q -rs tests/test_real_docker.py::test_real_docker_tsp_templates_run_from_temp_copy`
+- Full default suite：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py examples/templates`
+- `git diff --check`

@@ -77,11 +77,19 @@ calling `alab project init`.
 
 Copy one template directory, keep the `source/` or `task/starter/` public files
 as the worker-editable surface, then adjust the project name, task text, data,
-and evaluator logic. The bundled data lives in `instances.json`; it stores the
-fixed instance sizes and seeds used by the deterministic coordinate generator.
+and evaluator logic. Each `tsp_*` directory has its own short README so the
+copied template still carries the local command and file map. The bundled data
+lives in `instances.json`; it stores the fixed instance sizes and seeds used by
+the deterministic coordinate generator.
 Keep reward JSON files as string-to-finite-number maps. Put route diagnostics,
 explanations, and hidden verifier details in artifacts, logs, or SkyDiscover
 feedback instead of reward JSON.
+
+If the template is copied outside this repository, set `ALAB_REPO_ROOT` to the
+ALab checkout. The scripts build the default `uv run --project <repo> alab`
+command with shell arrays, so paths containing spaces are handled. If you set a
+custom `ALAB_BIN`, pass a shell-quoted command string when any argument contains
+spaces.
 
 ## Isolation Notes
 

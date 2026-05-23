@@ -74,10 +74,14 @@ examples/templates/tsp_skydiscover_docker/scripts/setup_project.sh
 
 复制任一 template 目录，把 `source/` 或 `task/starter/` 中的 public 文件作为
 worker-editable surface，然后调整 project name、task text、数据和 evaluator
-逻辑。内置数据在 `instances.json` 中；它保存 deterministic coordinate generator
-使用的固定实例规模和 seeds。reward JSON files 必须保持
-string-to-finite-number map。route diagnostics、解释和 hidden verifier details
-应写入 artifacts、logs 或 SkyDiscover feedback，不要放进 reward JSON。
+逻辑。每个 `tsp_*` 目录都有自己的简短 README，因此只复制单个模板目录时也会带上本地命令和文件说明。
+内置数据在 `instances.json` 中；它保存 deterministic coordinate generator 使用的固定实例规模和
+seeds。reward JSON files 必须保持 string-to-finite-number map。route diagnostics、解释和
+hidden verifier details 应写入 artifacts、logs 或 SkyDiscover feedback，不要放进 reward JSON。
+
+如果把模板复制到仓库外，设置 `ALAB_REPO_ROOT` 指向 ALab checkout。脚本使用 shell
+array 构造默认的 `uv run --project <repo> alab` 命令，因此可以处理包含空格的路径。
+如果设置自定义 `ALAB_BIN`，当任一参数包含空格时请传入 shell-quoted command string。
 
 ## 隔离说明
 

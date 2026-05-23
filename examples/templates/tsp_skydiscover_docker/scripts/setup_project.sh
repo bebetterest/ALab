@@ -38,9 +38,33 @@ ALAB_EXAMPLE_HOME="${ALAB_EXAMPLE_HOME:-$RUN_DIR/alab-home}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-$RUN_DIR/uv-cache}"
 UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.org/simple}"
 PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$RUN_DIR/pycache}"
-ALAB_BIN="${ALAB_BIN:-uv run --frozen --project $REPO_ROOT alab}"
-ALAB_CMD_PREFIX="UV_CACHE_DIR=$UV_CACHE_DIR UV_DEFAULT_INDEX=$UV_DEFAULT_INDEX PYTHONPYCACHEPREFIX=$PYTHONPYCACHEPREFIX $ALAB_BIN --home $ALAB_EXAMPLE_HOME"
+ALAB_BIN="${ALAB_BIN:-}"
+ALAB_CMD_PREFIX=""
 PROJECT_ENV="$SECRET_DIR/project.env"
+
+quote_words() {
+  printf "%q " "$@"
+}
+set_alab_cmd() {
+  if ! declare -p ALAB_CMD >/dev/null 2>&1; then
+    if [[ -n "$ALAB_BIN" ]]; then
+      if [[ -x "$ALAB_BIN" ]]; then
+        ALAB_CMD=("$ALAB_BIN")
+      else
+        eval "ALAB_CMD=($ALAB_BIN)"
+      fi
+    else
+      ALAB_CMD=(uv run --frozen --project "$REPO_ROOT" alab)
+    fi
+  fi
+  if [[ "${#ALAB_CMD[@]}" -eq 0 ]]; then
+    echo "ALAB_BIN resolved to an empty command" >&2
+    exit 1
+  fi
+  ALAB_BIN="$(quote_words "${ALAB_CMD[@]}")"
+  ALAB_BIN="${ALAB_BIN% }"
+  ALAB_CMD_PREFIX="UV_CACHE_DIR=$(printf "%q" "$UV_CACHE_DIR") UV_DEFAULT_INDEX=$(printf "%q" "$UV_DEFAULT_INDEX") PYTHONPYCACHEPREFIX=$(printf "%q" "$PYTHONPYCACHEPREFIX") $ALAB_BIN --home $(printf "%q" "$ALAB_EXAMPLE_HOME")"
+}
 
 if [[ "$DRY_RUN" == "1" ]]; then
   cat <<EOF
@@ -65,7 +89,8 @@ if [[ -f "$PROJECT_ENV" ]]; then
   echo "Use --reset to recreate the template project from scratch."
   exit 0
 fi
-if [[ "$ALAB_BIN" == uv\ * ]] && ! command -v uv >/dev/null 2>&1; then
+set_alab_cmd
+if [[ "${ALAB_CMD[0]}" == "uv" ]] && ! command -v uv >/dev/null 2>&1; then
   echo "missing uv CLI; install uv or set ALAB_BIN to an installed alab command" >&2
   exit 1
 fi
@@ -76,7 +101,6 @@ fi
 
 sed "s|@EVALUATOR_DIR@|$EVALUATOR_DIR|g" "$TEMPLATE_DIR/alab.project.template.toml" > "$CONFIG_PATH"
 
-read -r -a ALAB_CMD <<< "$ALAB_BIN"
 run_alab() {
   UV_CACHE_DIR="$UV_CACHE_DIR" UV_DEFAULT_INDEX="$UV_DEFAULT_INDEX" PYTHONPYCACHEPREFIX="$PYTHONPYCACHEPREFIX" "${ALAB_CMD[@]}" --home "$ALAB_EXAMPLE_HOME" "$@"
 }
@@ -103,6 +127,9 @@ printf '%s\n' "${PROJECT_OUTPUT//$PROJECT_KEY/<project-admin-key>}" | tee "$LOG_
   printf 'export ALAB_PROJECT_ID=%q\n' "$PROJECT_ID"
   printf 'export ALAB_PROJECT_KEY=%q\n' "$PROJECT_KEY"
   printf 'export ALAB_BIN=%q\n' "$ALAB_BIN"
+  printf 'ALAB_CMD=('
+  printf '%q ' "${ALAB_CMD[@]}"
+  printf ')\n'
   printf 'export ALAB_CMD_PREFIX=%q\n' "$ALAB_CMD_PREFIX"
   printf 'export UV_CACHE_DIR=%q\n' "$UV_CACHE_DIR"
   printf 'export UV_DEFAULT_INDEX=%q\n' "$UV_DEFAULT_INDEX"
