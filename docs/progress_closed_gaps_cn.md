@@ -47,9 +47,11 @@
 - SkyDiscover catalog/source guardrails：exact pinned commits、ref resolution 期间不 auto-update、dirty catalog update rejection、unexpected remote rejection、active-config 与 open-experiment removal blockers、dependencies close 后 successful removal、catalog-independent historical observability、source precedence、`--source-ref` rejection、initial program import、missing-initial failure、explicit source hash-conflict rejection，以及没有 initial program 时 explicit Git/empty source success。
 - Public Git inline-source guardrails：隔离的 global Git credential helper 已配置时，public `--source-git` 会渲染 `PUBLIC_GIT_CREDENTIAL_HELPER_USED`；global/system Git configs 都没有 helper 时不渲染 helper warning；并持久化匹配的 source-origin warning metadata。
 - SkyDiscover evaluator guardrails：Docker evaluator feedback/file-artifact separation、fake/default paths 下的 Docker evaluator hidden bundle 与 timeout cleanup、当前 Darwin real Docker-backed Docker evaluator proof、Python evaluator hidden bundle、wrapper-subprocess import boundary、non-sandbox disclosure、dependency-installation saved failures、hidden setup logs、default/fake paths 下无 debug traceback，以及当前 Darwin SkyDiscover Python local-wheel/network/native dependency proof。
+- HOME feedback guardrails：顶层 `alab feedback` 保持 submit-only initialized-HOME plaintext command，面向每个 ALab role 开放且不做 key/token validation；parser/file failures 保持 side-effect-free；`auth init` 前不会创建 HOME；每条 feedback 都使用原子 file record；记录 session priority 和 best-effort Git metadata。
 
 ## 最近关闭
 
+- 2026-05-24：HOME feedback command proof，覆盖所有 initialized-home roles、no-HOME failure without HOME creation、per-record plaintext metadata/body files、session priority/null fallback、Git/non-Git metadata，以及 side-effect-free invalid input handling。
 - 2026-05-22：当前 worktree 的最终 requirement-ledger closeout；`docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
 - 2026-05-22：当前 Darwin real Docker capability-refresh validation，覆盖 daemon availability、Linux platform rows、architecture platform rows 和 CPU/memory resource rows，证据为 `tests/test_real_docker.py::test_real_docker_config_validate_refreshes_capability_cache`。
 - 2026-05-22：当前 registered surfaces 的 CLI golden/command-contract completion proof 和 audit-summary consistency guard，证据为 `tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`。

@@ -56,6 +56,10 @@ class Home:
     def cache_path(self) -> Path:
         return self.path / "cache"
 
+    @property
+    def feedback_path(self) -> Path:
+        return self.path / "feedback"
+
 
 def resolve_home(explicit: str | None = None) -> Home:
     raw = explicit or os.environ.get("ALAB_HOME") or "~/.ALab"
@@ -71,6 +75,7 @@ def ensure_layout(home: Home) -> None:
         home.sources_path / "skydiscover",
         home.cache_path / "docker-images",
         home.cache_path / "skydiscover-python-envs",
+        home.feedback_path,
         home.tmp_path,
     ]:
         path.mkdir(parents=True, exist_ok=True)

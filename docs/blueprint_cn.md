@@ -14,7 +14,7 @@
 
 ## 2. 产品定义
 
-ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 在 ALab 创建的 Git worktree 中工作，通过 `alab` 创建尝试、提交迭代、运行评估、提交最终结果、查看可见历史、导出 artifact、编写 annotation。
+ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 在 ALab 创建的 Git worktree 中工作，通过 `alab` 创建尝试、提交迭代、运行评估、提交最终结果、查看可见历史、导出 artifact、编写 annotation，并为本地 suggestions、questions 或 bug reports 留 HOME-level feedback。
 
 ALab 负责 project 结构和本地记录。V1 不启动 agent、不调度 agent、不选择 prompt、不运行搜索循环、不托管服务，也不跨机器同步数据。
 
@@ -122,10 +122,14 @@ Canonical filesystem layout：
 ├── cache/
 │   ├── docker-images/
 │   └── skydiscover-python-envs/
+├── feedback/
+│   └── <feedback_record>/
+│       ├── metadata.json
+│       └── body.md
 └── tmp/
 ```
 
-V1 没有 `records/` 目录。SQLite 是结构化 record 的 authoritative store。Log 和 artifact bytes 由文件承载，并由 SQLite 引用。
+V1 没有 `records/` 目录。SQLite 是结构化 record 的 authoritative store。Log 和 artifact bytes 由文件承载，并由 SQLite 引用。Agent feedback entries 是 `feedback/` 下的 HOME-level plaintext files。
 
 `auth init` 生成稳定的 `home_id`，写入 SQLite，并写入每个 `.alab/context.json` marker。Context repair 必须验证 `home_id` 后才接受 marker。
 

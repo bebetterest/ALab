@@ -12,9 +12,9 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-05-23
+## 当前 Active Batch - 2026-05-24
 
-- Focus：当前 worktree 没有剩余 active implementation 或 evidence batch。
+- Focus：HOME feedback command batch 已对当前 worktree 关闭。`alab feedback` 现在是所有 ALab roles 在 initialized HOME 内提交 plaintext feedback 的入口。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
 - 下一步 evidence：当前 worktree 无需新增。只有 `docs/completion_audit.md` 点名具体 defect、changed requirement 使现有 evidence row 过宽而无法判断，或明确 release target 不同于当前已证明的 real-environment gates 时，才重新打开工作。
 

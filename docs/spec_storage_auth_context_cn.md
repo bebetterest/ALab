@@ -55,10 +55,16 @@ Canonical filesystem layout：
 ├── cache/
 │   ├── docker-images/
 │   └── skydiscover-python-envs/
+├── feedback/
+│   └── <feedback_record>/
+│       ├── metadata.json
+│       └── body.md
 └── tmp/
 ```
 
-V1 没有 `records/` directory。SQLite 是 structured records 的 authoritative source。Logs 和 artifact bytes 是 plaintext files，由 SQLite 记录引用。
+V1 没有 `records/` directory。SQLite 是 structured records 的 authoritative source。Logs 和 artifact bytes 是 plaintext files，由 SQLite 记录引用。Feedback entries 是 `feedback/` 下的 file-backed HOME-level notes，不是 SQLite rows。
+
+每条 feedback entry 存为 `feedback/<YYYYMMDDTHHMMSSZ>_<feedback_id>/metadata.json` 加 `body.md`。`metadata.json` 使用 schema version `1` 和固定 key set：`schema_version`、`feedback_id`、`kind`、`title`、`created_at`、`role`、`actor_type`、`actor_credential_id`、`actor_project_id`、`actor_exp_id`、`token_mode`、`context_type`、`context_project_id`、`context_exp_id`、`context_token_id`、`cwd`、`session_id`、`session_source`、`git_commit`、`git_dirty`、`git_commit_source`、`alab_home` 和 `body_path`。缺失的 role/session/context/actor/Git values 使用 JSON `null`。
 
 `project-workspaces/` 下的 project workspace directory 只是 project-scoped CLI context 的 marker-only control directory。它们不是 source checkout，不能作为可编辑 experiment worktree 使用。Experiment worktree 是 registered external path。`exp create` 省略 `--path` 时，默认 experiment worktree path 是相对 command cwd 的 `./<project_id>_<exp_id>`。该 cwd 可以是 project control context，但不是必须；任意通过 path registration 和 nesting checks 的 cwd 都有效。
 
@@ -92,7 +98,7 @@ PRAGMA busy_timeout = <configured milliseconds>;
 - SQLite foreign keys 对 hard remove 后不需要保留 parent 的 authoritative records 使用 restrict-style behavior。Implementation 应在安全的 authoritative parent-child relationships 上使用真实 foreign key；这些 parent 不得在 retained children 仍引用时 hard-remove。Hard remove flow 由 application code 显式检查 dependency、写 audit rows，然后按受控顺序删除 rows。
 - 需要保留的 diagnostic 和 audit tables 在必要时存 denormalized object ids，不得要求 foreign keys 指向 hard remove 可能删除的 rows。这包括 `audit_events`、保留的 revoked `credentials`、removed `path_registry` rows，以及仅为 cleanup 或 audit 保留的 cache/catalog metadata。
 
-Plaintext data 可能包含 project names、tasks、config summaries、experiment names、tags、summaries、feedback、annotations、logs、reward values、metrics、artifact metadata and bytes、local paths、source refs、branch names、commit hashes、content hashes 和 `secret_env` values。
+Plaintext data 可能包含 project names、tasks、config summaries、experiment names、tags、summaries、submissions、feedback entries、annotations、logs、reward values、metrics、artifact metadata and bytes、local paths、source refs、branch names、commit hashes、content hashes、session identifiers 和 `secret_env` values。
 
 ## 3. DDL-Level Schema Contract
 

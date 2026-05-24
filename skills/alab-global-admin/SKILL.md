@@ -25,6 +25,7 @@ This skill does not do experiment implementation. After creating a project or is
 This is a capability guide, not a required sequence. Use the capabilities that fit the administrative objective:
 
 - Bootstrap an ALab home with `alab auth init` only when no home exists, and inspect home health with `alab config show` or `alab config validate`.
+- Use `alab feedback` for local ALab/tooling suggestions, questions, or bug reports that should be retained under the home without adding database rows.
 - Manage root credentials deliberately. Rotate root only with explicit intent, and treat replacement keys as one-time-rendered secrets.
 - Create, list, and revoke project admin keys for project controllers. Revoke only after identifying the key id, project scope, and expected impact.
 - Initialize projects from local, Git, empty, Harbor, or SkyDiscover sources using config files. Capture the generated project admin key exactly once, store it only in an ignored secret location, and hand it off securely to a project controller rather than a worker.

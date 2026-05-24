@@ -283,7 +283,7 @@ Input normalization and lookup rules:
 - Git commit selectors may be full SHAs or unambiguous abbreviated SHAs when the command explicitly accepts a commit selector.
 - Time filter options such as `--created-after`, `--created-before`, `--started-after`, and `--ended-before` accept only RFC 3339 timestamps with `Z` or an explicit numeric offset. ALab normalizes accepted times to UTC `Z` for queries and output. When a matching `after` and `before` pair is supplied for the same field family, the `after` value must be less than or equal to the `before` value.
 - Export output paths that already exist as directories fail with `OUTPUT_EXISTS`, even when `--overwrite` is supplied; `--overwrite` may replace files, not directories.
-- Text input file options such as `--value-file`, `--summary-file`, `--feedback-file`, and `--body-file` fail with `CONFIG_INVALID` when the target is missing, a directory, unreadable, or not valid UTF-8; these failures occur before secret writes, submission rows, annotation rows, runner execution, or lifecycle audit rows.
+- Text input file options such as `--value-file`, `--summary-file`, `--feedback-file`, and `--body-file` fail with `CONFIG_INVALID` when the target is missing, a directory, unreadable, or not valid UTF-8; these failures occur before secret writes, feedback files, submission rows, annotation rows, runner execution, or lifecycle audit rows.
 - Unknown object ids use the most specific `*_NOT_FOUND` code when one exists; otherwise they use `CONFIG_INVALID` for invalid selectors or filters.
 - Token-scoped and public callers selecting an object that exists but is not visible receive `SCOPE_VIOLATION` with a non-disclosing reason such as `not visible or not found`. Public and token-scoped output must not reveal whether the object exists outside the caller's visibility. Root/admin callers receive precise `*_NOT_FOUND` or scope errors.
 
@@ -302,6 +302,7 @@ Command error matrix:
 | `auth init` | `HOME_EXISTS` exit `2`; `STORAGE_ERROR` exit `5` |
 | `auth root regenerate` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`; `STORAGE_ERROR` exit `5` |
+| `feedback` | `CONTEXT_NOT_FOUND` exit `2` when ALab home is not initialized; invalid inputs `CONFIG_INVALID` exit `2`; storage failures `STORAGE_ERROR` exit `5` |
 | `key create|list|revoke` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND`, `CREDENTIAL_NOT_FOUND`, or `CONFIG_INVALID` exit `2` |
 | `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`; `CONTEXT_CONFLICT`, `SCOPE_VIOLATION` exit `4`; `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; invalid path `CONFIG_INVALID` exit `2` |
 | `project list|show|status` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND` exit `2`; `CONTEXT_CONFLICT` exit `4` |
@@ -359,15 +360,15 @@ Capability surface terms:
 
 Default context surfaces:
 
-- Global with no explicit key: show `help`, `auth init`, config diagnostics/repair, and context diagnostics commands that do not require a project record. Commands that require a project may be available only when they include an explicit target and do not conflict with the current path.
+- Global with no explicit key: show `help`, `auth init`, `feedback`, config diagnostics/repair, and context diagnostics commands that do not require a project record. Commands that require a project may be available only when they include an explicit target and do not conflict with the current path.
 - Global with explicit project admin key: show the matching project's admin surface and commands that can run with that credential by passing its project id explicitly.
 - Global with explicit root key: additionally show root-level project creation, project listing, key management, catalog, cache, backup, and audit commands.
-- Project context with no explicit key: show public safe `status`; when project policy allows public experiment creation, show public `exp create` with source bootstrap options. Hide project management, source management, config, validation, audit, cache, catalog, backup, key, and lifecycle maintenance commands.
+- Project context with no explicit key: show global public commands, public safe `status`; when project policy allows public experiment creation, show public `exp create` with source bootstrap options. Hide project management, source management, config, validation, audit, cache, catalog, backup, key, and lifecycle maintenance commands.
 - Project context with explicit project admin key: show same-project project/source/config/validate/observe/experiment management commands except root-only commands.
 - Project context with explicit root key: show project admin capabilities plus root-only commands in scope.
-- Experiment context with worktree token: show `status`, `run`, `submit`, visible observe commands, own-experiment tag commands, authorized annotations, and own-experiment run/artifact/visible-log archive or unarchive commands. Hide project/source/config/project init, experiment remove, worktree maintenance, key management, audit, cache, catalog, and backup commands.
+- Experiment context with worktree token: show global public commands, `status`, `run`, `submit`, visible observe commands, own-experiment tag commands, authorized annotations, and own-experiment run/artifact/visible-log archive or unarchive commands. Hide project/source/config/project init, experiment remove, worktree maintenance, key management, audit, cache, catalog, and backup commands.
 - Experiment context with explicit project admin or root key: unlock the matching same-project admin or root surface while preserving existing context-conflict rules for different explicit projects.
-- Inspection context with inspection token: show `status`, visible observe commands, artifact/log export, and removal of its own inspection checkout. Hide run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, key management, audit, cache, catalog, and backup commands.
+- Inspection context with inspection token: show global public commands, `status`, visible observe commands, artifact/log export, and removal of its own inspection checkout. Hide run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, key management, audit, cache, catalog, and backup commands.
 - Inspection context with explicit project admin or root key: unlock the matching same-project admin or root surface while preserving inspection-token read-only behavior when no explicit key is provided.
 
 ## 7. Command Groups And Aliases
@@ -377,6 +378,7 @@ Canonical groups:
 - `help`
 - `auth`
 - `config`
+- `feedback`
 - `key`
 - `context`
 - `project`
@@ -430,6 +432,7 @@ Primary object types:
 | repeated command rows from help output | `help_command` |
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
+| `feedback` | `feedback` |
 | repeated capability rows from `config validate` | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
@@ -477,6 +480,24 @@ Lifecycle command rules:
 - `--all` rule: also renders locked `help_command` objects with `available: false`, safe `locked reason`, and safe `unlock hint`.
 - `--explain` rule: includes `capability source` and any safe explanatory `summary`; without `--explain`, `capability source` may render as `none`.
 - Exit: `0`; `2` on invalid help options/selectors or invalid global config; `5` on storage failure.
+
+### Feedback
+
+`alab feedback --body <text>|--body-file <path> [--kind suggestion|question|bug|other] [--title <text>]`
+
+- Context: Any initialized ALab home.
+- Credential: None, context token, or explicit root/admin/token key.
+- Required args: exactly one body input.
+- Options: `--body`, `--body-file`, `--kind`, `--title`.
+- Defaults: `--kind suggestion`.
+- Conflicts: `--body` with `--body-file`.
+- Body rule: feedback body must be non-empty UTF-8 text no longer than 65536 bytes.
+- Title rule: when provided, title must be non-empty UTF-8 text no longer than 120 bytes.
+- Storage rule: each feedback creates one directory under `ALAB_HOME/feedback/` with `metadata.json` and `body.md`; ALab does not create an uninitialized home for feedback.
+- Global config rule: invalid or missing global config does not block feedback once the home database is initialized.
+- Metadata rule: missing role, session, context, actor, or Git information is stored as JSON `null`.
+- Success fields: `feedback id`, `kind`, `title`, `created at`, `role`, `session id`, `commit`, `path`, `metadata path`, `body path`.
+- Exit: `0`; `2` on missing home or invalid input; `5` on storage failure.
 
 ### Auth
 

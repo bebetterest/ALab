@@ -11,6 +11,7 @@
 ```text
 alab status
 alab help
+alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab run --message "<message>"
 alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
 alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]
@@ -42,6 +43,9 @@ Worker lifecycle 权限有意保持很窄：
 - **`alab help`**：查看当前 worktree token 可用 commands。
   关键参数：`--all --explain` 可以显示 locked commands 和安全原因。
   输出用途：避免误用 admin/root commands，并识别可用 observe 或 annotation commands。
+- **`alab feedback`**：为 tooling suggestions、questions、bugs 或其他 agent observations 留 HOME-level local note。
+  关键参数：`--body <text>` 或 `--body-file <path>` 二选一；可选 `--kind suggestion|question|bug|other` 和 `--title <text>`。
+  输出用途：获取 `ALAB_HOME/feedback/` 下保存的 feedback id 和文件路径。该命令用于 ALab/tooling feedback，不替代 experiment submission summary。
 - **`alab run`**：评估当前 candidate，并保存 run evidence。
   关键参数：必需 `--message <text>`；保持简短且具体。
   输出用途：获取 run id、status、reward、parse status、warnings、previews、artifact count 和 next action。

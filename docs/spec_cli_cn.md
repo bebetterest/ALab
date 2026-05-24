@@ -281,7 +281,7 @@ Input normalization 和 lookup rules：
 - Git commit selector 可以使用完整 SHA；命令明确接受 commit selector 时，也可以使用无歧义的 abbreviated SHA。
 - `--created-after`、`--created-before`、`--started-after`、`--ended-before` 等时间过滤参数只接受带 `Z` 或显式 numeric offset 的 RFC3339 timestamp。ALab 接受后统一 normalizes to UTC `Z` 再查询和输出。同一字段 family 同时提供 matching `after` 与 `before` 时，`after` 值必须小于或等于 `before` 值。
 - 已存在且是目录的 export output path 会以 `OUTPUT_EXISTS` 失败，即使提供 `--overwrite`；`--overwrite` 只可替换文件，不可替换目录。
-- `--value-file`、`--summary-file`、`--feedback-file` 和 `--body-file` 等 text input file options 在目标缺失、是目录、不可读或不是有效 UTF-8 时，以 `CONFIG_INVALID` 失败；这些失败发生在 secret writes、submission rows、annotation rows、runner execution 或 lifecycle audit rows 之前。
+- `--value-file`、`--summary-file`、`--feedback-file` 和 `--body-file` 等 text input file options 在目标缺失、是目录、不可读或不是有效 UTF-8 时，以 `CONFIG_INVALID` 失败；这些失败发生在 secret writes、feedback files、submission rows、annotation rows、runner execution 或 lifecycle audit rows 之前。
 - Unknown object id 优先使用最具体的 `*_NOT_FOUND` code；没有对应 code 时，invalid selector/filter 使用 `CONFIG_INVALID`。
 - Token-scoped 和 public caller 选择一个存在但对 caller 不可见的对象时，返回 `SCOPE_VIOLATION`，reason 使用非泄露表述，例如 `not visible or not found`。Public/token-scoped output 不得泄露对象是否存在于 caller visibility 之外。Root/admin caller 使用精确的 `*_NOT_FOUND` 或 scope error。
 
@@ -300,6 +300,7 @@ Command error matrix：
 | `auth init` | `HOME_EXISTS` exit `2`；`STORAGE_ERROR` exit `5` |
 | `auth root regenerate` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
+| `feedback` | ALab home 未初始化时 `CONTEXT_NOT_FOUND` exit `2`；invalid inputs `CONFIG_INVALID` exit `2`；storage failures `STORAGE_ERROR` exit `5` |
 | `key create|list|revoke` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND`、`CREDENTIAL_NOT_FOUND` 或 `CONFIG_INVALID` exit `2` |
 | `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT`、`SCOPE_VIOLATION` exit `4`；`AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；invalid path `CONFIG_INVALID` exit `2` |
 | `project list|show|status` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT` exit `4` |
@@ -357,15 +358,15 @@ Capability surface terms：
 
 Default context surfaces：
 
-- Global 且无 explicit key：显示 `help`、`auth init`、config diagnostics/repair，以及不要求 project record 的 context diagnostics commands。要求 project 的 command 只有在提供 explicit target 且不与当前 path 冲突时才可能 available。
+- Global 且无 explicit key：显示 `help`、`auth init`、`feedback`、config diagnostics/repair，以及不要求 project record 的 context diagnostics commands。要求 project 的 command 只有在提供 explicit target 且不与当前 path 冲突时才可能 available。
 - Global 且带 explicit project admin key：显示匹配 project 的 admin surface，以及可通过显式传入该 project id 运行的 commands。
 - Global 且带 explicit root key：额外显示 root-level project creation、project listing、key management、catalog、cache、backup 和 audit commands。
-- Project context 且无 explicit key：显示 public safe `status`；当 project policy 允许 public experiment creation 时，显示 public `exp create` 和 source bootstrap。隐藏 project management、source management、config、validation、audit、cache、catalog、backup、key 和 lifecycle maintenance commands。
+- Project context 且无 explicit key：显示 global public commands 和 public safe `status`；当 project policy 允许 public experiment creation 时，显示 public `exp create` 和 source bootstrap。隐藏 project management、source management、config、validation、audit、cache、catalog、backup、key 和 lifecycle maintenance commands。
 - Project context 且带 explicit project admin key：显示同 project 的 project/source/config/validate/observe/experiment management commands，但不显示 root-only commands。
 - Project context 且带 explicit root key：显示 project admin capabilities 以及 scope 内的 root-only commands。
-- Experiment context 且使用 worktree token：显示 `status`、`run`、`submit`、visible observe commands、own-experiment tag commands、authorized annotations，以及 own-experiment run/artifact/visible-log archive 或 unarchive commands。隐藏 project/source/config/project init、experiment remove、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
+- Experiment context 且使用 worktree token：显示 global public commands、`status`、`run`、`submit`、visible observe commands、own-experiment tag commands、authorized annotations，以及 own-experiment run/artifact/visible-log archive 或 unarchive commands。隐藏 project/source/config/project init、experiment remove、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
 - Experiment context 且带 explicit project admin 或 root key：解锁匹配的 same-project admin 或 root surface，同时保留对不同 explicit project 的既有 context-conflict rules。
-- Inspection context 且使用 inspection token：显示 `status`、visible observe commands、artifact/log export，以及移除自己的 inspection checkout。隐藏 run、submit、tag mutation、annotation mutation、project/source/config management、experiment mutation、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
+- Inspection context 且使用 inspection token：显示 global public commands、`status`、visible observe commands、artifact/log export，以及移除自己的 inspection checkout。隐藏 run、submit、tag mutation、annotation mutation、project/source/config management、experiment mutation、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
 - Inspection context 且带 explicit project admin 或 root key：解锁匹配的 same-project admin 或 root surface；没有 explicit key 时仍保持 inspection-token read-only 行为。
 
 ## 6. Command Group 和 Alias
@@ -375,6 +376,7 @@ Canonical groups：
 - `help`
 - `auth`
 - `config`
+- `feedback`
 - `key`
 - `context`
 - `project`
@@ -428,6 +430,7 @@ Primary object types：
 | help output 的 repeated command rows | `help_command` |
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
+| `feedback` | `feedback` |
 | `config validate` 的 repeated capability rows | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
@@ -485,6 +488,22 @@ Lifecycle command rules：
 - `--all` rule：额外渲染 locked `help_command` objects，字段包含 `available: false`、安全的 `locked reason` 和安全的 `unlock hint`。
 - `--explain` rule：包含 `capability source` 和任何安全 explanatory `summary`；没有 `--explain` 时，`capability source` 可以渲染为 `none`。
 - Exit：成功 `0`；invalid help options/selectors 或 invalid global config `2`；storage failure `5`。
+
+`alab feedback --body <text>|--body-file <path> [--kind suggestion|question|bug|other] [--title <text>]`
+
+- Context：任意已初始化 ALab home。
+- Credential：None、context token 或 explicit root/admin/token key。
+- Required args：必须且只能提供一个 body input。
+- Options：`--body`、`--body-file`、`--kind`、`--title`。
+- Defaults：`--kind suggestion`。
+- Conflicts：`--body` 与 `--body-file` 冲突。
+- Body rule：feedback body 必须是非空 UTF-8 text，编码后不超过 65536 bytes。
+- Title rule：提供 title 时，必须是非空 UTF-8 text，编码后不超过 120 bytes。
+- Storage rule：每条 feedback 在 `ALAB_HOME/feedback/` 下创建一个目录，包含 `metadata.json` 和 `body.md`；ALab 不会为了 feedback 创建未初始化 home。
+- Global config rule：home database 已初始化后，invalid 或 missing global config 不会阻止 feedback。
+- Metadata rule：缺失的 role、session、context、actor 或 Git information 存为 JSON `null`。
+- Success fields：`feedback id`、`kind`、`title`、`created at`、`role`、`session id`、`commit`、`path`、`metadata path`、`body path`。
+- Exit：成功 `0`；missing home 或 invalid input `2`；storage failure `5`。
 
 `alab auth init`
 

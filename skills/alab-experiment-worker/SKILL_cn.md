@@ -37,6 +37,7 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 这是一份能力指南，不是固定步骤。根据任务需要使用下列能力：
 
 - 用 `alab status` 和 `alab help` 检查当前 context。
+- 发现 ALab/tooling suggestion、question 或 bug，且不应混入 experiment submission feedback 时，用 `alab feedback` 留 HOME-level feedback。
 - 读取 worktree 中已有的任务文件和项目说明。
 - 用 `alab observe experiments ...` 以及相关的可见 runs、artifacts、logs、annotations 查看历史 experiments。可以用这些证据寻找有希望的方案、避免重复失败，并理解 prior best 或 final commits。可见性仍由 ALab 强制执行；不要尝试访问 hidden 或 unavailable records。
 - 当某个可见历史 experiment 看起来相关时，用 `alab exp checkout <exp_id> --path <dir> --commit best|final|latest` 创建 inspection checkout，记录输出中的 inspection commit，阅读其源码，并先与当前 worktree 对比后再决定是否复制。需要时使用常规 Git 对比工具，例如 `git diff --stat <inspection_commit>..HEAD`、`git diff <inspection_commit> -- <path>`，或用 `git diff --no-index <inspection_checkout>/<source_path> <current_worktree>/<source_path>` 直接比较文件/子目录。只有在确实有帮助时，才把任务相关的 source files 或 snippets 复制到当前 experiment worktree；绝不复制 `.alab/`、raw token、hidden assets、secret files、ALab home/cache files 或 project control files。

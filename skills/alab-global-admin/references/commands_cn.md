@@ -18,6 +18,7 @@ Global admin 可以使用：
 alab auth init
 alab auth root regenerate
 alab config show|set|reset|validate
+alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab key create --project <project_id> --role admin
 alab key list --root
 alab key list --project <project_id>
@@ -53,6 +54,9 @@ alab audit list|show ...
 - **`config validate`**：校验 home config，并可刷新 runtime capability checks。
   关键参数：可选 `--refresh-capabilities`。
   注意点：Docker/runner-sensitive work 前或环境变化后使用。
+- **`feedback`**：为 ALab operation、docs、environment issues 或 bugs 留 HOME-level feedback。
+  关键参数：`--body <text>` 或 `--body-file <path>` 二选一；可选 `--kind suggestion|question|bug|other` 和 `--title <text>`。
+  注意点：Feedback 是 `ALAB_HOME/feedback/` 下的 plaintext，不创建 SQLite audit rows。
 - **`key create`**：为 controller 创建 project admin key。
   关键参数：必需 `--project <project_id>`；可选 `--role admin`。
   注意点：Root-only；raw admin key 只打印一次。

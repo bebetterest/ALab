@@ -17,6 +17,7 @@ Project controllers may use same-project admin commands:
 ```text
 alab project show|archive|unarchive ...
 alab status --project <project_id>
+alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab project config show|export|import|set ...
 alab project env set|unset|list ...
 alab project secret set|unset|list|gc ...
@@ -44,6 +45,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`status`**: Get a safe current-state summary.
   Parameters: Optional `--project <project_id>`.
   Notes: Useful before creating workers or when a context marker is ambiguous.
+- **`feedback`**: Leave HOME-level local feedback about ALab behavior, runner issues, docs gaps, or project-operation questions.
+  Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
+  Notes: Use annotations for project-visible experiment notes; use feedback for local ALab/tooling feedback that should be stored under `ALAB_HOME/feedback/`.
 - **`project config show`**: Inspect retained config metadata.
   Parameters: Optional `--project`; `--version latest-attempted|active-valid|<n>`.
   Notes: Shows runner/reward/artifact/env/secret fingerprints without raw secret values.

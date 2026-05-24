@@ -30,6 +30,7 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
 This is a capability guide, not a required sequence. Use the capabilities that fit the project objective:
 
 - Inspect project state with `alab project show`, `alab project config show`, `alab status`, and project-scoped audit or observe commands.
+- Use `alab feedback` for ALab/tooling suggestions, questions, or bug reports that should be stored with the local home rather than inside project annotations.
 - Create new experiments from the project default source, explicit sources, or visible predecessor experiments when continuation is useful.
 - Coordinate experiment lineage by recording experiment ids, worktree paths, source refs, tags, from-experiment choices, and selected commits such as `best`, `final`, or `latest`.
 - Launch worker agents in experiment worktrees without project admin or root credentials. Provide task instructions and non-secret helper variables only; let workers use their worktree tokens for `alab run` and `alab submit`, keep writable side directories as narrow as possible, and describe added directories as CLI state rather than editable source.

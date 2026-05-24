@@ -16,7 +16,7 @@ Chinese synchronized documents use the same names with `_cn.md`.
 
 ## 2. Product Definition
 
-ALab is a local, agent-first Python CLI workbench for iterative experiments. External agents work inside ALab-created Git worktrees. They use `alab` to create attempts, commit iterations, run evaluations, submit final results, inspect visible prior work, export artifacts, and write annotations.
+ALab is a local, agent-first Python CLI workbench for iterative experiments. External agents work inside ALab-created Git worktrees. They use `alab` to create attempts, commit iterations, run evaluations, submit final results, inspect visible prior work, export artifacts, write annotations, and leave HOME-level feedback for local suggestions, questions, or bug reports.
 
 ALab owns project structure and local records. It does not launch agents, schedule agents, choose prompts, run search loops, host a service, or synchronize data across machines in V1.
 
@@ -124,10 +124,14 @@ Canonical filesystem layout:
 ├── cache/
 │   ├── docker-images/
 │   └── skydiscover-python-envs/
+├── feedback/
+│   └── <feedback_record>/
+│       ├── metadata.json
+│       └── body.md
 └── tmp/
 ```
 
-There is no `records/` directory in V1. SQLite is authoritative for structured records. Logs and artifact bytes are file-backed and referenced from SQLite.
+There is no `records/` directory in V1. SQLite is authoritative for structured records. Logs and artifact bytes are file-backed and referenced from SQLite. Agent feedback entries are HOME-level plaintext files under `feedback/`.
 
 `auth init` generates a stable `home_id`, stores it in SQLite, and writes it into every `.alab/context.json` marker. Context repair must verify `home_id` before accepting a marker.
 

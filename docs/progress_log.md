@@ -7809,3 +7809,21 @@ Validation:
 - Full default suite: `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py examples/templates`
 - `git diff --check`
+
+## 2026-05-24 HOME Feedback Command
+
+Implemented:
+
+- Added top-level `alab feedback --body <text>|--body-file <path> [--kind suggestion|question|bug|other] [--title <text>]` as a submit-only initialized-HOME command available without key or token validation.
+- Added canonical `ALAB_HOME/feedback/` storage with one atomic plaintext record directory per feedback item, containing `metadata.json` and `body.md`.
+- Captured feedback metadata for role, actor/context/session, cwd, best-effort Git commit/dirty state, ALab home, and body path, using JSON `null` for missing values.
+- Kept feedback available for initialized homes even when global config is invalid, matching the command's HOME-only precondition.
+- Updated README, blueprint, CLI/storage specs, `.env.example`, role skills, progress, and completion-audit documents with synchronized Chinese versions.
+- Added CLI contract tests for command registry/docs sync, role/context availability, no-token-file experiment context behavior, no-HOME behavior, metadata/body persistence, session priority, Git/non-Git metadata, body-file handling, and invalid input side-effect prevention.
+
+Validation:
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py tests/test_smoke.py -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check src tests`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `git diff --check`

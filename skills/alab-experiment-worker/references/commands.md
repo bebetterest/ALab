@@ -11,6 +11,7 @@ Use these commands from inside an active experiment worktree:
 ```text
 alab status
 alab help
+alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab run --message "<message>"
 alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
 alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]
@@ -42,6 +43,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`alab help`**: Inspect the commands available to the current worktree token.
   Parameters: `--all --explain` may show locked commands and safe reasons.
   Use the output for: Avoid trying admin/root commands and identify available observe or annotation commands.
+- **`alab feedback`**: Leave a HOME-level local note for tooling suggestions, questions, bugs, or other agent observations.
+  Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
+  Use the output for: The stored feedback id and file paths under `ALAB_HOME/feedback/`. Use this for ALab/tooling feedback, not for experiment submission summaries.
 - **`alab run`**: Evaluate the current candidate and save run evidence.
   Parameters: Required `--message <text>`; keep it short and specific.
   Use the output for: Run id, status, reward, parse status, warnings, previews, artifact count, and next action.

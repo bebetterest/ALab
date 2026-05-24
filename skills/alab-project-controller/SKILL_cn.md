@@ -30,6 +30,7 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY \
 这是一份能力指南，不是固定步骤。根据 project objective 使用合适能力：
 
 - 用 `alab project show`、`alab project config show`、`alab status` 以及 project-scoped audit/observe commands 检查 project state。
+- 对于 ALab/tooling suggestion、question 或 bug report，使用 `alab feedback` 存到 local home，而不是混入 project annotations。
 - 在 default source、explicit sources 或可见 predecessor experiments 基础上创建新 experiments；需要延续时再使用 from-experiment。
 - 记录 experiment ids、worktree paths、source refs、tags、from-experiment choices，以及 `best`、`final`、`latest` 等 selected commits，保持 experiment lineage 清楚。
 - 在 experiment worktrees 中启动 worker agents，但不传递 project admin 或 root credentials。只提供任务说明和非 secret helper variables；让 worker 使用自己的 worktree token 执行 `alab run` 和 `alab submit`，尽量收窄 writable side directories，并说明额外目录是 CLI state 而不是 editable source。

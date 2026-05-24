@@ -12,16 +12,16 @@
 
 Blueprint 和 subsystem specs 仍是规范性产品契约。
 
-## 当前位置 - 2026-05-23
+## 当前位置 - 2026-05-24
 
-ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
+ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、HOME-level agent feedback capture、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
-当前 active focus 的短摘要：当前 worktree 没有开放的 implementation 或 evidence queue。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
+当前 active focus 的短摘要：2026-05-24 HOME feedback command batch 已经落地，是当前 worktree 的最新 changed edge。它新增了面向所有 initialized-home roles 的顶层 `alab feedback` 提交命令，并把每条 plaintext feedback record 存入 `ALAB_HOME/feedback/`。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
 
 当前 worktree 的 default/local runnable V1 implementation 已完成 closeout。剩余工作是条件性维护，不是当前 completion blocker：
 
 - `docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- 当前 worktree 的 latest full default-suite closeout gate 在 2026-05-23 TSP template usability polish 批次后已经保持 current。
+- 当前 worktree 的 latest full default-suite closeout gate 在 2026-05-24 HOME feedback command batch 后已经保持 current。
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
 - 最终 README/spec/local-notes/progress/audit consistency pass 在 TSP template usability polish 批次后已有当前 focused evidence；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后需要重跑。
 

@@ -525,6 +525,7 @@ _SYNCED_SUCCESS_FIELD_COMMANDS = (
     "config show",
     "config set",
     "config reset",
+    "feedback",
     "key create",
     "key list --root",
     "key list --project",
@@ -990,6 +991,16 @@ def _output_field_map(output: str) -> dict[str, str]:
         label, _separator, value = line.partition(": ")
         fields[label] = value
     return fields
+
+
+def _feedback_record(output: str) -> tuple[dict[str, str], Path, dict[str, object]]:
+    fields = _output_field_map(output)
+    record_path = Path(fields["path"])
+    metadata_path = Path(fields["metadata path"])
+    body_path = Path(fields["body path"])
+    assert metadata_path == record_path / "metadata.json"
+    assert body_path == record_path / "body.md"
+    return fields, record_path, json.loads(metadata_path.read_text(encoding="utf-8"))
 
 
 def _assert_entropy_id(value: str, prefix: str) -> None:
@@ -3185,6 +3196,8 @@ def _typed_value_invalid_invocation(
         args = [exp_marker["exp_id"] if item == "unexpected-selector-one" else item for item in args]
         if "--path" not in args:
             args.extend(["--path", str(extra_worktree_path)])
+    if spec.path == ("feedback",) and option == "--kind":
+        args.extend(["--body", "typed value feedback"])
     return _prepare_invalid_value_args(args, option, value, spec=spec), cwd
 
 
@@ -5323,6 +5336,7 @@ def test_alab_home_layout_and_markers_follow_blueprint(tmp_path: Path, monkeypat
         assert (home / "sources" / "skydiscover").is_dir()
         assert (home / "cache" / "docker-images").is_dir()
         assert (home / "cache" / "skydiscover-python-envs").is_dir()
+        assert (home / "feedback").is_dir()
         assert (home / "tmp").is_dir()
         assert not (home / "records").exists()
         with sqlite3.connect(home / "alab.db") as conn:
@@ -5403,6 +5417,356 @@ def test_alab_home_layout_and_markers_follow_blueprint(tmp_path: Path, monkeypat
     assert exp_marker["project_id"] == project_id
     assert exp_marker["exp_id"] == exp_id
     assert not (explicit_home / f"{project_id}_{exp_id}").exists()
+
+
+def test_feedback_submission_writes_file_record_with_session_and_git_metadata(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    home = tmp_path / "home"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(["init"], repo)
+    _git(["config", "user.name", "ALab Contract"], repo)
+    _git(["config", "user.email", "alab-contract@example.test"], repo)
+    _git(["config", "commit.gpgsign", "false"], repo)
+    (repo / "tracked.txt").write_text("one\n", encoding="utf-8")
+    _git(["add", "tracked.txt"], repo)
+    _git(["commit", "-m", "initial"], repo)
+    commit = _git(["rev-parse", "HEAD"], repo)
+    (repo / "tracked.txt").write_text("two\n", encoding="utf-8")
+
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    capsys.readouterr()
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("ALAB_SESSION_ID", "alab-session")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread")
+
+    assert (
+        cli.run(
+            [
+                "--home",
+                str(home),
+                "feedback",
+                "--kind",
+                "bug",
+                "--title",
+                "Bug report",
+                "--body",
+                "body text",
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    fields, record_path, metadata = _feedback_record(captured.out)
+
+    assert captured.err == ""
+    assert _output_field_labels(captured.out) == [
+        "object",
+        "feedback id",
+        "kind",
+        "title",
+        "created at",
+        "role",
+        "session id",
+        "commit",
+        "path",
+        "metadata path",
+        "body path",
+    ]
+    _assert_entropy_id(fields["feedback id"], "fb-bug")
+    assert fields["kind"] == "bug"
+    assert fields["title"] == "Bug report"
+    assert fields["role"] == "none"
+    assert fields["session id"] == "alab-session"
+    assert fields["commit"] == commit
+    assert record_path.parent == home / "feedback"
+    assert (record_path / "body.md").read_text(encoding="utf-8") == "body text"
+    assert metadata == {
+        "schema_version": 1,
+        "feedback_id": fields["feedback id"],
+        "kind": "bug",
+        "title": "Bug report",
+        "created_at": fields["created at"],
+        "role": "none",
+        "actor_type": None,
+        "actor_credential_id": None,
+        "actor_project_id": None,
+        "actor_exp_id": None,
+        "token_mode": None,
+        "context_type": None,
+        "context_project_id": None,
+        "context_exp_id": None,
+        "context_token_id": None,
+        "cwd": str(repo),
+        "session_id": "alab-session",
+        "session_source": "ALAB_SESSION_ID",
+        "git_commit": commit,
+        "git_dirty": True,
+        "git_commit_source": "cwd",
+        "alab_home": str(home.resolve()),
+        "body_path": str(record_path / "body.md"),
+    }
+
+
+def test_feedback_body_file_non_git_and_missing_session_are_recorded_as_null(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    home = tmp_path / "home"
+    non_git = tmp_path / "non-git"
+    non_git.mkdir()
+    body_path = non_git / "feedback.md"
+    body_path.write_text("file body\n", encoding="utf-8")
+    for key in services.FEEDBACK_SESSION_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    capsys.readouterr()
+    monkeypatch.chdir(non_git)
+
+    assert cli.run(["--home", str(home), "feedback", "--body-file", "feedback.md"]) == 0
+    captured = capsys.readouterr()
+    fields, record_path, metadata = _feedback_record(captured.out)
+
+    assert captured.err == ""
+    assert fields["kind"] == "suggestion"
+    assert fields["title"] == "none"
+    assert fields["session id"] == "none"
+    assert fields["commit"] == "none"
+    assert (record_path / "body.md").read_text(encoding="utf-8") == "file body\n"
+    assert metadata["session_id"] is None
+    assert metadata["session_source"] is None
+    assert metadata["git_commit"] is None
+    assert metadata["git_dirty"] is None
+    assert metadata["git_commit_source"] is None
+    assert metadata["cwd"] == str(non_git)
+
+
+def test_feedback_only_requires_initialized_home_not_valid_global_config(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    home = tmp_path / "home"
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    capsys.readouterr()
+    (home / "config.toml").write_text("schema_version = 'not-an-int'\n", encoding="utf-8")
+    monkeypatch.chdir(cwd)
+
+    assert cli.run(["--home", str(home), "feedback", "--body", "config is broken"]) == 0
+    captured = capsys.readouterr()
+    fields, record_path, metadata = _feedback_record(captured.out)
+
+    assert captured.err == ""
+    assert fields["feedback id"] == metadata["feedback_id"]
+    assert metadata["role"] == "none"
+    assert metadata["cwd"] == str(cwd)
+    assert (record_path / "body.md").read_text(encoding="utf-8") == "config is broken"
+
+
+def test_feedback_experiment_context_does_not_require_token_file(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    home, _root_key, project_id, _admin_key = _init_capability_project(tmp_path, capsys)
+    project_path = home / "project-workspaces" / project_id
+    monkeypatch.chdir(project_path)
+    assert cli.run(["--home", str(home), "exp", "create", "--name", "tokenless feedback"]) == 0
+    exp_fields = _output_field_map(capsys.readouterr().out)
+    exp_id = exp_fields["exp id"]
+    worktree_path = Path(exp_fields["worktree path"])
+    (worktree_path / ".alab" / "token").unlink()
+    monkeypatch.chdir(worktree_path)
+
+    assert cli.run(["--home", str(home), "feedback", "--body", "missing token is allowed"]) == 0
+    captured = capsys.readouterr()
+    fields, record_path, metadata = _feedback_record(captured.out)
+
+    assert captured.err == ""
+    assert fields["role"] == "experiment"
+    assert metadata["context_type"] == "experiment"
+    assert metadata["context_project_id"] == project_id
+    assert metadata["context_exp_id"] == exp_id
+    assert metadata["actor_type"] is None
+    assert (record_path / "body.md").read_text(encoding="utf-8") == "missing token is allowed"
+
+
+def test_feedback_is_executable_from_all_context_roles(tmp_path: Path, monkeypatch, capsys) -> None:
+    home, root_key, project_id, admin_key = _init_capability_project(tmp_path, capsys)
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    monkeypatch.chdir(scratch)
+
+    variants: list[tuple[str, list[str], str, dict[str, object | None]]] = [
+        ("global", ["feedback", "--body", "global"], "none", {"context_type": None, "actor_type": None}),
+        ("root", ["--key", root_key, "feedback", "--body", "root"], "root", {"context_type": None, "actor_type": "root"}),
+        ("admin", ["--key", admin_key, "feedback", "--body", "admin"], "admin", {"context_type": None, "actor_type": "admin"}),
+    ]
+    project_path = home / "project-workspaces" / project_id
+    monkeypatch.chdir(project_path)
+    variants.append(("project", ["feedback", "--body", "project"], "project", {"context_type": "project", "actor_type": None}))
+
+    assert cli.run(["--home", str(home), "exp", "create", "--name", "feedback role"]) == 0
+    exp_fields = _output_field_map(capsys.readouterr().out)
+    exp_id = exp_fields["exp id"]
+    worktree_path = Path(exp_fields["worktree path"])
+    worktree_token = (worktree_path / ".alab" / "token").read_text(encoding="utf-8").rstrip("\n")
+    variants.append(
+        (
+            "token",
+            ["--key", worktree_token, "feedback", "--body", "token"],
+            "token:worktree",
+            {"context_type": None, "actor_type": "token", "actor_exp_id": exp_id, "token_mode": "worktree"},
+        )
+    )
+    monkeypatch.chdir(worktree_path)
+    variants.append(
+        (
+            "experiment",
+            ["feedback", "--body", "experiment"],
+            "experiment",
+            {"context_type": "experiment", "context_exp_id": exp_id, "actor_type": None},
+        )
+    )
+
+    inspection_path = tmp_path / "feedback-inspection"
+    assert (
+        cli.run(
+            [
+                "--home",
+                str(home),
+                "--key",
+                admin_key,
+                "exp",
+                "checkout",
+                exp_id,
+                "--project",
+                project_id,
+                "--path",
+                str(inspection_path),
+                "--commit",
+                "latest",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    monkeypatch.chdir(inspection_path)
+    variants.append(
+        (
+            "inspection",
+            ["feedback", "--body", "inspection"],
+            "inspection",
+            {"context_type": "inspection", "context_exp_id": exp_id, "actor_type": None},
+        )
+    )
+
+    failures = []
+    for variant_name, args, expected_role, expected_metadata in variants:
+        if variant_name in {"global", "root", "admin", "token"}:
+            monkeypatch.chdir(scratch)
+        elif variant_name == "project":
+            monkeypatch.chdir(project_path)
+        elif variant_name == "experiment":
+            monkeypatch.chdir(worktree_path)
+        else:
+            monkeypatch.chdir(inspection_path)
+        assert cli.run(["--home", str(home), *args]) == 0
+        captured = capsys.readouterr()
+        fields, _record_path, metadata = _feedback_record(captured.out)
+        observed = {
+            "role": fields["role"],
+            "context_type": metadata["context_type"],
+            "context_project_id": metadata["context_project_id"],
+            "context_exp_id": metadata["context_exp_id"],
+            "actor_type": metadata["actor_type"],
+            "actor_exp_id": metadata["actor_exp_id"],
+            "token_mode": metadata["token_mode"],
+        }
+        expected = {
+            "role": expected_role,
+            "context_type": expected_metadata.get("context_type"),
+            "context_project_id": project_id if expected_metadata.get("context_type") else None,
+            "context_exp_id": expected_metadata.get("context_exp_id"),
+            "actor_type": expected_metadata.get("actor_type"),
+            "actor_exp_id": expected_metadata.get("actor_exp_id"),
+            "token_mode": expected_metadata.get("token_mode"),
+        }
+        if captured.err or observed != expected:
+            failures.append(
+                {
+                    "variant": variant_name,
+                    "stdout": captured.out,
+                    "stderr": captured.err,
+                    "observed": observed,
+                    "expected": expected,
+                }
+            )
+
+    assert failures == []
+
+
+def test_feedback_invalid_inputs_are_side_effect_free(tmp_path: Path, monkeypatch, capsys) -> None:
+    uninitialized_home = tmp_path / "uninitialized-home"
+    assert cli.run(["--home", str(uninitialized_home), "feedback", "--body", "before init"]) == 2
+    uninitialized = capsys.readouterr()
+    assert uninitialized.out == ""
+    assert "error code: CONTEXT_NOT_FOUND" in uninitialized.err
+    assert not uninitialized_home.exists()
+
+    home = tmp_path / "home"
+    sandbox = tmp_path / "feedback-inputs"
+    sandbox.mkdir()
+    body_file = sandbox / "body.txt"
+    body_file.write_text("body\n", encoding="utf-8")
+    bad_utf8 = sandbox / "bad.bin"
+    bad_utf8.write_bytes(b"\xff")
+    missing_file = sandbox / "missing.txt"
+    long_body = "x" * 65537
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    capsys.readouterr()
+    monkeypatch.chdir(sandbox)
+
+    cases = [
+        (["feedback"], "feedback requires exactly one of --body or --body-file"),
+        (["feedback", "--body", "x", "--body-file", "body.txt"], "feedback requires exactly one of --body or --body-file"),
+        (["feedback", "--body", "x", "--body", "y"], "--body may be provided once"),
+        (["feedback", "--body", ""], "feedback body must be non-empty"),
+        (["feedback", "--body", long_body], "feedback body exceeds 65536 bytes"),
+        (["feedback", "--body-file", str(missing_file)], "feedback body file not found"),
+        (["feedback", "--body-file", str(sandbox)], "feedback body file is a directory"),
+        (["feedback", "--body-file", str(bad_utf8)], "feedback body file must be UTF-8"),
+        (["feedback", "--body", "x", "--kind", "invalid"], "--kind must be one of bug, other, question, suggestion"),
+        (["feedback", "--body", "x", "--title", ""], "--title requires a non-empty value"),
+        (["feedback", "--body", "x", "--unknown"], "unsupported option --unknown"),
+        (["feedback", "extra", "--body", "x"], "feedback accepts no positional arguments"),
+    ]
+    failures = []
+    for args, expected_reason in cases:
+        before = sorted(path.name for path in (home / "feedback").iterdir())
+        code = cli.run(["--home", str(home), *args])
+        captured = capsys.readouterr()
+        after = sorted(path.name for path in (home / "feedback").iterdir())
+        if code != 2 or captured.out or expected_reason not in captured.err or before != after:
+            failures.append(
+                {
+                    "args": args,
+                    "code": code,
+                    "stdout": captured.out,
+                    "stderr": captured.err,
+                    "before": before,
+                    "after": after,
+                }
+            )
+
+    assert failures == []
 
 
 def test_context_marker_conflicts_are_strict_and_side_effect_free(tmp_path: Path, monkeypatch, capsys) -> None:

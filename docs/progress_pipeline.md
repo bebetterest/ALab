@@ -12,9 +12,9 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 - Keep only the current queue and update policy here. Do not append stale backlog; rewrite or remove queue rows as evidence closes.
 - English docs are canonical. Update the synchronized `*_cn.md` file in the same change.
 
-## Current Active Batch - 2026-05-23
+## Current Active Batch - 2026-05-24
 
-- Focus: no active implementation or evidence batch remains for the current worktree.
+- Focus: the HOME feedback command batch is closed for the current worktree. `alab feedback` is now the initialized-HOME plaintext feedback submission surface for all ALab roles.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
 - Next evidence to add: none for the current worktree. Reopen work only if `docs/completion_audit.md` names a concrete defect, a changed requirement makes an existing evidence row too broad to judge, or an explicit release target differs from the currently proved real-environment gates.
 

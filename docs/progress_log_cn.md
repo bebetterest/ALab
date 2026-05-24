@@ -7803,3 +7803,21 @@
 - Full default suite：`UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check tests/test_cli_contract.py examples/templates`
 - `git diff --check`
+
+## 2026-05-24 HOME Feedback Command
+
+已实现：
+
+- 新增顶层 `alab feedback --body <text>|--body-file <path> [--kind suggestion|question|bug|other] [--title <text>]`，作为 submit-only initialized-HOME command，执行时不要求 key 或 token validation。
+- 新增 canonical `ALAB_HOME/feedback/` storage；每条 feedback 一个原子写入的 plaintext record directory，包含 `metadata.json` 和 `body.md`。
+- Feedback metadata 记录 role、actor/context/session、cwd、best-effort Git commit/dirty state、ALab home 和 body path；缺失值统一使用 JSON `null`。
+- 保持 initialized home 中 feedback 可用，即使 global config invalid，也符合该命令只要求 HOME initialized 的前置条件。
+- 更新 README、blueprint、CLI/storage specs、`.env.example`、role skills、progress 与 completion-audit documents，并同步中文版本。
+- 新增 CLI contract tests，覆盖 command registry/docs sync、role/context availability、no-token-file experiment context behavior、no-HOME behavior、metadata/body persistence、session priority、Git/non-Git metadata、body-file handling，以及 invalid input side-effect prevention。
+
+验证：
+
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest tests/test_cli_contract.py tests/test_smoke.py -q`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check src tests`
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
+- `git diff --check`

@@ -18,6 +18,7 @@ Global admins may use:
 alab auth init
 alab auth root regenerate
 alab config show|set|reset|validate
+alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab key create --project <project_id> --role admin
 alab key list --root
 alab key list --project <project_id>
@@ -53,6 +54,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`config validate`**: Validate home config and optionally refresh runtime capability checks.
   Parameters: Optional `--refresh-capabilities`.
   Notes: Use before Docker/runner-sensitive work or after environment changes.
+- **`feedback`**: Leave HOME-level feedback about ALab operation, docs, environment issues, or bugs.
+  Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
+  Notes: Feedback is plaintext under `ALAB_HOME/feedback/` and does not create SQLite audit rows.
 - **`key create`**: Create a project admin key for a controller.
   Parameters: Required `--project <project_id>`; optional `--role admin`.
   Notes: Root-only; prints raw admin key exactly once.

@@ -55,10 +55,16 @@ Canonical filesystem layout:
 ├── cache/
 │   ├── docker-images/
 │   └── skydiscover-python-envs/
+├── feedback/
+│   └── <feedback_record>/
+│       ├── metadata.json
+│       └── body.md
 └── tmp/
 ```
 
-There is no `records/` directory in V1. SQLite is authoritative for structured records. Logs and artifact bytes are plaintext files referenced by SQLite.
+There is no `records/` directory in V1. SQLite is authoritative for structured records. Logs and artifact bytes are plaintext files referenced by SQLite. Feedback entries are file-backed HOME-level notes under `feedback/` and are not SQLite rows.
+
+Each feedback entry is stored as `feedback/<YYYYMMDDTHHMMSSZ>_<feedback_id>/metadata.json` plus `body.md`. `metadata.json` uses schema version `1` and the fixed key set `schema_version`, `feedback_id`, `kind`, `title`, `created_at`, `role`, `actor_type`, `actor_credential_id`, `actor_project_id`, `actor_exp_id`, `token_mode`, `context_type`, `context_project_id`, `context_exp_id`, `context_token_id`, `cwd`, `session_id`, `session_source`, `git_commit`, `git_dirty`, `git_commit_source`, `alab_home`, and `body_path`. Missing role/session/context/actor/Git values are JSON `null`.
 
 Project workspace directories under `project-workspaces/` are marker-only control directories for project-scoped CLI context. They are not source checkouts and must not be used as editable experiment worktrees. Experiment worktrees are registered external paths. The default experiment worktree path is `./<project_id>_<exp_id>` relative to the command cwd when `exp create` omits `--path`. That cwd may be a project control context, but it is not required to be one; any cwd that passes path registration and nesting checks is valid.
 
@@ -92,7 +98,7 @@ Rules:
 - SQLite foreign keys use restrict-style behavior for authoritative records that are not retained after parent removal. Implementation should use real foreign keys for authoritative parent-child relationships whose parents cannot be hard-removed while retained children still reference them. Application code performs explicit dependency checks, writes audit rows, and then deletes rows in a controlled order for hard remove flows.
 - Retained diagnostic and audit tables store denormalized object ids where needed and must not require foreign keys to rows that hard remove can delete. This includes `audit_events`, retained revoked `credentials`, removed `path_registry` rows, and cache/catalog metadata kept only for cleanup or audit.
 
-Plaintext data may include project names, tasks, config summaries, experiment names, tags, summaries, feedback, annotations, logs, reward values, metrics, artifact metadata and bytes, local paths, source refs, branch names, commit hashes, content hashes, and `secret_env` values.
+Plaintext data may include project names, tasks, config summaries, experiment names, tags, summaries, submissions, feedback entries, annotations, logs, reward values, metrics, artifact metadata and bytes, local paths, source refs, branch names, commit hashes, content hashes, session identifiers, and `secret_env` values.
 
 ## 3. DDL-Level Schema Contract
 

@@ -11,6 +11,7 @@ ALab V1 is intentionally local-only: no server, sync service, web UI, built-in a
 ## Highlights
 
 - Local CLI workbench for projects, sources, experiments, runs, submissions, logs, artifacts, annotations, and audits.
+- HOME-level feedback capture so any ALab role can leave local suggestions, questions, or bug reports without needing project credentials.
 - Context-aware command surface: `alab help` and command preflight show only what the current project, experiment, inspection checkout, token, or explicit key can use.
 - Git-backed experiment isolation: each experiment is an isolated branch/worktree with a worktree token for run and submit operations.
 - Reproducible project setup: project config controls runner, reward, artifact capture, environment, secrets, mutable paths, and visibility.
@@ -179,6 +180,7 @@ Useful next commands:
 
 ```sh
 alab help
+alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
 alab observe experiments list
 alab observe runs list --exp <exp-id>
 alab observe experiments best
@@ -192,6 +194,7 @@ alab observe experiments best
 - **Experiment**: isolated Git branch/worktree bound to exactly one source and one config version.
 - **Run**: one evaluator execution for an experiment commit, with status, reward, logs, artifacts, and warning codes.
 - **Submit**: closes an experiment with final summary, feedback, final run, final commit, and explicit refs.
+- **Feedback**: HOME-level plaintext notes for suggestions, questions, bugs, or other agent observations, stored as one directory per entry under `feedback/`.
 - **Inspection checkout**: read-only checkout for observing/exporting scoped experiment evidence without becoming submit-capable.
 
 ## Configuration

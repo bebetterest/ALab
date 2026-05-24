@@ -48,6 +48,7 @@ GLOBAL_PUBLIC: set[PathTuple] = {
     ("config", "validate"),
     ("context", "show"),
     ("context", "repair"),
+    ("feedback",),
 }
 
 GLOBAL_CONFIG_REPAIR: set[PathTuple] = {
@@ -56,6 +57,7 @@ GLOBAL_CONFIG_REPAIR: set[PathTuple] = {
     ("config", "set"),
     ("config", "reset"),
     ("config", "validate"),
+    ("feedback",),
 }
 
 PUBLIC_PROJECT: set[PathTuple] = {
