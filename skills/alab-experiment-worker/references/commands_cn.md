@@ -127,7 +127,20 @@ alab observe annotations list --target-type experiment --target-id <exp_id>
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
 ```
 
-用 `best` 做 reward-led exploration，用 `final` 查看已提交 candidate，用 `latest` 查看当前 branch tip。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，应在 final `--ref <exp_id>` 和 feedback 中保留引用。绝不复制 `.alab/`、token files、ALab home/cache files、hidden evaluator assets、secret files 或 project control files。
+用 `best` 做 reward-led exploration，用 `final` 查看已提交 candidate，用 `latest` 查看当前 branch tip。记录 `exp checkout` 输出中的 `inspection commit`，然后可以在当前 worktree 中用常规 Git 命令比较：
+
+```text
+git diff --stat <inspection_commit>..HEAD
+git diff <inspection_commit> -- <path>
+```
+
+如果要直接和 inspection checkout path 下的文件或子目录比较，只对任务相关 source paths 使用 `git diff --no-index`：
+
+```text
+git diff --no-index /tmp/alab-inspect-<exp_id>/<source_path> <current_worktree>/<source_path>
+```
+
+`git diff --no-index` 在发现差异时会返回 exit code `1`；这代表有可用的对比输出，不应视作 ALab failure。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，应在 final `--ref <exp_id>` 和 feedback 中保留引用。绝不复制 `.alab/`、token files、ALab home/cache files、hidden evaluator assets、secret files 或 project control files。
 
 Inspection checkouts 是比较 surface，不是 editable source surface。不要把它们的路径写入 commits 或 final artifacts。如果需要清理，应把 path 报告给 controller；只有在该 checkout context 的 `alab help` 明确显示 inspection token 可用 self-removal command 时才自行清理。
 

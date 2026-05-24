@@ -127,7 +127,20 @@ When a visible experiment looks potentially useful, inspect its code directly in
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
 ```
 
-Use `best` for reward-led exploration, `final` to inspect a submitted candidate, and `latest` when the current branch tip is what matters. Read and compare the checkout before copying anything. Copy only source content that advances the current task, adapt it to the current worktree, and keep the copied influence visible in the final `--ref <exp_id>` and feedback. Never copy `.alab/`, token files, ALab home/cache files, hidden evaluator assets, secret files, or project control files.
+Use `best` for reward-led exploration, `final` to inspect a submitted candidate, and `latest` when the current branch tip is what matters. Record the `inspection commit` rendered by `exp checkout`; use it for normal Git comparisons from the current worktree:
+
+```text
+git diff --stat <inspection_commit>..HEAD
+git diff <inspection_commit> -- <path>
+```
+
+For direct file or subtree comparisons against the inspection checkout path, use `git diff --no-index` on task source paths only:
+
+```text
+git diff --no-index /tmp/alab-inspect-<exp_id>/<source_path> <current_worktree>/<source_path>
+```
+
+`git diff --no-index` returns exit code `1` when differences exist; treat that as useful comparison output, not as an ALab failure. Read and compare the checkout before copying anything. Copy only source content that advances the current task, adapt it to the current worktree, and keep the copied influence visible in the final `--ref <exp_id>` and feedback. Never copy `.alab/`, token files, ALab home/cache files, hidden evaluator assets, secret files, or project control files.
 
 Inspection checkouts are comparison surfaces, not editable source surfaces. Keep their paths out of commits and final artifacts. If cleanup is needed, report the path to a controller unless `alab help` in the checkout context explicitly shows a self-removal command available to that inspection token.
 
