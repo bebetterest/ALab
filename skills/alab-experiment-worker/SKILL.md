@@ -19,8 +19,18 @@ This skill is not a project manager or global administrator. It must not use pro
 - Edit only task-relevant source files inside the experiment worktree.
 - Keep source editing and CLI state separate. The experiment worktree is the only editable source surface; any added ALab home, uv cache, pycache, or shared directory is for `alab run`/`submit` state only and must not be inspected, patched, copied, or committed.
 - Keep changes reviewable: prefer focused iterations, deterministic checks, and concise run messages.
+- If the launcher provides `ALAB_CMD_PREFIX`, use that launcher-provided command prefix for ALab calls; otherwise use `alab`.
+- Check `git status --short` before important runs or submit when Git is available, and keep generated/untracked files intentional.
 - Use `alab help` before unfamiliar commands; commands outside the worktree token surface must be treated as unavailable.
 - If ALab returns `COMMAND_UNAVAILABLE`, stop that branch and report the missing capability instead of trying to bypass it.
+
+## Working Flow
+
+Do not treat this as a fixed checklist. First understand the current worktree task, local instructions, existing candidate, and ALab context. When useful, inspect visible prior experiments, runs, artifacts, logs, annotations, or inspection checkouts for reference and inspiration.
+
+Iterate on the candidate with focused edits and cheap local checks. When the candidate is ready for evaluation, run `alab run --message "<brief reason>"`. Use visible evidence from stdout/stderr previews, warning codes, artifacts, logs, metrics, annotations, and prior runs to diagnose weak or failed results, then keep improving while there is a plausible path forward.
+
+When the mission is complete, or no useful optimization path remains, submit only if a passed run supports the final candidate. If there is no supporting passed run, do not submit; report the best available evidence and the reason further progress or submission is blocked.
 
 ## Capabilities
 
@@ -31,6 +41,7 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Inspect visible historical experiments with `alab observe experiments ...` and related visible runs, artifacts, logs, and annotations. Use this evidence to find promising approaches, avoid repeated failures, and understand prior best or final commits. Visibility is still enforced by ALab; do not try to access hidden or unavailable records.
 - When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, read its source code, and compare it with the current worktree. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, secret files, ALab home/cache files, or project control files.
 - Change task-relevant source files in the worktree and keep the implementation understandable for later workers.
+- Add or list tags on the current experiment when tags are useful evidence for later controllers or workers; tags do not grant visibility.
 - Keep runner outputs machine-parseable. If the task writes a reward file, put only the configured numeric metrics in that reward file; put case details, traces, or explanations in separate visible artifacts/logs when allowed.
 - Run local cheap checks when they exist, then run `alab run --message "<brief reason>"`.
 - Diagnose failed or weak runs using visible stdout/stderr previews, warning codes, artifacts, logs, metrics, and annotations.
@@ -39,8 +50,9 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 ## Submit Guidance
 
 - Submit only after a passed run for the current candidate, unless the user or controller explicitly asks for a non-passed closeout.
-- Use `--ref none` only when the result does not depend on or intentionally reference prior experiments.
-- If the work was inspired by, derived from, compared against, or intentionally continues visible historical experiments, pass each relevant experiment id as repeated `--ref <exp_id>`.
+- Treat submit refs as provenance links for later review and optimization, not as decoration.
+- Actively add `--ref <exp_id>` for visible experiments that informed the strategy, code, comparison baseline, failure avoidance, or continuation path.
+- Use `--ref none` only when the result does not depend on or intentionally reference any prior experiment.
 - Do not invent refs, cite inaccessible experiment ids, or cite a visible experiment only because it exists.
 - Keep `--message` short. Put the substantive record in `--summary`/`--summary-file` and `--feedback`/`--feedback-file`: what changed, which passed run supports it, key metrics, which refs mattered, and remaining risks.
 - If no submit is performed, clearly state the blocking reason and the best run evidence available.

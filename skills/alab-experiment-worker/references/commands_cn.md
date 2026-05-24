@@ -1,5 +1,9 @@
 # ALab Experiment Worker Commands
 
+## 调用前缀
+
+下面的示例使用 `alab`。如果 launcher 提供 `ALAB_CMD_PREFIX`，ALab 调用应按 launcher 指示使用该 prefix，例如 `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`。不要打印、检查或改写 launcher 提供的 credential material。
+
 ## 允许的 Surface
 
 在 active experiment worktree 内使用这些 commands：
@@ -10,6 +14,7 @@ alab help
 alab run --message "<message>"
 alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
 alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]
+alab exp tag add|remove|list <exp_id> ...
 alab observe experiments list|search|show|best ...
 alab observe runs list|show ...
 alab observe artifacts list|show|export ...
@@ -23,6 +28,7 @@ Worker lifecycle 权限有意保持很窄：
 - `run` 和 `submit` 需要当前 experiment 的 valid worktree token。
 - Observe commands 只显示当前 token 可见的 records。
 - `exp checkout` 只能为当前 token 可见的 experiments 创建 inspection checkout。
+- Experiment tags 只是 metadata；它们绝不会扩展 visibility。
 - Hidden logs 需要 root/admin，不属于本 skill。
 - Worker annotation mutation 只限于 visible targets 和由该 worker token 创建的 annotations。
 
@@ -45,7 +51,10 @@ Worker lifecycle 权限有意保持很窄：
   输出用途：获取 final run id、final commit、stored summary/feedback、experiment status 和 submitted refs。
 - **`alab exp checkout`**：在选定 commit 上为一个可见历史 experiment 创建 inspection checkout。
   关键参数：必需 `<exp_id>` 和 `--path <dir>`；可选 `--commit final|latest|best|<sha>`。使用当前 worktree 和其他 ALab contexts 之外的空路径。
-  输出用途：得到一个用于只读比较的 workspace，其中包含可见 prior experiment 的源码。阅读代码以寻找实现思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。
+  输出用途：得到一个用于只读比较的 workspace，其中包含可见 prior experiment 的源码。阅读代码以寻找实现思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。记录自己创建的 inspection path，方便 controller 后续清理；不要在 inspection checkouts 内编辑。
+- **`alab exp tag add|remove|list`**：为当前 experiment 添加或查看 metadata tags。
+  关键参数：`add`/`remove` 需要 `<exp_id> <tag>`；`list` 需要 `<exp_id>`。
+  输出用途：当 controller 预期 tags 时，标记有用的 worker-local evidence，例如 `promising`、`needs-review` 或任务相关标签。Tags 不是 authorization，也不能替代 submit refs。
 - **`observe experiments list`**：查看 project 中当前 token 可见的 experiments。
   关键参数：Filters 包括 `--status`、重复 `--tag`、`--source-id`、`--name-query`、reward bounds、config version、timestamps 和 `--include-archived`；pagination 使用 `--limit`/`--offset`；sorting 使用 `--sort <field>:<asc|desc>`。
   输出用途：查找 prior attempts、similar tags、source lineage、closed experiments 和可能的 refs。
@@ -66,16 +75,33 @@ Worker lifecycle 权限有意保持很窄：
   输出用途：读取 reward、parse status、warning codes、stdout/stderr previews、artifact count、hidden-log availability 和 timestamps。
 - **`observe artifacts list/show/export`**：查看或导出可见 captured artifacts。
   关键参数：List filters 包括 `--exp`、`--run`、`--validation`、`--root workspace|run`、`--status`、`--path-query`、`--content-hash`、size bounds、timestamps 和 `--include-archived`；export 需要 `<artifact_id> --out <path>`，可选 `--overwrite`/`--include-archived`。
-  输出用途：检查 outputs、generated reports 或解释 prior results 的文件。
+  输出用途：检查 outputs、generated reports 或解释 prior results 的文件。Artifact bytes 不保证已经 secret-redacted；只检查必要内容，除非明确安全且相关，不要把 raw artifact contents 粘贴到最终 feedback。
 - **`observe logs list/show/export`**：查看或导出可见 logs。
   关键参数：List filters 包括 `--exp`、`--run`、`--validation`、`--stream stdout|stderr|hidden_stdout|hidden_stderr`、`--truncated`、timestamps 和 archive flags。Worker tokens 不能使用 hidden logs。
-  输出用途：用可见 stdout/stderr content 和 previews 诊断失败。
+  输出用途：用可见 stdout/stderr content 和 previews 诊断失败。Summary 中只引用短小、相关的可见片段；worker role 下绝不请求或复述 hidden-log content。
 - **`observe annotations list/show`**：读取可见 notes 和 review comments。
   关键参数：List filters 包括 `--target-type`、`--target-id`、`--author`、`--created-by`、`--private`、`--query`、timestamps 和 `--include-archived`；show 接受 `<annotation_id>` 和可选 `--history`。
   输出用途：捕获 prior guidance、known issues，以及挂在 experiments、runs、artifacts 上的 rationale。
 - **`annotate add/edit/archive/unarchive`**：添加或维护 worker-visible notes。
   关键参数：`add` 需要 `--target <target>` 和 `--body`/`--body-file` 二选一；可选 `--author`、`--private`。`edit` 需要 `<annotation_id>` 和一个 body input。Archive/unarchive 需要 `<annotation_id>`。
-  输出用途：给后续 workers 留下有用证据，不改变 project configuration。
+  输出用途：给后续 workers 留下有用证据，不改变 project configuration。常用 targets 包括 `exp:<exp_id>`、`run:<run_id>`、`artifact:<artifact_id>`、`path:<repo_path>`、`lines:<repo_path>:<start>-<end>`、`path:<exp_id>@<commitish>:<repo_path>` 和 `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`。在 experiment context 中，path/line shorthand 要求 clean worktree。
+
+## 工作流程
+
+```text
+alab status
+alab help
+alab observe experiments best
+alab observe experiments search --query "<keyword>"
+# edit task-relevant source
+git status --short
+alab run --message "try focused improvement"
+alab observe runs show <run_id>
+```
+
+这只是一个示例形态，不是必需顺序。先理解当前任务、candidate 和 context。只有当可见历史能指导改动时才使用它。本地检查应保持轻量且与任务相关。当 candidate 准备好接受 evaluation 时，运行 `alab run --message "<brief reason>"`；根据可见证据诊断 weak 或 failed results；只要还有合理优化路径，就继续迭代。如果 `git status --short` 显示无关 generated files，应通过项目正常机制删除或忽略后再 run 或 submit。
+
+只有当工作完成或已经没有有价值的继续优化路径，并且 passed run 支撑 final candidate 时才 submit。如果没有 passed run 支撑 candidate，应报告最好的 run evidence 和没有 submit 的原因。
 
 ## 可见历史
 
@@ -93,7 +119,7 @@ alab observe logs list --exp <exp_id>
 alab observe annotations list --target-type experiment --target-id <exp_id>
 ```
 
-可见历史用于提供证据和灵感，不用于扩展权限。优先参考 high-reward passed runs、有用 warning patterns、清晰 annotations，以及可比较的 task/source lineage。如果某个 prior experiment 对最终答案有实质影响，应在 submit 时把它作为 ref。
+可见历史用于提供证据和灵感，不用于扩展权限。优先参考 high-reward passed runs、有用 warning patterns、清晰 annotations，以及可比较的 task/source lineage。Submit refs 是便于后续 review 和继续优化的 provenance links：如果某个 prior experiment 影响了最终策略、代码、comparison baseline、failure avoidance 或 continuation path，应通过重复 `--ref <exp_id>` 显式引用。
 
 当某个可见 experiment 看起来可能有借鉴价值时，直接查看它的代码，不要只依赖 summary：
 
@@ -101,7 +127,9 @@ alab observe annotations list --target-type experiment --target-id <exp_id>
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
 ```
 
-用 `best` 做 reward-led exploration，用 `final` 查看已提交 candidate，用 `latest` 查看当前 branch tip。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，在 submit 时用 `--ref <exp_id>` 保留引用。绝不复制 `.alab/`、token files、ALab home/cache files、hidden evaluator assets、secret files 或 project control files。
+用 `best` 做 reward-led exploration，用 `final` 查看已提交 candidate，用 `latest` 查看当前 branch tip。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，应在 final `--ref <exp_id>` 和 feedback 中保留引用。绝不复制 `.alab/`、token files、ALab home/cache files、hidden evaluator assets、secret files 或 project control files。
+
+Inspection checkouts 是比较 surface，不是 editable source surface。不要把它们的路径写入 commits 或 final artifacts。如果需要清理，应把 path 报告给 controller；只有在该 checkout context 的 `alab help` 明确显示 inspection token 可用 self-removal command 时才自行清理。
 
 ## 禁止的 Surface
 
@@ -137,7 +165,7 @@ alab run --message "try focused improvement"
 alab observe runs show <run_id>
 ```
 
-使用可见 stdout/stderr preview、warning code、artifact 和 log 诊断。除非用户明确把你切换到 admin role，不要请求 hidden evaluator logs。
+使用可见 stdout/stderr preview、warning code、artifact 和 log 诊断。除非用户明确把你切换到 admin role，不要请求 hidden evaluator logs。如果 run 失败是因为需要 admin/root operation 且当前不可用，应停止并报告具体缺失能力。
 
 ## Submit Pattern
 
@@ -151,7 +179,7 @@ alab submit \
   --ref none
 ```
 
-只有没有历史 experiment 对结果产生实质影响时，才使用 `--ref none`。如果可见 experiments 确实影响了结果，应显式重复传入 refs：
+只有没有历史 experiment 对结果产生实质影响时，才使用 `--ref none`。当可见 experiments 被用作 inspiration、source continuation、comparison baseline 或 failure example 时，应优先显式传入 refs：
 
 ```text
 alab submit \
@@ -162,7 +190,7 @@ alab submit \
   --ref <another_relevant_exp_id>
 ```
 
-summary 应描述最终改动和支撑它的 passed run。feedback 应包含有用的操作备注：关键 metrics、避开的 failure modes、每个 ref 为什么相关，以及剩余风险。不要包含 raw tokens、hidden-log content 或不可访问的 experiment ids。
+summary 应描述最终改动和支撑它的 passed run。feedback 应包含有用的操作备注：关键 metrics、避开的 failure modes、每个 ref 为什么相关，以及剩余风险。清楚解释 refs 可以让后续 workers 更容易检查 lineage 并继续优化。不要包含 raw tokens、hidden-log content 或不可访问的 experiment ids。
 
 Worker 的最终回复应包含：
 
@@ -171,4 +199,6 @@ Worker 的最终回复应包含：
 - reward 与关键 metrics；
 - 使用的 submit refs，或说明为什么是 `ref none`；
 - 如果 ALab 渲染了 final commit，则记录它；
+- 添加的 tags（如果有）；
+- 创建的 inspection checkout paths（如果有）；
 - 剩余风险或已知失败。
