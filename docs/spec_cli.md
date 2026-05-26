@@ -303,6 +303,7 @@ Command error matrix:
 | `auth root regenerate` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`; `STORAGE_ERROR` exit `5` |
 | `feedback` | `CONTEXT_NOT_FOUND` exit `2` when ALab home is not initialized; invalid inputs `CONFIG_INVALID` exit `2`; storage failures `STORAGE_ERROR` exit `5` |
+| `dashboard` | invalid port or refresh values `CONFIG_INVALID` exit `2`; `AUTH_REQUIRED` or `AUTH_DENIED` exit `3`; unavailable port `RESOURCE_BUSY` exit `4`; storage failures `STORAGE_ERROR` exit `5` |
 | `key create|list|revoke` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND`, `CREDENTIAL_NOT_FOUND`, or `CONFIG_INVALID` exit `2` |
 | `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`; `CONTEXT_CONFLICT`, `SCOPE_VIOLATION` exit `4`; `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; invalid path `CONFIG_INVALID` exit `2` |
 | `project list|show|status` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND` exit `2`; `CONTEXT_CONFLICT` exit `4` |
@@ -362,7 +363,7 @@ Default context surfaces:
 
 - Global with no explicit key: show `help`, `auth init`, `feedback`, config diagnostics/repair, and context diagnostics commands that do not require a project record. Commands that require a project may be available only when they include an explicit target and do not conflict with the current path.
 - Global with explicit project admin key: show the matching project's admin surface and commands that can run with that credential by passing its project id explicitly.
-- Global with explicit root key: additionally show root-level project creation, project listing, key management, catalog, cache, backup, and audit commands.
+- Global with explicit root key: additionally show root-level project creation, project listing, key management, catalog, cache, backup, audit, and local dashboard commands.
 - Project context with no explicit key: show global public commands, public safe `status`; when project policy allows public experiment creation, show public `exp create` with source bootstrap options. Hide project management, source management, config, validation, audit, cache, catalog, backup, key, and lifecycle maintenance commands.
 - Project context with explicit project admin key: show same-project project/source/config/validate/observe/experiment management commands except root-only commands.
 - Project context with explicit root key: show project admin capabilities plus root-only commands in scope.
@@ -379,6 +380,7 @@ Canonical groups:
 - `auth`
 - `config`
 - `feedback`
+- `dashboard`
 - `key`
 - `context`
 - `project`
@@ -433,6 +435,7 @@ Primary object types:
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
 | `feedback` | `feedback` |
+| `dashboard` | `dashboard` |
 | repeated capability rows from `config validate` | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
@@ -498,6 +501,23 @@ Lifecycle command rules:
 - Metadata rule: missing role, session, context, actor, or Git information is stored as JSON `null`.
 - Success fields: `feedback id`, `kind`, `title`, `created at`, `role`, `session id`, `commit`, `path`, `metadata path`, `body path`.
 - Exit: `0`; `2` on missing home or invalid input; `5` on storage failure.
+
+### Dashboard
+
+`alab dashboard [--port <0-65535>] [--no-open] [--refresh-seconds <0-3600>]`
+
+- Context: Any initialized ALab home.
+- Credential: Root.
+- Required args: none.
+- Options: `--port`, `--no-open`, `--refresh-seconds`.
+- Defaults: bind `127.0.0.1`, `--port 0`, `--refresh-seconds 15`, open the browser unless `--no-open` is set; `--refresh-seconds 0` disables automatic browser polling while keeping manual refresh available.
+- Long-running rule: the command renders the startup `dashboard` object, flushes stdout, then serves until interrupted. Clean shutdown exits `0`.
+- Browser auth rule: ALab verifies the root key at startup, discards the raw key, creates a random browser session token, places that token in the initial URL fragment, and requires `X-ALab-Dashboard-Token` on every `/api/*` request.
+- Read-only rule: the dashboard derives all data from existing SQLite rows and file-backed log/artifact/feedback files. It must not write audit rows, config, cache, records, logs, artifacts, tokens, or feedback.
+- Server rule: bind only to loopback, reject non-GET/HEAD methods with `405`, return `401` for missing/wrong API tokens, return `404` for unknown routes, and use `Cache-Control: no-store` for local dashboard responses.
+- Secret rule: API responses and static UI must not include raw root/admin keys, raw experiment tokens, raw credential verifiers/salts, or raw `secret_env` values. Secret config surfaces may expose names and fingerprints only.
+- Success fields: `url`, `host`, `port`, `refresh seconds`, `opened`, `auth scope`, `next`.
+- Exit: `0` on clean shutdown; `2` on invalid args; `3` on auth failure; `4` when the selected port is unavailable; `5` on storage failure.
 
 ### Auth
 

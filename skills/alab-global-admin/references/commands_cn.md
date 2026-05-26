@@ -19,6 +19,7 @@ alab auth init
 alab auth root regenerate
 alab config show|set|reset|validate
 alab feedback --kind suggestion|question|bug|other --body "<text>"
+alab dashboard [--port <0-65535>] [--no-open] [--refresh-seconds <0-3600>]
 alab key create --project <project_id> --role admin
 alab key list --root
 alab key list --project <project_id>
@@ -57,6 +58,9 @@ alab audit list|show ...
 - **`feedback`**：为 ALab operation、docs、environment issues 或 bugs 留 HOME-level feedback。
   关键参数：`--body <text>` 或 `--body-file <path>` 二选一；可选 `--kind suggestion|question|bug|other` 和 `--title <text>`。
   注意点：Feedback 是 `ALAB_HOME/feedback/` 下的 plaintext，不创建 SQLite audit rows。
+- **`dashboard`**：打开 root-only local read-only dashboard。
+  关键参数：可选 `--port <0-65535>`、`--refresh-seconds <0-3600>` 和 `--no-open`。
+  注意点：要求 root credential，只绑定 `127.0.0.1`，渲染 token URL，并阻塞直到 interrupted。不要分享 token URL；dashboard 可以读取 hidden/full logs 和 artifacts，但不得 mutate ALab state。
 - **`key create`**：为 controller 创建 project admin key。
   关键参数：必需 `--project <project_id>`；可选 `--role admin`。
   注意点：Root-only；raw admin key 只打印一次。

@@ -15,7 +15,7 @@
 
 除非 spec 或 implementation change 推翻已记录证据，不要再为这些 families 单独开 batch：
 
-- Runtime 和 layout guardrails：local CLI-only surface、无 server/web UI/ORM/scheduler/agent/LLM-provider dependency roots、canonical home/artifact/log layout、home/filesystem/path-registry evidence mapping、marker-only project contexts、cwd-relative experiment worktree markers，以及 128-bit home-id suffix checks。
+- Runtime 和 layout guardrails：local CLI surface 只额外包含 root-only loopback read-only dashboard；无 hosted/remote web framework/ORM/scheduler/agent/LLM-provider dependency roots；canonical home/artifact/log layout、home/filesystem/path-registry evidence mapping、marker-only project contexts、cwd-relative experiment worktree markers，以及 128-bit home-id suffix checks。
 - Storage/audit/object guardrails：schema/index/JSON contracts、retained `path_registry` 和 credential rows、maintenance/catalog audit metadata、credential/token/context audit metadata、lifecycle trash/reference-count relationships、annotation audit metadata，以及 visibility-linked object history 已映射到当前 default/local object families 的直接证据。
 - Core successful workflow guardrails：auth init、project init、baseline validation、reusable-source experiment creation、run/submit、observe/search/best history inspection、public/private collaboration visibility、lifecycle state transitions，以及 default/fake adapter paths 已对当前 default/local runnable V1 workflow 共同证明。
 - Capability/help/payload preflight guardrails：generated capability surfaces、locked-command explanations、ambient-key non-expansion、explicit-key unlock paths、invalid explicit credential preflight、token/public isolation、context conflict priority、text payload readers、stdin/file conflicts、output parent checks 和 `OUTPUT_EXISTS` behavior 已对当前 registered command surfaces 证明。
@@ -48,9 +48,11 @@
 - Public Git inline-source guardrails：隔离的 global Git credential helper 已配置时，public `--source-git` 会渲染 `PUBLIC_GIT_CREDENTIAL_HELPER_USED`；global/system Git configs 都没有 helper 时不渲染 helper warning；并持久化匹配的 source-origin warning metadata。
 - SkyDiscover evaluator guardrails：Docker evaluator feedback/file-artifact separation、fake/default paths 下的 Docker evaluator hidden bundle 与 timeout cleanup、当前 Darwin real Docker-backed Docker evaluator proof、Python evaluator hidden bundle、wrapper-subprocess import boundary、non-sandbox disclosure、dependency-installation saved failures、hidden setup logs、default/fake paths 下无 debug traceback，以及当前 Darwin SkyDiscover Python local-wheel/network/native dependency proof。
 - HOME feedback guardrails：顶层 `alab feedback` 保持 submit-only initialized-HOME plaintext command，面向每个 ALab role 开放且不做 key/token validation；parser/file failures 保持 side-effect-free；`auth init` 前不会创建 HOME；每条 feedback 都使用原子 file record；记录 session priority 和 best-effort Git metadata。
+- Root dashboard guardrails：顶层 `alab dashboard` 保持 root-only、read-only、loopback-bound；`/api/*` 需要 token；使用 CSP/no-store constraints；不引入 hosted web framework dependencies；随包提供 vendored Chart.js/Lucide assets；root 可以读取 hidden logs/artifacts；并禁止暴露 raw keys/tokens/verifiers/salts 或 raw `secret_env` values。
 
 ## 最近关闭
 
+- 2026-05-24：root dashboard command/server/frontend proof，覆盖 root-only startup、invalid option preflight、loopback binding、token-gated APIs、non-mutating method rejection、hidden log access、artifact preview、secret redaction、CSP-compatible static assets、browser smoke 和 full default-suite validation。
 - 2026-05-24：HOME feedback command proof，覆盖所有 initialized-home roles、no-HOME failure without HOME creation、per-record plaintext metadata/body files、session priority/null fallback、Git/non-Git metadata，以及 side-effect-free invalid input handling。
 - 2026-05-22：当前 worktree 的最终 requirement-ledger closeout；`docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
 - 2026-05-22：当前 Darwin real Docker capability-refresh validation，覆盖 daemon availability、Linux platform rows、architecture platform rows 和 CPU/memory resource rows，证据为 `tests/test_real_docker.py::test_real_docker_config_validate_refreshes_capability_cache`。

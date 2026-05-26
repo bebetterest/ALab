@@ -9,7 +9,7 @@
 3. [completion_audit.md](completion_audit.md)：用来定位精确 requirement evidence 和任何具体 proof gap。
 4. [progress_closed_gaps.md](progress_closed_gaps.md)：只有 planned work 像过去已关闭的 proof family 时才打开。
 5. [progress_log.md](progress_log.md)：只在需要历史上下文，或追溯某个 decision、implementation batch、validation run 的时间时使用。
-6. [blueprint.md](blueprint.md) 和 `spec_*.md` 文件：修改 product behavior、command contracts、storage、lifecycle semantics、runners、observe behavior 或 tests 时使用。
+6. [blueprint.md](blueprint.md) 和 `spec_*.md` 文件：修改 product behavior、command contracts、storage、lifecycle semantics、runners、observe behavior、dashboard behavior 或 tests 时使用。
 
 ## 文档分组
 
@@ -22,6 +22,7 @@
 | Lifecycle contract | [spec_lifecycle.md](spec_lifecycle.md), [spec_lifecycle_cn.md](spec_lifecycle_cn.md) | Archive、unarchive、hard remove、restore、repair、revoke、prune、lifecycle blockers、trash staging 和 lifecycle audit visibility。 |
 | Runner/adapter contract | [spec_runners_adapters.md](spec_runners_adapters.md), [spec_runners_adapters_cn.md](spec_runners_adapters_cn.md) | Runner contract、runtime directories、environment injection、local runner、Docker runner、rewards、artifacts、logs、hidden assets、Harbor、SkyDiscover 和 Docker-unavailable behavior。 |
 | Observe/collaboration contract | [spec_observe_collaboration.md](spec_observe_collaboration.md), [spec_observe_collaboration_cn.md](spec_observe_collaboration_cn.md) | Visibility model、observe commands、search/pagination/sorting、filters、best ranking、logs、artifact export、tags、annotations 和 public safe status。 |
+| Dashboard contract | [spec_dashboard.md](spec_dashboard.md), [spec_dashboard_cn.md](spec_dashboard_cn.md) | Root-only local read-only dashboard command、loopback HTTP server constraints、local API routes、frontend rules 和 security requirements。 |
 | Verification contract | [spec_tests.md](spec_tests.md), [spec_tests_cn.md](spec_tests_cn.md) | CLI、storage、auth/context/lifecycle、project/source、run/submit、runner/reward/log/artifact、adapters 和 observe/collaboration 的 test strategy 与 acceptance gates。 |
 | Current progress | [progress.md](progress.md), [progress_cn.md](progress_cn.md) | 当前状态、completion gates、do-not-reopen summary 和 next step 的短 dashboard。 |
 | Active work queue | [progress_pipeline.md](progress_pipeline.md), [progress_pipeline_cn.md](progress_pipeline_cn.md) | Active batch 和 queue。这里必须保持 narrow；不要追加 stale backlog。 |

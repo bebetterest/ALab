@@ -6,12 +6,13 @@
 
 ALab is a local, agent-first Python CLI workbench for iterative experiments. It lets external agents work in isolated Git worktrees, run repeatable evaluations, submit final results, and inspect visible prior experiment evidence through explicit collaboration boundaries.
 
-ALab V1 is intentionally local-only: no server, sync service, web UI, built-in agent launcher, or account system. It owns the local project records, source snapshots, experiment lifecycle, runner execution, logs, artifacts, and visibility rules; agents remain external CLI operators.
+ALab V1 is intentionally local-only: no hosted service, sync service, remote web UI, built-in agent launcher, or account system. It owns the local project records, source snapshots, experiment lifecycle, runner execution, logs, artifacts, visibility rules, and a root-only local read-only dashboard; agents remain external CLI operators.
 
 ## Highlights
 
 - Local CLI workbench for projects, sources, experiments, runs, submissions, logs, artifacts, annotations, and audits.
 - HOME-level feedback capture so any ALab role can leave local suggestions, questions, or bug reports without needing project credentials.
+- Root-only local dashboard for browser-based read-only inspection of global/project/experiment/run/log/artifact/audit/feedback/system state.
 - Context-aware command surface: `alab help` and command preflight show only what the current project, experiment, inspection checkout, token, or explicit key can use.
 - Git-backed experiment isolation: each experiment is an isolated branch/worktree with a worktree token for run and submit operations.
 - Reproducible project setup: project config controls runner, reward, artifact capture, environment, secrets, mutable paths, and visibility.
@@ -181,6 +182,7 @@ Useful next commands:
 ```sh
 alab help
 alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
+alab --key <root-key> dashboard --no-open
 alab observe experiments list
 alab observe runs list --exp <exp-id>
 alab observe experiments best
@@ -195,6 +197,7 @@ alab observe experiments best
 - **Run**: one evaluator execution for an experiment commit, with status, reward, logs, artifacts, and warning codes.
 - **Submit**: closes an experiment with final summary, feedback, final run, final commit, and explicit refs.
 - **Feedback**: HOME-level plaintext notes for suggestions, questions, bugs, or other agent observations, stored as one directory per entry under `feedback/`.
+- **Dashboard**: root-only local browser panel for read-only inspection. It binds to `127.0.0.1`, uses a random browser session token, and writes no ALab records.
 - **Inspection checkout**: read-only checkout for observing/exporting scoped experiment evidence without becoming submit-capable.
 
 ## Configuration
@@ -215,8 +218,8 @@ See [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_p
 See [examples](examples/) for the runnable example matrix. The current examples
 cover a local scoring loop, a Dockerized clinic-order fulfillment planner with
 artifact export, a Harbor hidden-verifier incident classifier, a collaborative
-incident triage lifecycle workflow, and the SkyDiscover circle-packing Codex
-single-worker protocol. The same examples area also includes
+incident triage lifecycle workflow, a generated dashboard showcase home, and
+the SkyDiscover circle-packing Codex single-worker protocol. The same examples area also includes
 `examples/templates/`, a copyable multi-instance TSP template library for
 local, Docker, Harbor, SkyDiscover Python, and SkyDiscover Docker runner
 projects.
@@ -259,6 +262,7 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 - Credential verifiers are stored; raw credential secrets are not.
 - Project records are local plaintext SQLite/filesystem data.
 - `secret_env` values are local plaintext, redacted from rendered logs where configured, and never exported by config commands.
+- The dashboard is loopback-only and root-only. Its API can read hidden/full logs and artifact bytes for that root session, but it must not render raw keys, raw tokens, credential verifier material, or raw `secret_env` values.
 - Artifact exports are exact captured bytes and are not automatically redacted.
 
 ## Repository Structure
@@ -285,6 +289,7 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 │   ├── README.md
 │   ├── README_cn.md
 │   ├── collaboration_observe_lifecycle/
+│   ├── dashboard_showcase/
 │   ├── docker_file_reward_artifacts/
 │   ├── harbor_verifier_minimal/
 │   ├── local_agent_scoreboard/
@@ -318,7 +323,7 @@ Local-only agent notes such as `AGENTS.md` and `CORE.md` are intentionally git-i
 - Synchronized Chinese documents use the `*_cn.md` naming pattern.
 - [docs/README.md](docs/README.md) explains the documentation structure and reading order.
 - [docs/blueprint.md](docs/blueprint.md) is the V1 product overview.
-- [docs/spec_cli.md](docs/spec_cli.md), [docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md), [docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md), [docs/spec_lifecycle.md](docs/spec_lifecycle.md), [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md), and [docs/spec_tests.md](docs/spec_tests.md) define subsystem contracts.
+- [docs/spec_cli.md](docs/spec_cli.md), [docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md), [docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md), [docs/spec_lifecycle.md](docs/spec_lifecycle.md), [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md), [docs/spec_dashboard.md](docs/spec_dashboard.md), and [docs/spec_tests.md](docs/spec_tests.md) define subsystem contracts.
 - [docs/progress.md](docs/progress.md), [docs/progress_pipeline.md](docs/progress_pipeline.md), [docs/progress_closed_gaps.md](docs/progress_closed_gaps.md), and [docs/progress_log.md](docs/progress_log.md) track current state, active queues, closed gaps, and history.
 - [docs/completion_audit.md](docs/completion_audit.md) tracks requirement-level evidence.
 

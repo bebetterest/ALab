@@ -6,12 +6,13 @@
 
 ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 可以在 ALab 创建的隔离 Git worktree 中迭代，运行可重复 evaluation，提交最终结果，并通过明确的协作边界查看可见的历史 experiment 证据。
 
-ALab V1 有意保持 local-only：没有 server、sync service、Web UI、内置 agent launcher 或 account system。ALab 负责本地 project records、source snapshots、experiment lifecycle、runner execution、logs、artifacts 和 visibility rules；agent 仍然是外部 CLI operator。
+ALab V1 有意保持 local-only：没有 hosted service、sync service、remote Web UI、内置 agent launcher 或 account system。ALab 负责本地 project records、source snapshots、experiment lifecycle、runner execution、logs、artifacts、visibility rules，以及 root-only local read-only dashboard；agent 仍然是外部 CLI operator。
 
 ## Highlights
 
 - 面向 projects、sources、experiments、runs、submissions、logs、artifacts、annotations 和 audits 的本地 CLI workbench。
 - HOME-level feedback capture，让任何 ALab role 都能在不需要 project credential 的情况下留下本地建议、问题或 bug reports。
+- Root-only local dashboard，用浏览器只读查看 global/project/experiment/run/log/artifact/audit/feedback/system state。
 - Context-aware command surface：`alab help` 和 command preflight 只显示当前 project、experiment、inspection checkout、token 或 explicit key 可使用的 commands。
 - Git-backed experiment isolation：每个 experiment 是独立 branch/worktree，并有 worktree token 用于 run 和 submit。
 - 可复现 project setup：project config 控制 runner、reward、artifact capture、environment、secrets、mutable paths 和 visibility。
@@ -181,6 +182,7 @@ ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab submit \
 ```sh
 alab help
 alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
+alab --key <root-key> dashboard --no-open
 alab observe experiments list
 alab observe runs list --exp <exp-id>
 alab observe experiments best
@@ -195,6 +197,7 @@ alab observe experiments best
 - **Run**：针对某个 experiment commit 的一次 evaluator execution，包含 status、reward、logs、artifacts 和 warning codes。
 - **Submit**：用 final summary、feedback、final run、final commit 和 explicit refs 关闭 experiment。
 - **Feedback**：HOME-level plaintext notes，用于 suggestions、questions、bugs 或其他 agent observations，每条记录在 `feedback/` 下独立存放。
+- **Dashboard**：root-only local browser panel，用于 read-only inspection。它只绑定 `127.0.0.1`，使用随机 browser session token，且不写 ALab records。
 - **Inspection checkout**：只读 checkout，用于 observe/export scoped experiment evidence，不会变成 submit-capable。
 
 ## Configuration
@@ -215,7 +218,8 @@ Project behavior 由 TOML config 控制：
 参见 [examples](examples/) 中的 runnable example matrix。当前 examples 覆盖
 local scoring loop、带 artifact export 的 Dockerized 诊所订单履约计划器、Harbor
 hidden-verifier incident classifier、协作式 incident triage lifecycle workflow，
-以及 SkyDiscover circle-packing Codex single-worker protocol。同一区域还包含
+生成式 dashboard showcase home，以及 SkyDiscover circle-packing Codex
+single-worker protocol。同一区域还包含
 `examples/templates/`，这是可复制的 multi-instance TSP template library，覆盖
 local、Docker、Harbor、SkyDiscover Python 和 SkyDiscover Docker runner
 projects。
@@ -258,6 +262,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 - 存储 credential verifiers，不存 raw credential secrets。
 - Project records 是本地 plaintext SQLite/filesystem data。
 - `secret_env` values 是本地 plaintext；配置后会从 rendered logs 中 redacted，config commands 不会导出。
+- Dashboard 是 loopback-only 且 root-only。它的 API 可以为该 root session 读取 hidden/full logs 和 artifact bytes，但不得渲染 raw keys、raw tokens、credential verifier material 或 raw `secret_env` values。
 - Artifact exports 是精确捕获的 bytes，不会自动 redacted。
 
 ## Repository Structure
@@ -284,6 +289,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 │   ├── README.md
 │   ├── README_cn.md
 │   ├── collaboration_observe_lifecycle/
+│   ├── dashboard_showcase/
 │   ├── docker_file_reward_artifacts/
 │   ├── harbor_verifier_minimal/
 │   ├── local_agent_scoreboard/
@@ -317,7 +323,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 - 中文同步文档使用 `*_cn.md` 命名。
 - [docs/README.md](docs/README.md) 说明文档结构和阅读顺序。
 - [docs/blueprint.md](docs/blueprint.md) 是 V1 product overview。
-- [docs/spec_cli.md](docs/spec_cli.md)、[docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md)、[docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md)、[docs/spec_lifecycle.md](docs/spec_lifecycle.md)、[docs/spec_runners_adapters.md](docs/spec_runners_adapters.md)、[docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md) 和 [docs/spec_tests.md](docs/spec_tests.md) 定义 subsystem contracts。
+- [docs/spec_cli.md](docs/spec_cli.md)、[docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md)、[docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md)、[docs/spec_lifecycle.md](docs/spec_lifecycle.md)、[docs/spec_runners_adapters.md](docs/spec_runners_adapters.md)、[docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md)、[docs/spec_dashboard.md](docs/spec_dashboard.md) 和 [docs/spec_tests.md](docs/spec_tests.md) 定义 subsystem contracts。
 - [docs/progress.md](docs/progress.md)、[docs/progress_pipeline.md](docs/progress_pipeline.md)、[docs/progress_closed_gaps.md](docs/progress_closed_gaps.md) 和 [docs/progress_log.md](docs/progress_log.md) 跟踪 current state、active queues、closed gaps 和 history。
 - [docs/completion_audit.md](docs/completion_audit.md) 跟踪 requirement-level evidence。
 

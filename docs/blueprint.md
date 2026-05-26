@@ -10,6 +10,7 @@ This document is the canonical V1 overview for ALab. Detailed implementation con
 - Archive, unarchive, remove, restore, repair, revoke, prune, and lifecycle audit rules: [spec_lifecycle.md](spec_lifecycle.md)
 - Runner, reward, log, artifact, Docker, Harbor, and SkyDiscover adapter contracts: [spec_runners_adapters.md](spec_runners_adapters.md)
 - Observe, collaboration visibility, logs, tags, artifacts, and annotations: [spec_observe_collaboration.md](spec_observe_collaboration.md)
+- Root-only local read-only browser dashboard: [spec_dashboard.md](spec_dashboard.md)
 - V1 verification plan and acceptance coverage: [spec_tests.md](spec_tests.md)
 
 Chinese synchronized documents use the same names with `_cn.md`.
@@ -18,7 +19,7 @@ Chinese synchronized documents use the same names with `_cn.md`.
 
 ALab is a local, agent-first Python CLI workbench for iterative experiments. External agents work inside ALab-created Git worktrees. They use `alab` to create attempts, commit iterations, run evaluations, submit final results, inspect visible prior work, export artifacts, write annotations, and leave HOME-level feedback for local suggestions, questions, or bug reports.
 
-ALab owns project structure and local records. It does not launch agents, schedule agents, choose prompts, run search loops, host a service, or synchronize data across machines in V1.
+ALab owns project structure and local records. It does not launch agents, schedule agents, choose prompts, run search loops, host a remote service, or synchronize data across machines in V1. A root-only local read-only dashboard may be launched by the CLI for loopback browser inspection of the local home.
 
 Core objects:
 
@@ -37,7 +38,7 @@ Project initialization always creates one project admin key when the project rec
 
 Out of scope:
 
-- Hosted service, account system, multi-user server, native web UI, remote database, cloud object storage, or cross-machine sync.
+- Hosted service, account system, multi-user server, remote web UI, remote database, cloud object storage, or cross-machine sync.
 - Built-in LLM provider integration.
 - Agent scheduling, autonomous search, or agent hiring.
 - Strong local security isolation between users sharing an OS account or filesystem.
@@ -75,6 +76,7 @@ V1 stack:
 - pytest for tests.
 - Git CLI subprocesses for repository, branch, commit, worktree, and checkout operations.
 - Docker CLI as an optional runtime dependency for Docker, Harbor, and SkyDiscover Docker runners.
+- Standard-library loopback HTTP serving plus packaged static assets for the root-only read-only dashboard.
 
 Supported hosts are macOS and Linux. Windows is not part of V1 acceptance testing.
 
@@ -86,6 +88,7 @@ Implementation architecture:
 - Repository classes own Python `sqlite3` access through explicit transactions and typed query methods. ALab does not use an ORM in V1.
 - Pydantic models validate TOML input, canonical JSON fields, command results, runner records, and renderer input at module boundaries.
 - Renderers consume structured result objects. They must not re-query storage, perform authorization checks, or add fields that were not present in the result object.
+- The local dashboard uses separate read-model APIs and static assets. Its browser JSON APIs are not CLI output formats and must remain read-only.
 - Future implementation should use a layered package shape: CLI routing, service workflows, repositories, Pydantic models, renderers, Git helpers, storage/migrations, runners, adapters, and tests remain separate modules with explicit boundaries.
 
 ## 5. ALab Home And Files
@@ -152,6 +155,8 @@ ALab uses a context-aware capability surface. Running `alab`, `alab help`, `alab
 Capability display uses the current context token or public project policy by default. Explicit `--key` or `--key-stdin` unlocks the matching project admin or root surface. `ALAB_KEY` does not affect help or broaden public/token context surfaces, though it may still satisfy root/admin authentication for a command already available in the current context surface.
 
 `text` is the default output and the only persisted output format. It is a strict key-value object format: each object block starts with `object: <type>`, fields render as `field: value`, multiline text renders as an indented block after `field:`, lists render as repeated labeled lines, and repeated objects are separated by one blank line. Warnings render after result blocks as `object: warning`. `rich` uses the same structured result data with different rendering and is available only through `--output rich` for a single command.
+
+`alab dashboard` is a long-running root-only command. It renders a startup `dashboard` object, flushes stdout, starts a temporary `127.0.0.1` HTTP service, and serves packaged static assets plus read-only JSON APIs until shutdown. The dashboard does not change the CLI output contract and must not mutate ALab state.
 
 Every stable error code maps to one numeric exit code. All `*_NOT_FOUND` codes exit `2`; `PROJECT_INVALID` and `COMMAND_UNAVAILABLE` exit `4`; saved runner or validation result errors exit `1`; only failures that cannot store the intended record are system/internal exit `5`.
 

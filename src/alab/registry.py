@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from .rendering import ResultBlock
 from .services import (
+    LongRunningResult,
     Request,
     cmd_annotate_add,
     cmd_annotate_archive,
@@ -27,6 +28,7 @@ from .services import (
     cmd_config_validate,
     cmd_context_repair,
     cmd_context_show,
+    cmd_dashboard,
     cmd_exp_archive,
     cmd_exp_best,
     cmd_exp_checkout,
@@ -102,7 +104,7 @@ from .services import (
     cmd_submit,
 )
 
-Handler = Callable[[list[str], Request], list[ResultBlock]]
+Handler = Callable[[list[str], Request], list[ResultBlock] | LongRunningResult]
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,7 @@ COMMANDS: list[CommandSpec] = [
     _spec("context show", "context", "Show context marker and registry status.", "none", cmd_context_show),
     _spec("context repair", "context", "Repair context path registry entries.", "none", cmd_context_repair),
     _spec("feedback", "feedback", "Submit local agent feedback into ALab home.", "none", cmd_feedback),
+    _spec("dashboard", "dashboard", "Open the root-only local read-only dashboard.", "root", cmd_dashboard),
     _spec("key create", "credential", "Create a project admin key.", "root", cmd_key_create),
     _spec("key list", "credential", "List root or project admin keys.", "admin", cmd_key_list),
     _spec("key revoke", "credential", "Revoke a credential.", "root", cmd_key_revoke),

@@ -9,7 +9,7 @@ This directory contains ALab's V1 product contract, subsystem specifications, ev
 3. [completion_audit.md](completion_audit.md): use this to identify exact requirement evidence and any concrete proof gap.
 4. [progress_closed_gaps.md](progress_closed_gaps.md): open this only when planned work resembles a previously closed proof family.
 5. [progress_log.md](progress_log.md): use this only for historical context or to trace when a decision, implementation batch, or validation run happened.
-6. [blueprint.md](blueprint.md) and the `spec_*.md` files: use these when changing product behavior, command contracts, storage, lifecycle semantics, runners, observe behavior, or tests.
+6. [blueprint.md](blueprint.md) and the `spec_*.md` files: use these when changing product behavior, command contracts, storage, lifecycle semantics, runners, observe behavior, dashboard behavior, or tests.
 
 ## Document Groups
 
@@ -22,6 +22,7 @@ This directory contains ALab's V1 product contract, subsystem specifications, ev
 | Lifecycle contract | [spec_lifecycle.md](spec_lifecycle.md), [spec_lifecycle_cn.md](spec_lifecycle_cn.md) | Archive, unarchive, hard remove, restore, repair, revoke, prune, lifecycle blockers, trash staging, and lifecycle audit visibility. |
 | Runner/adapter contract | [spec_runners_adapters.md](spec_runners_adapters.md), [spec_runners_adapters_cn.md](spec_runners_adapters_cn.md) | Runner contract, runtime directories, environment injection, local runner, Docker runner, rewards, artifacts, logs, hidden assets, Harbor, SkyDiscover, and Docker-unavailable behavior. |
 | Observe/collaboration contract | [spec_observe_collaboration.md](spec_observe_collaboration.md), [spec_observe_collaboration_cn.md](spec_observe_collaboration_cn.md) | Visibility model, observe commands, search/pagination/sorting, filters, best ranking, logs, artifact export, tags, annotations, and public safe status. |
+| Dashboard contract | [spec_dashboard.md](spec_dashboard.md), [spec_dashboard_cn.md](spec_dashboard_cn.md) | Root-only local read-only dashboard command, loopback HTTP server constraints, local API routes, frontend rules, and security requirements. |
 | Verification contract | [spec_tests.md](spec_tests.md), [spec_tests_cn.md](spec_tests_cn.md) | Test strategy and acceptance gates for CLI, storage, auth/context/lifecycle, project/source, run/submit, runner/reward/log/artifact, adapters, and observe/collaboration. |
 | Current progress | [progress.md](progress.md), [progress_cn.md](progress_cn.md) | Short dashboard for current state, completion gates, do-not-reopen summary, and next step. |
 | Active work queue | [progress_pipeline.md](progress_pipeline.md), [progress_pipeline_cn.md](progress_pipeline_cn.md) | Active batch and queue. Keep this narrow; do not append stale backlog. |

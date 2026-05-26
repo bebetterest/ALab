@@ -65,6 +65,7 @@ Add golden tests for every command's:
 - Default help hiding locked commands, and `alab help --all --explain` rendering safe `help_command` rows with locked reasons, unlock hints, context type, credential source, and capability source.
 - Explicit `--key` and `--key-stdin` unlocking project-admin or root surfaces, while ambient `ALAB_KEY` does not affect help output or broaden token/public command surfaces.
 - Explicit root/admin credential surfaces must have generated runtime coverage proving registered commands outside the credential surface, including token-only commands outside experiment worktree contexts and root-only commands under admin keys, fail with `COMMAND_UNAVAILABLE` before handler option parsing, file reads, file/output writes, DB mutation, marker/token mutation, Git operations, runner execution, or filesystem staging, with fresh DB/file/tree snapshots per command/payload variant.
+- Root-only long-running dashboard coverage must prove no-key, admin, token, and public contexts cannot enter the server; invalid port/refresh values fail before bind; `--no-open` avoids browser launch in tests; startup output is flushed before serving; and clean shutdown exits `0`.
 - Invalid explicit credentials through `--key` and `--key-stdin` must have generated registered-command coverage proving `AUTH_DENIED` occurs before handler option parsing, unsupported-option validation, config/body/value/summary/feedback file reads, output parent creation, DB mutation, config/marker/token mutation, or project/source/tmp tree changes, with a fresh snapshot for each command variant.
 - Direct invocation of commands outside the current capability surface failing with `COMMAND_UNAVAILABLE` exit `4` before reading body/value files, writing SQLite rows, creating audit events, running Git, or executing runners.
 - Public project contexts must have generated runtime coverage proving every registered command outside the public project surface fails with `COMMAND_UNAVAILABLE` before handler option parsing, file reads, file/output writes, DB mutation, marker/token mutation, Git operations, runner execution, or filesystem staging; each unsupported option, missing file, config-file, and output-path payload must use a fresh SQLite/file/tree snapshot.
@@ -76,6 +77,7 @@ Commands covered:
 - `help`, no-command `alab`, `alab --help`, and nested command help.
 - `auth init`, `auth root regenerate`.
 - `config show`, `config set`, `config reset`, `config validate`.
+- `dashboard`.
 - `key create`, `key list`, `key revoke`.
 - `context show`, `context repair`.
 - `project list/show/archive/unarchive/remove/status/init/config/env/secret/validate/validation/locks`.
@@ -112,6 +114,14 @@ Lifecycle golden cases:
 - `exp archive` rejects removed V1 flags `--remove-worktree` and `--force-remove-worktree`.
 - Archived artifact/log export fails without `--include-archived`; archived artifact/log show by id succeeds when authorized.
 - Config, artifact, and log exports fail with `OUTPUT_EXISTS` when the target exists and `--overwrite` is omitted.
+
+Dashboard security cases:
+
+- `alab dashboard` binds only to `127.0.0.1`, generates a random browser token in the URL fragment, and requires `X-ALab-Dashboard-Token` on every `/api/*` request.
+- Missing or wrong API tokens return `401`; unknown routes return `404`; non-GET/HEAD methods return `405` and do not mutate state.
+- API responses and frontend assets never expose raw root/admin keys, raw experiment tokens, credential verifier material, salts, or raw `secret_env` values.
+- Root dashboard sessions can read hidden log full text and raw artifact/log download bytes through path-contained file reads.
+- Static assets avoid inline event handlers and remain compatible with the dashboard CSP.
 
 ## 2. Storage And Migration Tests
 

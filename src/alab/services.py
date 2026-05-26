@@ -13,6 +13,7 @@ import socket
 import sqlite3
 import sys
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -94,6 +95,13 @@ class Request:
     globals: GlobalOptions
     context: Context | None
     actor: Actor | None = None
+
+
+@dataclass
+class LongRunningResult:
+    blocks: list[ResultBlock]
+    run: Callable[[], int]
+    close: Callable[[], None] | None = None
 
 
 @dataclass
@@ -635,6 +643,8 @@ OPTIONS_WITH_VALUES = {
     "--keep",
     "--older-than",
     "--origin-url",
+    "--port",
+    "--refresh-seconds",
 }
 
 
@@ -931,6 +941,37 @@ def cmd_feedback(args: list[str], req: Request) -> list[ResultBlock]:
             ],
         )
     ]
+
+
+def cmd_dashboard(args: list[str], req: Request) -> LongRunningResult:
+    require_known_options(args, ("--port", "--no-open", "--refresh-seconds"))
+    require_options_at_most_once(args, ("--port", "--no-open", "--refresh-seconds"))
+    require_actor(req, "root")
+    require_positional_count(
+        args,
+        0,
+        "dashboard accepts no positional arguments",
+        options_with_values=("--port", "--refresh-seconds"),
+    )
+    port = _parse_int_option(args, "--port")
+    if port is None:
+        port = 0
+    if port < 0 or port > 65535:
+        raise AlabError("CONFIG_INVALID", "--port must be between 0 and 65535")
+    refresh_seconds = _parse_int_option(args, "--refresh-seconds")
+    if refresh_seconds is None:
+        refresh_seconds = 15
+    if refresh_seconds < 0 or refresh_seconds > 3600:
+        raise AlabError("CONFIG_INVALID", "--refresh-seconds must be between 0 and 3600")
+    from .dashboard import create_dashboard_server
+
+    server = create_dashboard_server(
+        home=req.globals.home,
+        port=port,
+        refresh_seconds=refresh_seconds,
+        open_browser=not flag(args, "--no-open"),
+    )
+    return LongRunningResult(blocks=server.result_blocks(), run=server.serve, close=server.close)
 
 
 def cmd_auth_root_regenerate(args: list[str], req: Request) -> list[ResultBlock]:

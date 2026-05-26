@@ -16,7 +16,7 @@ from .errors import AlabError, error_exit_code
 from .home import resolve_home
 from .registry import COMMANDS, CommandSpec, match_command
 from .rendering import ResultBlock, error_block, render_text
-from .services import GlobalOptions, Request
+from .services import GlobalOptions, LongRunningResult, Request
 
 
 @dataclass
@@ -588,7 +588,13 @@ def run(argv: list[str]) -> int:
         enforce_global_config_valid(spec.path, base_req)
         req = build_request(parsed)
         preflight(spec, req, rest)
-        blocks = spec.handler(rest, req)
+        result = spec.handler(rest, req)
+        if isinstance(result, LongRunningResult):
+            blocks = _with_context_token_warnings(req, result.blocks)
+            sys.stdout.write(render_text(blocks))
+            sys.stdout.flush()
+            return result.run()
+        blocks = result
         blocks = _with_context_token_warnings(req, blocks)
         sys.stdout.write(render_text(blocks))
         return infer_result_exit_code(blocks)

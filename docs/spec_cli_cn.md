@@ -301,6 +301,7 @@ Command error matrix：
 | `auth root regenerate` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
 | `feedback` | ALab home 未初始化时 `CONTEXT_NOT_FOUND` exit `2`；invalid inputs `CONFIG_INVALID` exit `2`；storage failures `STORAGE_ERROR` exit `5` |
+| `dashboard` | invalid port 或 refresh values `CONFIG_INVALID` exit `2`；`AUTH_REQUIRED` 或 `AUTH_DENIED` exit `3`；port unavailable 时 `RESOURCE_BUSY` exit `4`；storage failures `STORAGE_ERROR` exit `5` |
 | `key create|list|revoke` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND`、`CREDENTIAL_NOT_FOUND` 或 `CONFIG_INVALID` exit `2` |
 | `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT`、`SCOPE_VIOLATION` exit `4`；`AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；invalid path `CONFIG_INVALID` exit `2` |
 | `project list|show|status` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT` exit `4` |
@@ -360,7 +361,7 @@ Default context surfaces：
 
 - Global 且无 explicit key：显示 `help`、`auth init`、`feedback`、config diagnostics/repair，以及不要求 project record 的 context diagnostics commands。要求 project 的 command 只有在提供 explicit target 且不与当前 path 冲突时才可能 available。
 - Global 且带 explicit project admin key：显示匹配 project 的 admin surface，以及可通过显式传入该 project id 运行的 commands。
-- Global 且带 explicit root key：额外显示 root-level project creation、project listing、key management、catalog、cache、backup 和 audit commands。
+- Global 且带 explicit root key：额外显示 root-level project creation、project listing、key management、catalog、cache、backup、audit 和 local dashboard commands。
 - Project context 且无 explicit key：显示 global public commands 和 public safe `status`；当 project policy 允许 public experiment creation 时，显示 public `exp create` 和 source bootstrap。隐藏 project management、source management、config、validation、audit、cache、catalog、backup、key 和 lifecycle maintenance commands。
 - Project context 且带 explicit project admin key：显示同 project 的 project/source/config/validate/observe/experiment management commands，但不显示 root-only commands。
 - Project context 且带 explicit root key：显示 project admin capabilities 以及 scope 内的 root-only commands。
@@ -377,6 +378,7 @@ Canonical groups：
 - `auth`
 - `config`
 - `feedback`
+- `dashboard`
 - `key`
 - `context`
 - `project`
@@ -431,6 +433,7 @@ Primary object types：
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
 | `feedback` | `feedback` |
+| `dashboard` | `dashboard` |
 | `config validate` 的 repeated capability rows | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
@@ -504,6 +507,23 @@ Lifecycle command rules：
 - Metadata rule：缺失的 role、session、context、actor 或 Git information 存为 JSON `null`。
 - Success fields：`feedback id`、`kind`、`title`、`created at`、`role`、`session id`、`commit`、`path`、`metadata path`、`body path`。
 - Exit：成功 `0`；missing home 或 invalid input `2`；storage failure `5`。
+
+### Dashboard
+
+`alab dashboard [--port <0-65535>] [--no-open] [--refresh-seconds <0-3600>]`
+
+- Context：任意已初始化 ALab home。
+- Credential：Root。
+- Required args：无。
+- Options：`--port`、`--no-open`、`--refresh-seconds`。
+- Defaults：只绑定 `127.0.0.1`，`--port 0`，`--refresh-seconds 15`，除非设置 `--no-open` 否则打开 browser；`--refresh-seconds 0` 表示关闭 browser 自动轮询，但仍保留 manual refresh。
+- Long-running rule：命令先渲染 startup `dashboard` object 并 flush stdout，然后持续服务直到 interrupted。Clean shutdown exit `0`。
+- Browser auth rule：ALab 在 startup 验证 root key，丢弃 raw key，创建随机 browser session token，把 token 放入初始 URL fragment，并要求每个 `/api/*` request 都携带 `X-ALab-Dashboard-Token`。
+- Read-only rule：dashboard 全部数据来自现有 SQLite rows 和 file-backed log/artifact/feedback files。不得写 audit rows、config、cache、records、logs、artifacts、tokens 或 feedback。
+- Server rule：只绑定 loopback；非 GET/HEAD methods 返回 `405`；missing/wrong API token 返回 `401`；未知 routes 返回 `404`；local dashboard responses 使用 `Cache-Control: no-store`。
+- Secret rule：API responses 和 static UI 不得包含 raw root/admin keys、raw experiment tokens、raw credential verifiers/salts 或 raw `secret_env` values。Secret config surface 只能展示 names 和 fingerprints。
+- Success fields：`url`、`host`、`port`、`refresh seconds`、`opened`、`auth scope`、`next`。
+- Exit：clean shutdown `0`；invalid args `2`；auth failure `3`；selected port unavailable `4`；storage failure `5`。
 
 `alab auth init`
 

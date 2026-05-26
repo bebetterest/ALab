@@ -50,6 +50,7 @@ _KNOWN_FLAG_OPTIONS = {
     "--history",
     "--include-archived",
     "--include-hidden",
+    "--no-open",
     "--overwrite",
     "--private",
     "--refresh-capabilities",
@@ -420,7 +421,7 @@ _PAIRED_MARKDOWN_ROOTS = (_REPO_ROOT, _REPO_ROOT / "docs")
 _MARKDOWN_PAIR_EXCEPTIONS = {"潜在问题.md"}
 _GLOBAL_CLI_OPTIONS = {"--home", "--key", "--key-stdin", "--output"}
 _BANNED_RUNTIME_DEPENDENCY_ROOTS = {
-    # Hosted services / web UI frameworks are outside ALab V1.
+    # Hosted services / remote web UI frameworks are outside ALab V1.
     "aiohttp",
     "dash",
     "django",
@@ -20949,6 +20950,7 @@ def test_examples_matrix_paths_exist_and_document_current_examples() -> None:
         "docker_file_reward_artifacts",
         "harbor_verifier_minimal",
         "collaboration_observe_lifecycle",
+        "dashboard_showcase",
         "skydiscover_circle_packing_codex",
         "templates",
     }
@@ -20992,6 +20994,10 @@ def test_examples_are_task_shaped_demos() -> None:
         "collaboration_observe_lifecycle": [
             "source/solver.py",
             "source/data/incidents.json",
+        ],
+        "dashboard_showcase": [
+            "scripts/create_demo_home.py",
+            "scripts/run_dashboard.sh",
         ],
         "skydiscover_circle_packing_codex": [
             "alab.project.toml",

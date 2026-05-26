@@ -10,13 +10,14 @@
 - Archive、unarchive、remove、restore、repair、revoke、prune 和 lifecycle audit 规则：[spec_lifecycle.md](spec_lifecycle.md)，中文同步版 [spec_lifecycle_cn.md](spec_lifecycle_cn.md)
 - Runner、reward、log、artifact、Docker、Harbor 和 SkyDiscover adapter 契约：[spec_runners_adapters.md](spec_runners_adapters.md)，中文同步版 [spec_runners_adapters_cn.md](spec_runners_adapters_cn.md)
 - Observe、协作可见性、log、tag、artifact 和 annotation：[spec_observe_collaboration.md](spec_observe_collaboration.md)，中文同步版 [spec_observe_collaboration_cn.md](spec_observe_collaboration_cn.md)
+- Root-only local read-only browser dashboard：[spec_dashboard.md](spec_dashboard.md)，中文同步版 [spec_dashboard_cn.md](spec_dashboard_cn.md)
 - V1 验证计划和 acceptance coverage：[spec_tests.md](spec_tests.md)，中文同步版 [spec_tests_cn.md](spec_tests_cn.md)
 
 ## 2. 产品定义
 
 ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 在 ALab 创建的 Git worktree 中工作，通过 `alab` 创建尝试、提交迭代、运行评估、提交最终结果、查看可见历史、导出 artifact、编写 annotation，并为本地 suggestions、questions 或 bug reports 留 HOME-level feedback。
 
-ALab 负责 project 结构和本地记录。V1 不启动 agent、不调度 agent、不选择 prompt、不运行搜索循环、不托管服务，也不跨机器同步数据。
+ALab 负责 project 结构和本地记录。V1 不启动 agent、不调度 agent、不选择 prompt、不运行搜索循环、不托管远程服务，也不跨机器同步数据。CLI 可以启动 root-only local read-only dashboard，用于通过 loopback browser 查看本地 home。
 
 核心对象：
 
@@ -35,7 +36,7 @@ Project initialization 在写入 project record 时始终创建一个 project ad
 
 V1 不包含：
 
-- 托管服务、账号系统、多用户 server、原生 Web UI、远程数据库、云对象存储或跨机器同步。
+- 托管服务、账号系统、多用户 server、远程 Web UI、远程数据库、云对象存储或跨机器同步。
 - 内置 LLM provider 集成。
 - Agent 调度、自动搜索或 agent hiring。
 - 同一 OS 账号或同一文件系统内不同用户之间的强安全隔离。
@@ -73,6 +74,7 @@ V1 技术栈：
 - pytest 用于测试。
 - Git CLI subprocess 用于 repository、branch、commit、worktree 和 checkout 操作。
 - Docker CLI 作为 Docker、Harbor、SkyDiscover Docker runner 的可选运行时依赖。
+- Standard-library loopback HTTP serving 和 packaged static assets，用于 root-only read-only dashboard。
 
 支持 host 为 macOS 和 Linux。Windows 不进入 V1 acceptance testing。
 
@@ -84,6 +86,7 @@ V1 技术栈：
 - Repository class 通过显式 transaction 和 typed query method 管理 Python `sqlite3` access。V1 不使用 ORM。
 - Pydantic model 在模块边界校验 TOML input、canonical JSON field、command result、runner record 和 renderer input。
 - Renderer 只消费 structured result object。它不得重新查询 storage、执行 authorization check，或添加 result object 中不存在的字段。
+- Local dashboard 使用独立 read-model APIs 和 static assets。它的 browser JSON APIs 不是 CLI output format，且必须保持 read-only。
 - 未来实现应采用分层 package 结构：CLI routing、service workflows、repositories、Pydantic models、renderers、Git helpers、storage/migrations、runners、adapters 和 tests 分别保持清晰边界。
 
 ## 5. ALab Home 和文件
@@ -150,6 +153,8 @@ ALab 使用 context-aware capability surface。运行 `alab`、`alab help`、`al
 Capability display 默认使用当前 context token 或 public project policy。显式 `--key` 或 `--key-stdin` 解锁匹配的 project admin 或 root surface。`ALAB_KEY` 不影响 help，也不扩展 public/token context surface；但对于已经在当前 context surface 中可用且需要 root/admin authentication 的命令，它仍可继续满足 authentication。
 
 `text` 是默认输出，也是唯一可持久化输出格式。它是严格 key-value object 格式：每个 object block 以 `object: <type>` 开头，字段渲染为 `field: value`，多行文本在 `field:` 后使用缩进 block，list 使用 repeated labeled lines，重复 object 之间用一个空行分隔。Warning 在主结果后以 `object: warning` 渲染。`rich` 使用同一份 structured result data 进行不同渲染，只能通过 `--output rich` 对单次命令启用。
+
+`alab dashboard` 是 long-running root-only command。它渲染 startup `dashboard` object，flush stdout，启动 temporary `127.0.0.1` HTTP service，并持续 serve packaged static assets 和 read-only JSON APIs 直到 shutdown。Dashboard 不改变 CLI output contract，且不得 mutate ALab state。
 
 每个 stable error code 都映射到唯一 numeric exit code。所有 `*_NOT_FOUND` code exit `2`；`PROJECT_INVALID` 和 `COMMAND_UNAVAILABLE` exit `4`；已保存 runner 或 validation result error 时 exit `1`；只有无法保存目标 record 的 failure 才是 system/internal exit `5`。
 

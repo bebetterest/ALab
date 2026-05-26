@@ -36,7 +36,7 @@ dev = [
 package = true
 
 [tool.setuptools.package-data]
-alab = ["migrations/*.sql"]
+alab = ["migrations/*.sql", "dashboard_static/*", "dashboard_static/vendor/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

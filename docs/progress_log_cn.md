@@ -7821,3 +7821,24 @@
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked ruff check src tests`
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv run --locked pytest -q`
 - `git diff --check`
+
+## 2026-05-24 Root Dashboard
+
+已实现：
+
+- 新增顶层 `alab dashboard [--port <0-65535>] [--no-open] [--refresh-seconds <0-3600>]`，作为 root-only long-running command。
+- 新增受限 `127.0.0.1` `ThreadingHTTPServer` dashboard server，包含 random browser-token URL fragments、`X-ALab-Dashboard-Token` API checks、非 GET/HEAD methods 的 `405` rejection、no directory serving、CSP/no-store headers，以及 read-only JSON/binary routes。
+- 新增 dashboard read models，覆盖 global summary、projects、project detail、experiments、runs、logs、artifacts、audit、feedback 和 system state，并 redacted raw key/token/verifier/salt 与 raw `secret_env`。
+- 在 `src/alab/dashboard_static/` 下新增 packaged static assets：responsive English/Chinese UI、cards、filters、charts、detail panels、log/artifact preview/download flows、vendored Chart.js、selected Lucide SVG symbols 和 license notices。
+- 新增 `LongRunningResult` handling，使 `cli.run()` 可以渲染 startup blocks、flush stdout，然后 serve dashboard，同时不改变普通 command result behavior。
+- 更新 README、blueprint、CLI/dashboard/test specs、completion audit、progress/pipeline/guardrails/log、ignored local AGENTS notes 和 global-admin skill docs，并同步中文版本。
+
+验证：
+
+- Dashboard focused tests：`UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked pytest tests/test_dashboard.py -q`
+- CLI/docs contract focused subset：`UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked pytest tests/test_cli_contract.py::test_command_registry_object_types_follow_cli_contract_table tests/test_cli_contract.py::test_cli_primary_object_type_tables_are_synchronized tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized -q`
+- Focused default surfaces：`UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked pytest tests/test_dashboard.py tests/test_cli_contract.py tests/test_smoke.py -q`
+- 针对 seeded temporary `alab dashboard --no-open --refresh-seconds 0` server 的 Browser smoke：验证 Overview render with charts、Projects table data、Chinese language toggle、Experiments view、URL fragment token cleanup 和无 visible errors。
+- `UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked ruff check src tests`
+- Full default suite：`UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked pytest -q`
+- `git diff --check`

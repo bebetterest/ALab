@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ALab Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <div>
+            <div class="brand-name">ALab</div>
+            <div class="brand-subtitle" data-i18n="brand.subtitle">Local Viewer</div>
+          </div>
+        </div>
+        <nav class="nav" id="nav"></nav>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="view-title">Overview</h1>
+            <p id="view-subtitle"></p>
+          </div>
+          <div class="topbar-actions">
+            <label class="search-shell">
+              <span class="visually-hidden" data-i18n="global.search">Search</span>
+              <input id="global-search" type="search" autocomplete="off">
+            </label>
+            <button id="clear-search" class="icon-button" type="button" title="Clear search" hidden></button>
+            <select id="language-select" aria-label="Language">
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+            <button id="refresh-toggle" class="icon-button" type="button" title="Pause auto refresh"></button>
+            <button id="refresh-now" class="primary-button" type="button" data-i18n="global.refresh">Refresh</button>
+            <span id="last-refresh" class="refresh-meta"></span>
+          </div>
+        </header>
+        <section id="content" class="content"></section>
+      </main>
+      <div id="detail-backdrop" class="detail-backdrop" aria-hidden="true" hidden></div>
+      <aside id="detail-panel" class="detail-panel" aria-live="polite" aria-hidden="true"></aside>
+    </div>
+    <script src="/static/vendor/chart.umd.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

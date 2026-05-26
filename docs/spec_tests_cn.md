@@ -62,6 +62,7 @@
 - 默认 help 隐藏 locked commands，`alab help --all --explain` 渲染安全 `help_command` rows，其中包含 locked reason、unlock hint、context type、credential source 和 capability source。
 - 显式 `--key` 和 `--key-stdin` 解锁 project-admin 或 root surface；ambient `ALAB_KEY` 不影响 help output，也不扩展 token/public command surface。
 - Explicit root/admin credential surfaces 必须有 generated runtime coverage，证明 credential surface 外的 registered commands，包括 experiment worktree context 外的 token-only commands，以及 admin key 下的 root-only commands，都会在 handler option parsing、file reads、file/output writes、DB mutation、marker/token mutation、Git operations、runner execution 或 filesystem staging 前以 `COMMAND_UNAVAILABLE` 失败，并且每个 command/payload variant 都使用 fresh DB/file/tree snapshots。
+- Root-only long-running dashboard coverage 必须证明 no-key、admin、token 和 public contexts 不能进入 server；invalid port/refresh values 会在 bind 前失败；tests 中 `--no-open` 不打开 browser；startup output 在 serving 前 flush；clean shutdown exit `0`。
 - 通过 `--key` 和 `--key-stdin` 传入 invalid explicit credentials 时，必须有 generated registered-command coverage，证明 `AUTH_DENIED` 会在 handler option parsing、unsupported-option validation、config/body/value/summary/feedback file reads、output parent creation、DB mutation、config/marker/token mutation 或 project/source/tmp tree changes 前发生，并且每个 command variant 都使用新的 snapshot。
 - 直接调用当前 capability surface 外的 command 时，以 `COMMAND_UNAVAILABLE` exit `4` 失败，并且发生在读取 body/value files、写 SQLite row、创建 audit event、运行 Git 或执行 runner 之前。
 - Public project context 必须有 generated runtime coverage，证明每个不属于 public project surface 的 registered command 都会在 handler option parsing、file reads、file/output writes、DB mutation、marker/token mutation、Git operations、runner execution 或 filesystem staging 前以 `COMMAND_UNAVAILABLE` 失败；每个 unsupported option、missing file、config-file 和 output-path payload 都必须使用新的 SQLite/file/tree snapshot。
@@ -73,6 +74,7 @@
 - `help`、无 command `alab`、`alab --help` 和 nested command help。
 - `auth init`、`auth root regenerate`。
 - `config show`、`config set`、`config reset`、`config validate`。
+- `dashboard`。
 - `key create`、`key list`、`key revoke`。
 - `context show`、`context repair`。
 - `project list/show/archive/unarchive/remove/status/init/config/env/secret/validate/validation/locks`。
@@ -109,6 +111,14 @@ Lifecycle golden cases：
 - `exp archive` 拒绝已移除的 V1 flags `--remove-worktree` 和 `--force-remove-worktree`。
 - Archived artifact/log export 在没有 `--include-archived` 时失败；authorized by-id show 成功。
 - Config、artifact 和 log export 在 target exists 且未提供 `--overwrite` 时以 `OUTPUT_EXISTS` 失败。
+
+Dashboard security cases：
+
+- `alab dashboard` 只绑定 `127.0.0.1`，在 URL fragment 生成随机 browser token，并要求每个 `/api/*` request 携带 `X-ALab-Dashboard-Token`。
+- Missing 或 wrong API token 返回 `401`；unknown routes 返回 `404`；非 GET/HEAD methods 返回 `405` 且不 mutate state。
+- API responses 和 frontend assets 绝不暴露 raw root/admin keys、raw experiment tokens、credential verifier material、salts 或 raw `secret_env` values。
+- Root dashboard sessions 可以通过 path-contained file reads 读取 hidden log full text 和 raw artifact/log download bytes。
+- Static assets 避免 inline event handlers，并保持 dashboard CSP-compatible。
 
 ## 2. Storage 和 Migration Tests
 
