@@ -4,6 +4,12 @@
   <img src="docs/assets/readme-header.png" alt="Hand-drawn ALab virtual experiment workbench banner" width="100%">
 </p>
 
+> 🤖 大部分代码由 [Codex](https://openai.com/codex/) 完成。
+>
+> 📮 反馈：[bebetterest@outlook.com](mailto:bebetterest@outlook.com)
+>
+> [English](README.md) | [中文](README_cn.md)
+
 ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 可以在 ALab 创建的隔离 Git worktree 中迭代，运行可重复 evaluation，提交最终结果，并通过明确的协作边界查看可见的历史 experiment 证据。
 
 ALab V1 有意保持 local-only：没有 hosted service、sync service、remote Web UI、内置 agent launcher 或 account system。ALab 负责本地 project records、source snapshots、experiment lifecycle、runner execution、logs、artifacts、visibility rules，以及 root-only local read-only dashboard；agent 仍然是外部 CLI operator。
