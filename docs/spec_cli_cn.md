@@ -302,6 +302,7 @@ Command error matrix：
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
 | `feedback` | ALab home 未初始化时 `CONTEXT_NOT_FOUND` exit `2`；invalid inputs `CONFIG_INVALID` exit `2`；storage failures `STORAGE_ERROR` exit `5` |
 | `dashboard` | invalid port 或 refresh values `CONFIG_INVALID` exit `2`；`AUTH_REQUIRED` 或 `AUTH_DENIED` exit `3`；port unavailable 时 `RESOURCE_BUSY` exit `4`；storage failures `STORAGE_ERROR` exit `5` |
+| `report` | invalid selector 或 output path `CONFIG_INVALID` exit `2`；output 已存在时 `OUTPUT_EXISTS` exit `2`；root/admin 下 `PROJECT_NOT_FOUND` 或 `EXPERIMENT_NOT_FOUND` exit `2`；token not-visible-or-not-found selector `SCOPE_VIOLATION` exit `4`；auth failures exit `3` |
 | `key create|list|revoke` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND`、`CREDENTIAL_NOT_FOUND` 或 `CONFIG_INVALID` exit `2` |
 | `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT`、`SCOPE_VIOLATION` exit `4`；`AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；invalid path `CONFIG_INVALID` exit `2` |
 | `project list|show|status` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND` exit `2`；`CONTEXT_CONFLICT` exit `4` |
@@ -365,9 +366,9 @@ Default context surfaces：
 - Project context 且无 explicit key：显示 global public commands 和 public safe `status`；当 project policy 允许 public experiment creation 时，显示 public `exp create` 和 source bootstrap。隐藏 project management、source management、config、validation、audit、cache、catalog、backup、key 和 lifecycle maintenance commands。
 - Project context 且带 explicit project admin key：显示同 project 的 project/source/config/validate/observe/experiment management commands，但不显示 root-only commands。
 - Project context 且带 explicit root key：显示 project admin capabilities 以及 scope 内的 root-only commands。
-- Experiment context 且使用 worktree token：显示 global public commands、`status`、`run`、`submit`、visible observe commands、own-experiment tag commands、authorized annotations，以及 own-experiment run/artifact/visible-log archive 或 unarchive commands。隐藏 project/source/config/project init、experiment remove、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
+- Experiment context 且使用 worktree token：显示 global public commands、`status`、`run`、`submit`、visible observe commands、visible experiment reports、own-experiment tag commands、authorized annotations，以及 own-experiment run/artifact/visible-log archive 或 unarchive commands。隐藏 project/source/config/project init、experiment remove、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
 - Experiment context 且带 explicit project admin 或 root key：解锁匹配的 same-project admin 或 root surface，同时保留对不同 explicit project 的既有 context-conflict rules。
-- Inspection context 且使用 inspection token：显示 global public commands、`status`、visible observe commands、artifact/log export，以及移除自己的 inspection checkout。隐藏 run、submit、tag mutation、annotation mutation、project/source/config management、experiment mutation、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
+- Inspection context 且使用 inspection token：显示 global public commands、`status`、visible observe commands、visible experiment reports、artifact/log export，以及移除自己的 inspection checkout。隐藏 run、submit、tag mutation、annotation mutation、project/source/config management、experiment mutation、worktree maintenance、key management、audit、cache、catalog 和 backup commands。
 - Inspection context 且带 explicit project admin 或 root key：解锁匹配的 same-project admin 或 root surface；没有 explicit key 时仍保持 inspection-token read-only 行为。
 
 ## 6. Command Group 和 Alias
@@ -379,6 +380,7 @@ Canonical groups：
 - `config`
 - `feedback`
 - `dashboard`
+- `report`
 - `key`
 - `context`
 - `project`
@@ -434,6 +436,7 @@ Primary object types：
 | `config show|set|reset|validate` | `config` |
 | `feedback` | `feedback` |
 | `dashboard` | `dashboard` |
+| `report` | `report` |
 | `config validate` 的 repeated capability rows | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
@@ -524,6 +527,21 @@ Lifecycle command rules：
 - Secret rule：API responses 和 static UI 不得包含 raw root/admin keys、raw experiment tokens、raw credential verifiers/salts 或 raw `secret_env` values。Secret config surface 只能展示 names 和 fingerprints。
 - Success fields：`url`、`host`、`port`、`refresh seconds`、`opened`、`auth scope`、`next`。
 - Exit：clean shutdown `0`；invalid args `2`；auth failure `3`；selected port unavailable `4`；storage failure `5`。
+
+### Report
+
+`alab report [--project <project_id>] [--exp <exp_id>] --out <path> [--overwrite]`
+
+- Context：Global、project、experiment 或 inspection。
+- Credential：Project report 要求 Root/admin；experiment report 支持 root/admin，或对该 experiment 可见的 experiment/inspection token。
+- Required args：`--out`；不在 project/experiment/inspection context 内时必须显式提供 `--project`。
+- Options：`--project`、`--exp`、`--out`、`--overwrite`。
+- Output rule：将 Markdown report 写入 `--out`；parent directory 必须已存在。Existing file 需要 `--overwrite`；existing directory 始终以 `OUTPUT_EXISTS` 失败。
+- Scope rule：不带 `--exp` 时导出 project report，并要求 root/admin。带 `--exp` 时导出一个 visible experiment report，并应用与 observe commands 相同的 visibility rules。
+- Secret rule：report 不得包含 raw root/admin keys、raw experiment tokens、credential verifiers/salts、raw `secret_env` values、hidden log contents 或 artifact bytes。Root/admin report 可以包含 hidden-log metadata；token report 省略 hidden logs。
+- Content rule：report 包含 project/experiment metadata、safe config summaries、run/result tables、存在时的 submission summary/feedback、artifact/log metadata、counts 和 local timestamps。
+- Success fields：`project id`、`exp id`、`scope`、`out`、`wrote`、`bytes`。
+- Exit：成功 `0`；invalid args、root/admin not found 或 output conflicts `2`；auth failure `3`；token visibility failure `4`；storage/write failure `5`。
 
 `alab auth init`
 

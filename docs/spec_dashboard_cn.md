@@ -91,15 +91,17 @@ API routes：
 - `/api/experiments/{id}`
 - `/api/runs`
 - `/api/runs/{id}`
+- `/api/logs`
 - `/api/logs/{id}/content`
 - `/api/logs/{id}/download`
+- `/api/artifacts`
 - `/api/artifacts/{id}/preview`
 - `/api/artifacts/{id}/download`
 - `/api/audit`
 - `/api/feedback`
 - `/api/system`
 
-除 download responses 外，所有 API output 都是 JSON；download responses 返回 bytes、content type 和 download filename。API queries 使用 parameterized SQLite queries 和 explicit JSON sanitizers。File reads 必须 resolve 到 ALab-owned project artifact/log storage root 下，并拒绝 path traversal。
+除 download responses 外，所有 API output 都是 JSON；download responses 返回 bytes、content type 和 download filename。Project、experiment、run、log、artifact 和 audit record 的 list routes 接受 `limit` 和 `offset`，最大 `limit` 为 `500`；返回原有 top-level array field，并额外包含 `page` metadata：`limit`、`offset`、`total` 和 `next_offset`。Top-level `projects`、`experiments`、`runs`、`logs`、`artifacts` 和 `audit` list routes 在适用时接受 `query`；`experiments`、`runs`、`logs`、`artifacts` 和 `audit` 接受 `project`；`runs`、`logs` 和 `artifacts` 在适用时接受更窄的 `exp` 或 `run` filters。Project、experiment 和 run detail routes 返回有界 recent related arrays，并附带高容量 related records 的 page totals。API queries 使用 parameterized SQLite queries 和 explicit JSON sanitizers。File reads 必须 resolve 到 ALab-owned project artifact/log storage root 下，并拒绝 path traversal。
 
 ## 5. Read Model
 
@@ -107,11 +109,12 @@ Dashboard read model 应暴露：
 
 - Global overview：home health、status distributions、active locks、recent activity、validation health、feedback count、cache/capability/catalog state、artifact/log volume 和 recent failures。
 - Projects：sortable/filterable project summaries，包含 status、source count、experiment count、latest activity、run health、artifact/log volume、active config/validation 和 project-local best summary。
-- Project detail：overview、experiments、runs、sources/config、validations、logs/artifacts、annotations 和 audit records。Overview 必须包含 project-level aggregate statistics，以及按 project reward direction 绘制每次 run reward 并连接每个 new best point 的 reward trend chart。
+- Project detail：overview、有界 recent experiments、runs、sources/config、validations、logs/artifacts、annotations 和 audit records，并带 related-record page totals。Overview 必须包含 project-level aggregate statistics，以及按 project reward direction 绘制 loaded run reward 并连接每个 new best point 的 reward trend chart。
+- Run detail：overview、有界 recent logs/artifacts、related-record page totals、parsed metrics、runner/failure metadata、safe log preview/download links，以及 safe artifact preview/download links。
 - Experiments：status、tags、source binding、config binding、worktree state、latest/final run、submission 和 reward trend。
 - Runs：status、reward、warnings、runner metadata、stdout/stderr/hidden log references、artifact references、commit/config context 和 failure reasons。
-- Logs and artifacts：chunked full log reads、text/image previews、binary metadata 和 raw downloads。
-- Audit、feedback 和 system：searchable audit rows、HOME feedback entries、global config、locks、runtime capabilities、catalogs 和 caches。
+- Logs and artifacts：paginated global/project-scoped metadata lists、chunked full log reads、text/image previews、binary metadata 和 raw downloads。
+- Audit、feedback 和 system：searchable audit rows、HOME feedback entries、global config、locks、runtime capabilities、catalogs 和 paginated cache entries。
 
 Reward values 只能在 compatible project/reward-policy context 内比较。Global dashboard 不得展示跨 project leaderboard。
 
@@ -141,4 +144,6 @@ Focused tests 必须覆盖：
 - Raw keys、tokens、credential verifier material 和 raw `secret_env` values 不会出现在 API responses。
 - Root dashboard sessions 可以访问 hidden log full text。
 - Text/image artifact preview 和 binary download 行为安全且 path-contained。
+- List routes 返回 bounded pages，并拒绝 invalid pagination values。
+- Global assets frontend 使用 top-level paginated `/api/logs` 和 `/api/artifacts` routes，而不是抓取每个 project detail。
 - Static frontend assets 避免 inline handlers，并保持 English/Chinese key parity。

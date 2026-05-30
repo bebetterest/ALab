@@ -19,6 +19,7 @@ ALab V1 is intentionally local-only: no hosted service, sync service, remote web
 - Local CLI workbench for projects, sources, experiments, runs, submissions, logs, artifacts, annotations, and audits.
 - HOME-level feedback capture so any ALab role can leave local suggestions, questions, or bug reports without needing project credentials.
 - Root-only local dashboard for browser-based read-only inspection of global/project/experiment/run/log/artifact/audit/feedback/system state.
+- Markdown evidence reports for project owners or visible experiment contexts through `alab report`.
 - Context-aware command surface: `alab help` and command preflight show only what the current project, experiment, inspection checkout, token, or explicit key can use.
 - Git-backed experiment isolation: each experiment is an isolated branch/worktree with a worktree token for run and submit operations.
 - Reproducible project setup: project config controls runner, reward, artifact capture, environment, secrets, mutable paths, and visibility.
@@ -189,6 +190,7 @@ Useful next commands:
 alab help
 alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
 alab --key <root-key> dashboard --no-open
+alab --key <admin-or-root-key> report --project <project-id> --out ./alab-project-report.md
 alab observe experiments list
 alab observe runs list --exp <exp-id>
 alab observe experiments best
@@ -203,7 +205,8 @@ alab observe experiments best
 - **Run**: one evaluator execution for an experiment commit, with status, reward, logs, artifacts, and warning codes.
 - **Submit**: closes an experiment with final summary, feedback, final run, final commit, and explicit refs.
 - **Feedback**: HOME-level plaintext notes for suggestions, questions, bugs, or other agent observations, stored as one directory per entry under `feedback/`.
-- **Dashboard**: root-only local browser panel for read-only inspection. It binds to `127.0.0.1`, uses a random browser session token, and writes no ALab records.
+- **Dashboard**: root-only local browser panel for read-only inspection. It binds to `127.0.0.1`, uses a random browser session token, serves bounded paginated read models for large homes, and writes no ALab records.
+- **Reports**: Markdown evidence exports for project-level owner handoffs or visible experiment contexts, without raw secrets, hidden log contents, or artifact bytes.
 - **Inspection checkout**: read-only checkout for observing/exporting scoped experiment evidence without becoming submit-capable.
 
 ## Configuration

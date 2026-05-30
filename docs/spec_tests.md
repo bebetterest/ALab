@@ -78,6 +78,7 @@ Commands covered:
 - `auth init`, `auth root regenerate`.
 - `config show`, `config set`, `config reset`, `config validate`.
 - `dashboard`.
+- `report`.
 - `key create`, `key list`, `key revoke`.
 - `context show`, `context repair`.
 - `project list/show/archive/unarchive/remove/status/init/config/env/secret/validate/validation/locks`.
@@ -113,7 +114,8 @@ Lifecycle golden cases:
 - Token/public selectors for objects that exist outside the caller's visibility return non-disclosing `SCOPE_VIOLATION` rather than revealing object existence.
 - `exp archive` rejects removed V1 flags `--remove-worktree` and `--force-remove-worktree`.
 - Archived artifact/log export fails without `--include-archived`; archived artifact/log show by id succeeds when authorized.
-- Config, artifact, and log exports fail with `OUTPUT_EXISTS` when the target exists and `--overwrite` is omitted.
+- Config, artifact, log, and report exports fail with `OUTPUT_EXISTS` when the target exists and `--overwrite` is omitted.
+- `alab report` project exports require root/admin authority; experiment exports may use root/admin or a token that can observe the target experiment; hidden log contents and artifact bytes are not included in generated Markdown; best-run sections use the active valid reward policy identity and exclude incomparable runs.
 
 Dashboard security cases:
 
@@ -121,6 +123,7 @@ Dashboard security cases:
 - Missing or wrong API tokens return `401`; unknown routes return `404`; non-GET/HEAD methods return `405` and do not mutate state.
 - API responses and frontend assets never expose raw root/admin keys, raw experiment tokens, credential verifier material, salts, or raw `secret_env` values.
 - Root dashboard sessions can read hidden log full text and raw artifact/log download bytes through path-contained file reads.
+- Dashboard list APIs return bounded pages with `page` metadata; invalid pagination values fail; the static frontend must not fetch every project detail to build global log/artifact views.
 - Static assets avoid inline event handlers and remain compatible with the dashboard CSP.
 
 ## 2. Storage And Migration Tests

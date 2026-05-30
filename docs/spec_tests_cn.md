@@ -75,6 +75,7 @@
 - `auth init`、`auth root regenerate`。
 - `config show`、`config set`、`config reset`、`config validate`。
 - `dashboard`。
+- `report`。
 - `key create`、`key list`、`key revoke`。
 - `context show`、`context repair`。
 - `project list/show/archive/unarchive/remove/status/init/config/env/secret/validate/validation/locks`。
@@ -110,7 +111,8 @@ Lifecycle golden cases：
 - Token/public caller 选择不可见对象时返回非泄露 `SCOPE_VIOLATION`，reason 为 `not visible or not found`。
 - `exp archive` 拒绝已移除的 V1 flags `--remove-worktree` 和 `--force-remove-worktree`。
 - Archived artifact/log export 在没有 `--include-archived` 时失败；authorized by-id show 成功。
-- Config、artifact 和 log export 在 target exists 且未提供 `--overwrite` 时以 `OUTPUT_EXISTS` 失败。
+- Config、artifact、log 和 report export 在 target exists 且未提供 `--overwrite` 时以 `OUTPUT_EXISTS` 失败。
+- `alab report` project export 需要 root/admin authority；experiment export 可以使用 root/admin 或能够 observe target experiment 的 token；生成的 Markdown 不包含 hidden log contents 或 artifact bytes；best-run sections 使用 active valid reward policy identity，并排除不可比 runs。
 
 Dashboard security cases：
 
@@ -118,6 +120,7 @@ Dashboard security cases：
 - Missing 或 wrong API token 返回 `401`；unknown routes 返回 `404`；非 GET/HEAD methods 返回 `405` 且不 mutate state。
 - API responses 和 frontend assets 绝不暴露 raw root/admin keys、raw experiment tokens、credential verifier material、salts 或 raw `secret_env` values。
 - Root dashboard sessions 可以通过 path-contained file reads 读取 hidden log full text 和 raw artifact/log download bytes。
+- Dashboard list APIs 返回有界 page 和 `page` metadata；invalid pagination values 会失败；static frontend 构建 global log/artifact views 时不得 fetch every project detail。
 - Static assets 避免 inline event handlers，并保持 dashboard CSP-compatible。
 
 ## 2. Storage 和 Migration Tests

@@ -12,29 +12,29 @@
 
 Blueprint 和 subsystem specs 仍是规范性产品契约。
 
-## 当前位置 - 2026-05-24
+## 当前位置 - 2026-05-30
 
 ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、HOME-level agent feedback capture、root-only local read-only dashboard、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
-当前 active focus 的短摘要：2026-05-24 root dashboard batch 已经落地，是当前 worktree 的最新 changed edge。它新增了 `alab dashboard`，作为 root-only local read-only browser panel，由 loopback token-gated APIs 和 packaged static assets 支撑。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
+当前 active focus 的短摘要：2026-05-30 report/dashboard scale batch 已经落地，是当前 worktree 的最新 changed edge。它新增 `alab report`，用于导出 project 或 visible experiment 的 Markdown evidence report，并通过 paginated list APIs、top-level log/artifact routes、有界 detail payloads 和 loaded/total frontend metadata 收紧 dashboard 数据加载。Feedback 保持不变，JSON output 仍不处理，local batch execution 也不属于本 batch。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
 
-当前 worktree 的 default/local runnable V1 implementation 已完成 closeout。剩余工作是条件性维护，不是当前 completion blocker：
+当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，但最新 implementation/test changes 发生在 2026-05-24 full-suite closeout 之后。Release-quality claim 前剩余工作是 validation，不是已知缺失实现：
 
-- `docs/completion_audit.md` 除 status legend 和 future-state instructions 外，已经没有 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- 当前 worktree 的 latest full default-suite closeout gate 在 2026-05-24 root dashboard batch 后已经保持 current。
+- `docs/completion_audit.md` 已为 report/dashboard scale edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
+- Latest full default-suite closeout gate 在 2026-05-30 implementation/test changes 后已 stale；任何 release claim 前必须重跑。
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
-- 最终 README/spec/local-notes/progress/audit consistency pass 在 TSP template usability polish 批次后已有当前 focused evidence；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后需要重跑。
+- 2026-05-30 batch 的 focused dashboard、CLI/docs contract、lint 和 diff checks 已通过。Full default suite 在这些 implementation/test changes 后仍然 stale，release claim 前应重跑。
 
 ## Gate 快照
 
 | Gate | State | Completion blocker |
 | --- | --- | --- |
-| Requirement evidence | `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
-| Full default suite | `PASSED` | 任何后续 implementation/test change 后，以及任何 release claim 前重跑。 |
-| CLI contract completeness | `PASSED` | 当前 registered CLI surfaces 已由 generated parser/capability/output matrices、docs-derived success schemas、saved result-failure/system-error checks 和 completion-audit consistency guard 证明；commands 或 output variants 变化时重跑/更新。 |
-| Non-CLI hardening | default/local 与当前 opt-in subsets `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |
+| Requirement evidence | 2026-05-30 focused edge 为 `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
+| Full default suite | `STALE_AFTER_CHANGE` | 2026-05-30 implementation/test changes 后，以及任何 release claim 前重跑。 |
+| CLI contract completeness | `report` focused checks `PASSED` | 当前 registered CLI surfaces 已由 generated parser/capability/output matrices、docs-derived success schemas、saved result-failure/system-error checks 和 completion-audit consistency guard 证明；commands 或 output variants 变化时重跑/更新。 |
+| Non-CLI hardening | Dashboard scale focused tests `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |
 | Real-environment runners | Docker-backed、real Docker capability-refresh、live catalog 与 SkyDiscover Python dependency subsets 在 all-opt-in suite 中 `PASSED` 且 `skipped=0` | 如果 release-target host/platform/Python/network/upstream catalog behavior 变化，重跑 opt-in gates。 |
-| Documentation consistency | `PASSED` | 当前 documentation set 的 focused docs/README/spec/local-notes checks 已通过；未来 documentation、`.env.example`、`.gitignore` 或 local-note changes 后重跑。 |
+| Documentation consistency | focused docs/CLI contract checks `PASSED` | Release claim 前重跑更宽的 docs checks。 |
 
 ## Do-Not-Reopen 摘要
 
@@ -44,4 +44,4 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 
 ## 下一步
 
-当前没有 implementation batch。未来变更先从 `docs/completion_audit.md` 点名精确新 edge 开始；只有确实产生 active queue 时，才更新 `docs/progress_pipeline.md`。
+当前 worktree 没有 active implementation queue。任何 release-quality claim 前重跑 full default suite。

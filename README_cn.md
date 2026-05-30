@@ -19,6 +19,7 @@ ALab V1 有意保持 local-only：没有 hosted service、sync service、remote 
 - 面向 projects、sources、experiments、runs、submissions、logs、artifacts、annotations 和 audits 的本地 CLI workbench。
 - HOME-level feedback capture，让任何 ALab role 都能在不需要 project credential 的情况下留下本地建议、问题或 bug reports。
 - Root-only local dashboard，用浏览器只读查看 global/project/experiment/run/log/artifact/audit/feedback/system state。
+- 通过 `alab report` 为 project owner 或 visible experiment context 导出 Markdown evidence reports。
 - Context-aware command surface：`alab help` 和 command preflight 只显示当前 project、experiment、inspection checkout、token 或 explicit key 可使用的 commands。
 - Git-backed experiment isolation：每个 experiment 是独立 branch/worktree，并有 worktree token 用于 run 和 submit。
 - 可复现 project setup：project config 控制 runner、reward、artifact capture、environment、secrets、mutable paths 和 visibility。
@@ -189,6 +190,7 @@ ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab submit \
 alab help
 alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
 alab --key <root-key> dashboard --no-open
+alab --key <admin-or-root-key> report --project <project-id> --out ./alab-project-report.md
 alab observe experiments list
 alab observe runs list --exp <exp-id>
 alab observe experiments best
@@ -203,7 +205,8 @@ alab observe experiments best
 - **Run**：针对某个 experiment commit 的一次 evaluator execution，包含 status、reward、logs、artifacts 和 warning codes。
 - **Submit**：用 final summary、feedback、final run、final commit 和 explicit refs 关闭 experiment。
 - **Feedback**：HOME-level plaintext notes，用于 suggestions、questions、bugs 或其他 agent observations，每条记录在 `feedback/` 下独立存放。
-- **Dashboard**：root-only local browser panel，用于 read-only inspection。它只绑定 `127.0.0.1`，使用随机 browser session token，且不写 ALab records。
+- **Dashboard**：root-only local browser panel，用于 read-only inspection。它只绑定 `127.0.0.1`，使用随机 browser session token，为 large homes 提供 bounded paginated read models，且不写 ALab records。
+- **Reports**：Markdown evidence exports，用于 project-level owner handoffs 或 visible experiment contexts，不包含 raw secrets、hidden log contents 或 artifact bytes。
 - **Inspection checkout**：只读 checkout，用于 observe/export scoped experiment evidence，不会变成 submit-capable。
 
 ## Configuration

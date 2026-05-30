@@ -7848,3 +7848,22 @@ Validation:
 - `UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked ruff check src tests`
 - Full default suite: `UV_CACHE_DIR=/private/tmp/alab-uv-cache uv run --locked pytest -q`
 - `git diff --check`
+
+## 2026-05-30 Report Export And Dashboard Scale
+
+Implemented:
+
+- Added top-level `alab report [--project <project_id>] [--exp <exp_id>] --out <path> [--overwrite]` with primary object type `report`.
+- Project reports require root/admin authority; experiment reports can use root/admin or an experiment/inspection token that can observe the target experiment.
+- Generated Markdown reports include safe project/experiment metadata, counts, recent run/result tables, submission summary/feedback, and artifact/log metadata while omitting raw keys, raw tokens, raw `secret_env` values, hidden log contents, and artifact bytes.
+- Added dashboard pagination metadata and bounded `limit`/`offset` handling to top-level project, experiment, run, log, artifact, and audit APIs while leaving feedback capture unchanged.
+- Added top-level `/api/logs` and `/api/artifacts`, bounded high-volume project/experiment/run detail related arrays, cache-entry paging, and frontend loaded/total metadata so global asset views no longer fetch every project detail.
+- Kept `alab feedback`, JSON output, and local batch execution unchanged by explicit batch scope.
+- Updated README, blueprint, CLI/dashboard/test specs, role skills, completion audit, progress dashboard/pipeline/guardrails, and synchronized Chinese documents.
+
+Validation:
+
+- Dashboard/report focused tests: `.venv/bin/pytest tests/test_dashboard.py -q`
+- CLI/docs contract focused subset: `.venv/bin/pytest tests/test_cli_contract.py::test_command_registry_object_types_follow_cli_contract_table tests/test_cli_contract.py::test_cli_primary_object_type_tables_are_synchronized tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_capability_surfaces_reference_registered_commands_with_expected_credentials tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale -q`
+- Focused lint: `.venv/bin/ruff check src/alab/dashboard.py src/alab/services.py src/alab/registry.py src/alab/cli.py tests/test_dashboard.py tests/test_cli_contract.py`
+- `git diff --check`

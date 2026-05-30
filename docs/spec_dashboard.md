@@ -91,15 +91,17 @@ API routes:
 - `/api/experiments/{id}`
 - `/api/runs`
 - `/api/runs/{id}`
+- `/api/logs`
 - `/api/logs/{id}/content`
 - `/api/logs/{id}/download`
+- `/api/artifacts`
 - `/api/artifacts/{id}/preview`
 - `/api/artifacts/{id}/download`
 - `/api/audit`
 - `/api/feedback`
 - `/api/system`
 
-All API output is JSON except download responses, which return bytes with content type and download filename. API queries use parameterized SQLite queries and explicit JSON sanitizers. File reads must resolve under the ALab-owned project artifact/log storage root and reject path traversal.
+All API output is JSON except download responses, which return bytes with content type and download filename. List routes for project, experiment, run, log, artifact, and audit records accept `limit` and `offset` with a maximum `limit` of `500`, return the same top-level array field as before, and include `page` metadata with `limit`, `offset`, `total`, and `next_offset`. Top-level `projects`, `experiments`, `runs`, `logs`, `artifacts`, and `audit` list routes accept `query` where applicable; `experiments`, `runs`, `logs`, `artifacts`, and `audit` accept `project`; `runs`, `logs`, and `artifacts` accept narrower `exp` or `run` filters where applicable. Project, experiment, and run detail routes return bounded recent related arrays plus page totals for high-volume related records. API queries use parameterized SQLite queries and explicit JSON sanitizers. File reads must resolve under the ALab-owned project artifact/log storage root and reject path traversal.
 
 ## 5. Read Model
 
@@ -107,11 +109,12 @@ The dashboard read model should expose:
 
 - Global overview: home health, status distributions, active locks, recent activity, validation health, feedback count, cache/capability/catalog state, artifact/log volume, and recent failures.
 - Projects: sortable/filterable project summaries with status, source count, experiment count, latest activity, run health, artifact/log volume, active config/validation, and project-local best summary.
-- Project detail: overview, experiments, runs, sources/config, validations, logs/artifacts, annotations, and audit records. Overview must include project-level aggregate statistics and a reward trend chart that plots each run reward and connects each new best point according to the project's reward direction.
+- Project detail: overview, bounded recent experiments, runs, sources/config, validations, logs/artifacts, annotations, and audit records with related-record page totals. Overview must include project-level aggregate statistics and a reward trend chart that plots each loaded run reward and connects each new best point according to the project's reward direction.
+- Run detail: overview, bounded recent logs/artifacts, related-record page totals, parsed metrics, runner/failure metadata, safe log preview/download links, and safe artifact preview/download links.
 - Experiments: status, tags, source binding, config binding, worktree state, latest/final run, submission, and reward trend.
 - Runs: status, reward, warnings, runner metadata, stdout/stderr/hidden log references, artifact references, commit/config context, and failure reasons.
-- Logs and artifacts: chunked full log reads, text/image previews, binary metadata, and raw downloads.
-- Audit, feedback, and system: searchable audit rows, HOME feedback entries, global config, locks, runtime capabilities, catalogs, and caches.
+- Logs and artifacts: paginated global/project-scoped metadata lists, chunked full log reads, text/image previews, binary metadata, and raw downloads.
+- Audit, feedback, and system: searchable audit rows, HOME feedback entries, global config, locks, runtime capabilities, catalogs, and paginated cache entries.
 
 Reward values should be compared only within compatible project/reward-policy context. The global dashboard must not present a cross-project leaderboard.
 
@@ -141,4 +144,6 @@ Focused tests must cover:
 - Raw keys, tokens, credential verifier material, and raw `secret_env` values do not appear in API responses.
 - Hidden log full-text access works for root dashboard sessions.
 - Text/image artifact preview and binary download behavior are safe and path-contained.
+- List routes return bounded pages and reject invalid pagination values.
+- The global assets frontend uses top-level paginated `/api/logs` and `/api/artifacts` routes instead of fetching every project detail.
 - Static frontend assets avoid inline handlers and keep English/Chinese key parity.

@@ -20,6 +20,7 @@ alab auth root regenerate
 alab config show|set|reset|validate
 alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab dashboard [--port <0-65535>] [--no-open] [--refresh-seconds <0-3600>]
+alab report --project <project_id> [--exp <exp_id>] --out <path> [--overwrite]
 alab key create --project <project_id> --role admin
 alab key list --root
 alab key list --project <project_id>
@@ -61,6 +62,9 @@ alab audit list|show ...
 - **`dashboard`**：打开 root-only local read-only dashboard。
   关键参数：可选 `--port <0-65535>`、`--refresh-seconds <0-3600>` 和 `--no-open`。
   注意点：要求 root credential，只绑定 `127.0.0.1`，渲染 token URL，并阻塞直到 interrupted。不要分享 token URL；dashboard 可以读取 hidden/full logs 和 artifacts，但不得 mutate ALab state。
+- **`report`**：导出 Markdown project 或 experiment evidence report。
+  关键参数：必需 `--project <project_id>` 和 `--out <path>`；可选 `--exp <exp_id>` 和 `--overwrite`。
+  注意点：Root 可以导出 project-wide 或 experiment-scoped reports。Report 有意省略 raw keys、tokens、secret values、hidden-log contents 和 artifact bytes。
 - **`key create`**：为 controller 创建 project admin key。
   关键参数：必需 `--project <project_id>`；可选 `--role admin`。
   注意点：Root-only；raw admin key 只打印一次。

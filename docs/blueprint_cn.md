@@ -15,7 +15,7 @@
 
 ## 2. 产品定义
 
-ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 在 ALab 创建的 Git worktree 中工作，通过 `alab` 创建尝试、提交迭代、运行评估、提交最终结果、查看可见历史、导出 artifact、编写 annotation，并为本地 suggestions、questions 或 bug reports 留 HOME-level feedback。
+ALab 是一个本地、agent-first 的 Python CLI 实验工作台。外部 agent 在 ALab 创建的 Git worktree 中工作，通过 `alab` 创建尝试、提交迭代、运行评估、提交最终结果、查看可见历史、导出 artifact、编写 annotation、导出 Markdown evidence reports，并为本地 suggestions、questions 或 bug reports 留 HOME-level feedback。
 
 ALab 负责 project 结构和本地记录。V1 不启动 agent、不调度 agent、不选择 prompt、不运行搜索循环、不托管远程服务，也不跨机器同步数据。CLI 可以启动 root-only local read-only dashboard，用于通过 loopback browser 查看本地 home。
 
@@ -155,6 +155,8 @@ Capability display 默认使用当前 context token 或 public project policy。
 `text` 是默认输出，也是唯一可持久化输出格式。它是严格 key-value object 格式：每个 object block 以 `object: <type>` 开头，字段渲染为 `field: value`，多行文本在 `field:` 后使用缩进 block，list 使用 repeated labeled lines，重复 object 之间用一个空行分隔。Warning 在主结果后以 `object: warning` 渲染。`rich` 使用同一份 structured result data 进行不同渲染，只能通过 `--output rich` 对单次命令启用。
 
 `alab dashboard` 是 long-running root-only command。它渲染 startup `dashboard` object，flush stdout，启动 temporary `127.0.0.1` HTTP service，并持续 serve packaged static assets 和 read-only JSON APIs 直到 shutdown。Dashboard 不改变 CLI output contract，且不得 mutate ALab state。
+
+`alab report` 将 Markdown evidence reports 写入显式 local output path。Project reports 需要 root/admin authority；experiment reports 可由 root/admin 或能 observe target experiment 的 token 生成。Reports 是 handoff artifacts，不是 JSON output mode，且必须省略 raw keys、raw tokens、raw `secret_env` values、hidden log contents 和 artifact bytes。
 
 每个 stable error code 都映射到唯一 numeric exit code。所有 `*_NOT_FOUND` code exit `2`；`PROJECT_INVALID` 和 `COMMAND_UNAVAILABLE` exit `4`；已保存 runner 或 validation result error 时 exit `1`；只有无法保存目标 record 的 failure 才是 system/internal exit `5`。
 

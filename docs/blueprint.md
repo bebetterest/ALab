@@ -17,7 +17,7 @@ Chinese synchronized documents use the same names with `_cn.md`.
 
 ## 2. Product Definition
 
-ALab is a local, agent-first Python CLI workbench for iterative experiments. External agents work inside ALab-created Git worktrees. They use `alab` to create attempts, commit iterations, run evaluations, submit final results, inspect visible prior work, export artifacts, write annotations, and leave HOME-level feedback for local suggestions, questions, or bug reports.
+ALab is a local, agent-first Python CLI workbench for iterative experiments. External agents work inside ALab-created Git worktrees. They use `alab` to create attempts, commit iterations, run evaluations, submit final results, inspect visible prior work, export artifacts, write annotations, export Markdown evidence reports, and leave HOME-level feedback for local suggestions, questions, or bug reports.
 
 ALab owns project structure and local records. It does not launch agents, schedule agents, choose prompts, run search loops, host a remote service, or synchronize data across machines in V1. A root-only local read-only dashboard may be launched by the CLI for loopback browser inspection of the local home.
 
@@ -157,6 +157,8 @@ Capability display uses the current context token or public project policy by de
 `text` is the default output and the only persisted output format. It is a strict key-value object format: each object block starts with `object: <type>`, fields render as `field: value`, multiline text renders as an indented block after `field:`, lists render as repeated labeled lines, and repeated objects are separated by one blank line. Warnings render after result blocks as `object: warning`. `rich` uses the same structured result data with different rendering and is available only through `--output rich` for a single command.
 
 `alab dashboard` is a long-running root-only command. It renders a startup `dashboard` object, flushes stdout, starts a temporary `127.0.0.1` HTTP service, and serves packaged static assets plus read-only JSON APIs until shutdown. The dashboard does not change the CLI output contract and must not mutate ALab state.
+
+`alab report` writes Markdown evidence reports to an explicit local output path. Project reports require root/admin authority; experiment reports are available to root/admin or tokens that can observe the target experiment. Reports are handoff artifacts, not a JSON output mode, and must omit raw keys, raw tokens, raw `secret_env` values, hidden log contents, and artifact bytes.
 
 Every stable error code maps to one numeric exit code. All `*_NOT_FOUND` codes exit `2`; `PROJECT_INVALID` and `COMMAND_UNAVAILABLE` exit `4`; saved runner or validation result errors exit `1`; only failures that cannot store the intended record are system/internal exit `5`.
 

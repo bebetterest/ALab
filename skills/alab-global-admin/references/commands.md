@@ -20,6 +20,7 @@ alab auth root regenerate
 alab config show|set|reset|validate
 alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab dashboard [--port <0-65535>] [--no-open] [--refresh-seconds <0-3600>]
+alab report --project <project_id> [--exp <exp_id>] --out <path> [--overwrite]
 alab key create --project <project_id> --role admin
 alab key list --root
 alab key list --project <project_id>
@@ -61,6 +62,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`dashboard`**: Open the root-only local read-only dashboard.
   Parameters: Optional `--port <0-65535>`, `--refresh-seconds <0-3600>`, and `--no-open`.
   Notes: Requires root credential, binds only to `127.0.0.1`, renders a token URL, and blocks until interrupted. Do not share the token URL; the dashboard can read hidden/full logs and artifacts but must not mutate ALab state.
+- **`report`**: Export a Markdown project or experiment evidence report.
+  Parameters: Required `--project <project_id>` and `--out <path>`; optional `--exp <exp_id>` and `--overwrite`.
+  Notes: Root can export project-wide or experiment-scoped reports. Reports intentionally omit raw keys, tokens, secret values, hidden-log contents, and artifact bytes.
 - **`key create`**: Create a project admin key for a controller.
   Parameters: Required `--project <project_id>`; optional `--role admin`.
   Notes: Root-only; prints raw admin key exactly once.

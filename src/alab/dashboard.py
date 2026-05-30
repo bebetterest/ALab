@@ -24,6 +24,8 @@ DASHBOARD_TOKEN_HEADER = "X-ALab-Dashboard-Token"
 DEFAULT_REFRESH_SECONDS = 15
 MAX_CONTENT_CHUNK_BYTES = 1024 * 1024
 DEFAULT_CONTENT_CHUNK_BYTES = 64 * 1024
+DEFAULT_LIST_LIMIT = 100
+MAX_LIST_LIMIT = 500
 MAX_PREVIEW_BYTES = 512 * 1024
 STATIC_ROOT = resources.files("alab").joinpath("dashboard_static")
 STATIC_TYPES = {
@@ -240,17 +242,39 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         if segments == ["summary"]:
             return read_summary(self.server.home, self.server.refresh_seconds)
         if segments == ["projects"]:
-            return {"projects": read_projects(self.server.home)}
+            limit, offset = _list_limit_offset(params)
+            total = count_projects(self.server.home, query=_first(params, "query"))
+            return {
+                "projects": read_projects(self.server.home, query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if len(segments) == 2 and segments[0] == "projects":
             return read_project_detail(self.server.home, segments[1])
         if segments == ["experiments"]:
-            return {"experiments": read_experiments(self.server.home, project_id=_first(params, "project"))}
+            limit, offset = _list_limit_offset(params)
+            total = count_experiments(self.server.home, project_id=_first(params, "project"), query=_first(params, "query"))
+            return {
+                "experiments": read_experiments(self.server.home, project_id=_first(params, "project"), query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if len(segments) == 2 and segments[0] == "experiments":
             return read_experiment_detail(self.server.home, segments[1])
         if segments == ["runs"]:
-            return {"runs": read_runs(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"))}
+            limit, offset = _list_limit_offset(params)
+            total = count_runs(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"), query=_first(params, "query"))
+            return {
+                "runs": read_runs(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"), query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if len(segments) == 2 and segments[0] == "runs":
             return read_run_detail(self.server.home, segments[1])
+        if segments == ["logs"]:
+            limit, offset = _list_limit_offset(params)
+            total = count_logs(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"), run_id=_first(params, "run"), query=_first(params, "query"))
+            return {
+                "logs": read_logs(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"), run_id=_first(params, "run"), query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if len(segments) == 3 and segments[0] == "logs" and segments[2] == "content":
             return read_log_content(
                 self.server.home,
@@ -260,16 +284,32 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             )
         if len(segments) == 3 and segments[0] == "logs" and segments[2] == "download":
             return read_log_download(self.server.home, segments[1])
+        if segments == ["artifacts"]:
+            limit, offset = _list_limit_offset(params)
+            total = count_artifacts(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"), run_id=_first(params, "run"), query=_first(params, "query"))
+            return {
+                "artifacts": read_artifacts(self.server.home, project_id=_first(params, "project"), exp_id=_first(params, "exp"), run_id=_first(params, "run"), query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if len(segments) == 3 and segments[0] == "artifacts" and segments[2] == "preview":
             return read_artifact_preview(self.server.home, segments[1])
         if len(segments) == 3 and segments[0] == "artifacts" and segments[2] == "download":
             return read_artifact_download(self.server.home, segments[1])
         if segments == ["audit"]:
-            return {"audit": read_audit(self.server.home, project_id=_first(params, "project"), query=_first(params, "query"))}
+            limit, offset = _list_limit_offset(params)
+            total = count_audit(self.server.home, project_id=_first(params, "project"), query=_first(params, "query"))
+            return {
+                "audit": read_audit(self.server.home, project_id=_first(params, "project"), query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if segments == ["feedback"]:
             return {"feedback": read_feedback(self.server.home)}
         if segments == ["system"]:
-            return read_system(self.server.home)
+            return read_system(
+                self.server.home,
+                cache_limit=_int_param(params, "cache_limit", MAX_LIST_LIMIT, minimum=1, maximum=MAX_LIST_LIMIT),
+                cache_offset=_int_param(params, "cache_offset", 0, minimum=0, maximum=10**12),
+            )
         raise AlabError("CONTEXT_NOT_FOUND", "dashboard route not found")
 
 
@@ -306,6 +346,18 @@ def _int_param(params: dict[str, list[str]], name: str, default: int, *, minimum
     if value < minimum or value > maximum:
         raise AlabError("CONFIG_INVALID", f"{name} must be between {minimum} and {maximum}")
     return value
+
+
+def _list_limit_offset(params: dict[str, list[str]]) -> tuple[int, int]:
+    return (
+        _int_param(params, "limit", DEFAULT_LIST_LIMIT, minimum=1, maximum=MAX_LIST_LIMIT),
+        _int_param(params, "offset", 0, minimum=0, maximum=10**12),
+    )
+
+
+def _page_meta(total: int, limit: int, offset: int) -> dict[str, int | None]:
+    next_offset = offset + limit if offset + limit < total else None
+    return {"limit": limit, "offset": offset, "total": total, "next_offset": next_offset}
 
 
 def read_summary(home: Home, refresh_seconds: int = DEFAULT_REFRESH_SECONDS) -> dict[str, Any]:
@@ -350,22 +402,44 @@ def read_summary(home: Home, refresh_seconds: int = DEFAULT_REFRESH_SECONDS) -> 
             },
             "recent_failures": recent_failures,
             "recent_activity": recent_activity,
-            "projects": read_projects(home, conn=conn),
+            "projects": read_projects(home, conn=conn, limit=DEFAULT_LIST_LIMIT, offset=0),
+            "projects_page": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM projects"), DEFAULT_LIST_LIMIT, 0),
         }
     finally:
         conn.close()
 
 
-def read_projects(home: Home, *, conn: Any | None = None) -> list[dict[str, Any]]:
+def read_projects(
+    home: Home,
+    *,
+    conn: Any | None = None,
+    query: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
     owns_conn = conn is None
     if conn is None:
         conn = connect_initialized(home)
     try:
-        rows = all_rows(conn, "SELECT * FROM projects ORDER BY updated_at DESC")
+        clauses, params = _project_list_filters(query=query)
+        where = _where_sql(clauses)
+        if limit is None:
+            rows = all_rows(conn, f"SELECT * FROM projects{where} ORDER BY updated_at DESC", tuple(params))
+        else:
+            rows = all_rows(conn, f"SELECT * FROM projects{where} ORDER BY updated_at DESC LIMIT ? OFFSET ?", (*params, limit, offset))
         return [_project_summary(conn, row) for row in rows]
     finally:
         if owns_conn:
             conn.close()
+
+
+def count_projects(home: Home, *, query: str | None = None) -> int:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _project_list_filters(query=query)
+        return _scalar_count(conn, f"SELECT COUNT(*) FROM projects{_where_sql(clauses)}", tuple(params))
+    finally:
+        conn.close()
 
 
 def read_project_detail(home: Home, project_id: str) -> dict[str, Any]:
@@ -374,43 +448,75 @@ def read_project_detail(home: Home, project_id: str) -> dict[str, Any]:
         project = one(conn, "SELECT * FROM projects WHERE project_id = ?", (project_id,))
         if project is None:
             raise AlabError("PROJECT_NOT_FOUND", "project not found")
+        list_limit = DEFAULT_LIST_LIMIT
         configs = [
             _config_summary(row)
             for row in all_rows(
                 conn,
-                "SELECT * FROM project_config_versions WHERE project_id = ? ORDER BY version DESC",
-                (project_id,),
+                "SELECT * FROM project_config_versions WHERE project_id = ? ORDER BY version DESC LIMIT ?",
+                (project_id, list_limit),
             )
         ]
         return {
             "project": _project_summary(conn, project),
             "configs": configs,
-            "sources": [_source_summary(row) for row in all_rows(conn, "SELECT * FROM sources WHERE project_id = ? ORDER BY created_at DESC", (project_id,))],
-            "validations": [_validation_summary(row) for row in all_rows(conn, "SELECT * FROM project_validations WHERE project_id = ? ORDER BY started_at DESC LIMIT 100", (project_id,))],
-            "experiments": read_experiments(home, project_id=project_id, conn=conn),
-            "runs": read_runs(home, project_id=project_id, conn=conn, limit=100),
-            "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE project_id = ? ORDER BY created_at DESC LIMIT 100", (project_id,))],
-            "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE project_id = ? ORDER BY created_at DESC LIMIT 100", (project_id,))],
-            "annotations": [_annotation_summary(row) for row in all_rows(conn, "SELECT * FROM annotations WHERE project_id = ? ORDER BY updated_at DESC LIMIT 100", (project_id,))],
-            "audit": [_audit_summary(row) for row in all_rows(conn, "SELECT * FROM audit_events WHERE project_id = ? ORDER BY created_at DESC LIMIT 100", (project_id,))],
+            "sources": [_source_summary(row) for row in all_rows(conn, "SELECT * FROM sources WHERE project_id = ? ORDER BY created_at DESC LIMIT ?", (project_id, list_limit))],
+            "validations": [_validation_summary(row) for row in all_rows(conn, "SELECT * FROM project_validations WHERE project_id = ? ORDER BY started_at DESC LIMIT ?", (project_id, list_limit))],
+            "experiments": read_experiments(home, project_id=project_id, conn=conn, limit=list_limit),
+            "runs": read_runs(home, project_id=project_id, conn=conn, limit=list_limit),
+            "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE project_id = ? ORDER BY created_at DESC LIMIT ?", (project_id, list_limit))],
+            "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE project_id = ? ORDER BY created_at DESC LIMIT ?", (project_id, list_limit))],
+            "annotations": [_annotation_summary(row) for row in all_rows(conn, "SELECT * FROM annotations WHERE project_id = ? ORDER BY updated_at DESC LIMIT ?", (project_id, list_limit))],
+            "audit": [_audit_summary(row) for row in all_rows(conn, "SELECT * FROM audit_events WHERE project_id = ? ORDER BY created_at DESC LIMIT ?", (project_id, list_limit))],
+            "pages": {
+                "configs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM project_config_versions WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "sources": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM sources WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "validations": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM project_validations WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "experiments": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM experiments WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "runs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM runs WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "artifacts": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM artifacts WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "logs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM log_streams WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "annotations": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM annotations WHERE project_id = ?", (project_id,)), list_limit, 0),
+                "audit": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM audit_events WHERE project_id = ?", (project_id,)), list_limit, 0),
+            },
         }
     finally:
         conn.close()
 
 
-def read_experiments(home: Home, *, project_id: str | None = None, conn: Any | None = None) -> list[dict[str, Any]]:
+def read_experiments(
+    home: Home,
+    *,
+    project_id: str | None = None,
+    conn: Any | None = None,
+    query: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
     owns_conn = conn is None
     if conn is None:
         conn = connect_initialized(home)
     try:
-        if project_id:
-            rows = all_rows(conn, "SELECT * FROM experiments WHERE project_id = ? ORDER BY updated_at DESC", (project_id,))
+        clauses, params = _experiment_list_filters(project_id=project_id, query=query)
+        where = _where_sql(clauses)
+        effective_limit = MAX_LIST_LIMIT if limit is None and project_id is None else limit
+        if effective_limit is None:
+            rows = all_rows(conn, f"SELECT * FROM experiments{where} ORDER BY updated_at DESC", tuple(params))
         else:
-            rows = all_rows(conn, "SELECT * FROM experiments ORDER BY updated_at DESC LIMIT 500")
+            rows = all_rows(conn, f"SELECT * FROM experiments{where} ORDER BY updated_at DESC LIMIT ? OFFSET ?", (*params, effective_limit, offset))
         return [_experiment_summary(conn, row) for row in rows]
     finally:
         if owns_conn:
             conn.close()
+
+
+def count_experiments(home: Home, *, project_id: str | None = None, query: str | None = None) -> int:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _experiment_list_filters(project_id=project_id, query=query)
+        return _scalar_count(conn, f"SELECT COUNT(*) FROM experiments{_where_sql(clauses)}", tuple(params))
+    finally:
+        conn.close()
 
 
 def read_experiment_detail(home: Home, exp_id: str) -> dict[str, Any]:
@@ -419,64 +525,68 @@ def read_experiment_detail(home: Home, exp_id: str) -> dict[str, Any]:
         exp = one(conn, "SELECT * FROM experiments WHERE exp_id = ?", (exp_id,))
         if exp is None:
             raise AlabError("EXPERIMENT_NOT_FOUND", "experiment not found")
+        list_limit = DEFAULT_LIST_LIMIT
         return {
             "experiment": _experiment_summary(conn, exp),
-            "runs": read_runs(home, exp_id=exp_id, conn=conn),
+            "runs": read_runs(home, exp_id=exp_id, conn=conn, limit=list_limit),
             "submission": _maybe_row_summary(one(conn, "SELECT * FROM experiment_submissions WHERE exp_id = ?", (exp_id,))),
             "tags": [row["tag_slug"] for row in all_rows(conn, "SELECT tag_slug FROM experiment_tags WHERE exp_id = ? ORDER BY tag_slug", (exp_id,))],
-            "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE exp_id = ? ORDER BY created_at DESC LIMIT 100", (exp_id,))],
-            "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE exp_id = ? ORDER BY created_at DESC LIMIT 100", (exp_id,))],
-            "annotations": [_annotation_summary(row) for row in all_rows(conn, "SELECT * FROM annotations WHERE project_id = ? AND target_id = ? ORDER BY updated_at DESC", (exp["project_id"], exp_id))],
-            "audit": [_audit_summary(row) for row in all_rows(conn, "SELECT * FROM audit_events WHERE exp_id = ? ORDER BY created_at DESC LIMIT 100", (exp_id,))],
+            "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE exp_id = ? ORDER BY created_at DESC LIMIT ?", (exp_id, list_limit))],
+            "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE exp_id = ? ORDER BY created_at DESC LIMIT ?", (exp_id, list_limit))],
+            "annotations": [_annotation_summary(row) for row in all_rows(conn, "SELECT * FROM annotations WHERE project_id = ? AND target_id = ? ORDER BY updated_at DESC LIMIT ?", (exp["project_id"], exp_id, list_limit))],
+            "audit": [_audit_summary(row) for row in all_rows(conn, "SELECT * FROM audit_events WHERE exp_id = ? ORDER BY created_at DESC LIMIT ?", (exp_id, list_limit))],
+            "pages": {
+                "runs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM runs WHERE exp_id = ?", (exp_id,)), list_limit, 0),
+                "artifacts": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM artifacts WHERE exp_id = ?", (exp_id,)), list_limit, 0),
+                "logs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM log_streams WHERE exp_id = ?", (exp_id,)), list_limit, 0),
+                "annotations": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM annotations WHERE project_id = ? AND target_id = ?", (exp["project_id"], exp_id)), list_limit, 0),
+                "audit": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM audit_events WHERE exp_id = ?", (exp_id,)), list_limit, 0),
+            },
         }
     finally:
         conn.close()
 
 
-def read_runs(home: Home, *, project_id: str | None = None, exp_id: str | None = None, conn: Any | None = None, limit: int = 500) -> list[dict[str, Any]]:
+def read_runs(
+    home: Home,
+    *,
+    project_id: str | None = None,
+    exp_id: str | None = None,
+    conn: Any | None = None,
+    query: str | None = None,
+    limit: int = MAX_LIST_LIMIT,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
     owns_conn = conn is None
     if conn is None:
         conn = connect_initialized(home)
     try:
-        if exp_id:
-            rows = all_rows(
-                conn,
-                """
-                SELECT r.*, e.metadata_json AS exp_metadata_json
-                FROM runs r LEFT JOIN experiments e ON e.exp_id = r.exp_id
-                WHERE r.exp_id = ?
-                ORDER BY r.started_at DESC
-                LIMIT ?
-                """,
-                (exp_id, limit),
-            )
-        elif project_id:
-            rows = all_rows(
-                conn,
-                """
-                SELECT r.*, e.metadata_json AS exp_metadata_json
-                FROM runs r LEFT JOIN experiments e ON e.exp_id = r.exp_id
-                WHERE r.project_id = ?
-                ORDER BY r.started_at DESC
-                LIMIT ?
-                """,
-                (project_id, limit),
-            )
-        else:
-            rows = all_rows(
-                conn,
-                """
-                SELECT r.*, e.metadata_json AS exp_metadata_json
-                FROM runs r LEFT JOIN experiments e ON e.exp_id = r.exp_id
-                ORDER BY r.started_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            )
+        clauses, params = _run_list_filters(project_id=project_id, exp_id=exp_id, query=query)
+        where = _where_sql(clauses, prefix="WHERE")
+        rows = all_rows(
+            conn,
+            f"""
+            SELECT r.*, e.metadata_json AS exp_metadata_json
+            FROM runs r LEFT JOIN experiments e ON e.exp_id = r.exp_id
+            {where}
+            ORDER BY r.started_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (*params, limit, offset),
+        )
         return [_run_summary(row) for row in rows]
     finally:
         if owns_conn:
             conn.close()
+
+
+def count_runs(home: Home, *, project_id: str | None = None, exp_id: str | None = None, query: str | None = None) -> int:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _run_list_filters(project_id=project_id, exp_id=exp_id, query=query)
+        return _scalar_count(conn, f"SELECT COUNT(*) FROM runs r{_where_sql(clauses)}", tuple(params))
+    finally:
+        conn.close()
 
 
 def read_run_detail(home: Home, run_id: str) -> dict[str, Any]:
@@ -493,11 +603,72 @@ def read_run_detail(home: Home, run_id: str) -> dict[str, Any]:
         )
         if run is None:
             raise AlabError("RUN_NOT_FOUND", "run not found")
+        list_limit = DEFAULT_LIST_LIMIT
         return {
             "run": _run_summary(run, include_record=True),
-            "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE run_id = ? ORDER BY stream, created_at", (run_id,))],
-            "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE run_id = ? ORDER BY relative_path", (run_id,))],
+            "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE run_id = ? ORDER BY stream, created_at LIMIT ?", (run_id, list_limit))],
+            "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE run_id = ? ORDER BY relative_path LIMIT ?", (run_id, list_limit))],
+            "pages": {
+                "logs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM log_streams WHERE run_id = ?", (run_id,)), list_limit, 0),
+                "artifacts": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM artifacts WHERE run_id = ?", (run_id,)), list_limit, 0),
+            },
         }
+    finally:
+        conn.close()
+
+
+def read_logs(
+    home: Home,
+    *,
+    project_id: str | None = None,
+    exp_id: str | None = None,
+    run_id: str | None = None,
+    query: str | None = None,
+    limit: int = DEFAULT_LIST_LIMIT,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _log_list_filters(project_id=project_id, exp_id=exp_id, run_id=run_id, query=query)
+        rows = all_rows(conn, f"SELECT * FROM log_streams{_where_sql(clauses)} ORDER BY created_at DESC LIMIT ? OFFSET ?", (*params, limit, offset))
+        return [_log_summary(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def count_logs(home: Home, *, project_id: str | None = None, exp_id: str | None = None, run_id: str | None = None, query: str | None = None) -> int:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _log_list_filters(project_id=project_id, exp_id=exp_id, run_id=run_id, query=query)
+        return _scalar_count(conn, f"SELECT COUNT(*) FROM log_streams{_where_sql(clauses)}", tuple(params))
+    finally:
+        conn.close()
+
+
+def read_artifacts(
+    home: Home,
+    *,
+    project_id: str | None = None,
+    exp_id: str | None = None,
+    run_id: str | None = None,
+    query: str | None = None,
+    limit: int = DEFAULT_LIST_LIMIT,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _artifact_list_filters(project_id=project_id, exp_id=exp_id, run_id=run_id, query=query)
+        rows = all_rows(conn, f"SELECT * FROM artifacts{_where_sql(clauses)} ORDER BY created_at DESC LIMIT ? OFFSET ?", (*params, limit, offset))
+        return [_artifact_summary(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def count_artifacts(home: Home, *, project_id: str | None = None, exp_id: str | None = None, run_id: str | None = None, query: str | None = None) -> int:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _artifact_list_filters(project_id=project_id, exp_id=exp_id, run_id=run_id, query=query)
+        return _scalar_count(conn, f"SELECT COUNT(*) FROM artifacts{_where_sql(clauses)}", tuple(params))
     finally:
         conn.close()
 
@@ -577,20 +748,27 @@ def read_artifact_download(home: Home, artifact_id: str) -> _BinaryResponse:
         conn.close()
 
 
-def read_audit(home: Home, *, project_id: str | None = None, query: str | None = None) -> list[dict[str, Any]]:
+def read_audit(
+    home: Home,
+    *,
+    project_id: str | None = None,
+    query: str | None = None,
+    limit: int = MAX_LIST_LIMIT,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
     conn = connect_initialized(home)
     try:
-        clauses: list[str] = []
-        params: list[Any] = []
-        if project_id:
-            clauses.append("project_id = ?")
-            params.append(project_id)
-        if query:
-            like = f"%{query}%"
-            clauses.append("(audit_id LIKE ? OR object_id LIKE ? OR action LIKE ? OR object_type LIKE ?)")
-            params.extend([like, like, like, like])
-        where = " WHERE " + " AND ".join(clauses) if clauses else ""
-        return [_audit_summary(row) for row in all_rows(conn, f"SELECT * FROM audit_events{where} ORDER BY created_at DESC LIMIT 500", tuple(params))]
+        clauses, params = _audit_list_filters(project_id=project_id, query=query)
+        return [_audit_summary(row) for row in all_rows(conn, f"SELECT * FROM audit_events{_where_sql(clauses)} ORDER BY created_at DESC LIMIT ? OFFSET ?", (*params, limit, offset))]
+    finally:
+        conn.close()
+
+
+def count_audit(home: Home, *, project_id: str | None = None, query: str | None = None) -> int:
+    conn = connect_initialized(home)
+    try:
+        clauses, params = _audit_list_filters(project_id=project_id, query=query)
+        return _scalar_count(conn, f"SELECT COUNT(*) FROM audit_events{_where_sql(clauses)}", tuple(params))
     finally:
         conn.close()
 
@@ -611,21 +789,113 @@ def read_feedback(home: Home) -> list[dict[str, Any]]:
     return entries
 
 
-def read_system(home: Home) -> dict[str, Any]:
+def read_system(home: Home, *, cache_limit: int = MAX_LIST_LIMIT, cache_offset: int = 0) -> dict[str, Any]:
     conn = connect_initialized(home)
     try:
         home_row = one(conn, "SELECT * FROM homes LIMIT 1")
+        cache_total = _scalar_count(conn, "SELECT COUNT(*) FROM cache_entries")
         return {
             "home": _clean_dict(_row(home_row) if home_row else {"path": str(home.path)}),
             "global_config": _clean_dict(load_global_config(home.config_path)),
             "locks": [_clean_dict(_row(row)) for row in all_rows(conn, "SELECT * FROM locks ORDER BY expires_at")],
             "capabilities": [_clean_dict(_row(row)) for row in all_rows(conn, "SELECT * FROM runtime_capabilities ORDER BY checked_at DESC")],
             "catalogs": [_clean_dict(_row(row)) for row in all_rows(conn, "SELECT * FROM catalogs ORDER BY updated_at DESC")],
-            "cache_entries": [_clean_dict(_row(row)) for row in all_rows(conn, "SELECT * FROM cache_entries ORDER BY COALESCE(last_used_at, created_at) DESC LIMIT 500")],
+            "cache_entries": [_clean_dict(_row(row)) for row in all_rows(conn, "SELECT * FROM cache_entries ORDER BY COALESCE(last_used_at, created_at) DESC LIMIT ? OFFSET ?", (cache_limit, cache_offset))],
+            "cache_entries_page": _page_meta(cache_total, cache_limit, cache_offset),
             "feedback_count": _feedback_count(home),
         }
     finally:
         conn.close()
+
+
+def _where_sql(clauses: list[str], *, prefix: str = "WHERE") -> str:
+    return f" {prefix} {' AND '.join(clauses)}" if clauses else ""
+
+
+def _like_params(query: str | None, count: int) -> list[str]:
+    return [f"%{query}%"] * count if query else []
+
+
+def _project_list_filters(*, query: str | None) -> tuple[list[str], list[Any]]:
+    if not query:
+        return [], []
+    like = _like_params(query, 5)
+    return ["(project_id LIKE ? OR status LIKE ? OR canonical_repo_path LIKE ? OR control_path LIKE ? OR active_validation_id LIKE ?)"], like
+
+
+def _experiment_list_filters(*, project_id: str | None, query: str | None) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if project_id:
+        clauses.append("project_id = ?")
+        params.append(project_id)
+    if query:
+        clauses.append("(exp_id LIKE ? OR source_id LIKE ? OR branch_name LIKE ? OR metadata_json LIKE ?)")
+        params.extend(_like_params(query, 4))
+    return clauses, params
+
+
+def _run_list_filters(*, project_id: str | None, exp_id: str | None, query: str | None) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if project_id:
+        clauses.append("r.project_id = ?")
+        params.append(project_id)
+    if exp_id:
+        clauses.append("r.exp_id = ?")
+        params.append(exp_id)
+    if query:
+        clauses.append("(r.run_id LIKE ? OR r.exp_id LIKE ? OR r.project_id LIKE ? OR r.commit_sha LIKE ? OR r.status LIKE ?)")
+        params.extend(_like_params(query, 5))
+    return clauses, params
+
+
+def _log_list_filters(*, project_id: str | None, exp_id: str | None, run_id: str | None, query: str | None) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if project_id:
+        clauses.append("project_id = ?")
+        params.append(project_id)
+    if exp_id:
+        clauses.append("exp_id = ?")
+        params.append(exp_id)
+    if run_id:
+        clauses.append("run_id = ?")
+        params.append(run_id)
+    if query:
+        clauses.append("(log_id LIKE ? OR stream LIKE ? OR exp_id LIKE ? OR run_id LIKE ? OR project_id LIKE ? OR preview_text LIKE ?)")
+        params.extend(_like_params(query, 6))
+    return clauses, params
+
+
+def _artifact_list_filters(*, project_id: str | None, exp_id: str | None, run_id: str | None, query: str | None) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if project_id:
+        clauses.append("project_id = ?")
+        params.append(project_id)
+    if exp_id:
+        clauses.append("exp_id = ?")
+        params.append(exp_id)
+    if run_id:
+        clauses.append("run_id = ?")
+        params.append(run_id)
+    if query:
+        clauses.append("(artifact_id LIKE ? OR relative_path LIKE ? OR exp_id LIKE ? OR run_id LIKE ? OR project_id LIKE ? OR status LIKE ?)")
+        params.extend(_like_params(query, 6))
+    return clauses, params
+
+
+def _audit_list_filters(*, project_id: str | None, query: str | None) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if project_id:
+        clauses.append("project_id = ?")
+        params.append(project_id)
+    if query:
+        clauses.append("(audit_id LIKE ? OR object_id LIKE ? OR action LIKE ? OR object_type LIKE ?)")
+        params.extend(_like_params(query, 4))
+    return clauses, params
 
 
 def _row(row: Any) -> dict[str, Any]:

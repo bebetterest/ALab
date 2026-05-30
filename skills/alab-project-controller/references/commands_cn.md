@@ -18,6 +18,7 @@ Project controller 可以使用 same-project admin commands：
 alab project show|archive|unarchive ...
 alab status --project <project_id>
 alab feedback --kind suggestion|question|bug|other --body "<text>"
+alab report --project <project_id> [--exp <exp_id>] --out <path> [--overwrite]
 alab project config show|export|import|set ...
 alab project env set|unset|list ...
 alab project secret set|unset|list|gc ...
@@ -48,6 +49,9 @@ alab audit list|show --project <project_id> ...
 - **`feedback`**：为 ALab behavior、runner issues、docs gaps 或 project-operation questions 留 HOME-level local feedback。
   关键参数：`--body <text>` 或 `--body-file <path>` 二选一；可选 `--kind suggestion|question|bug|other` 和 `--title <text>`。
   注意点：project-visible experiment notes 用 annotations；local ALab/tooling feedback 用 feedback，存储在 `ALAB_HOME/feedback/`。
+- **`report`**：导出 project 或一个 visible experiment 的 Markdown evidence report。
+  关键参数：必须提供 `--out <path>`；不在 context 中时提供 `--project <project_id>`；可选 `--exp <exp_id>` 和 `--overwrite`。
+  注意点：Project report 要求 admin/root authority。Experiment report 遵循 observe visibility。Report 包含 summaries 和 metadata，但不包含 raw keys、tokens、raw secrets、hidden-log contents 或 artifact bytes。
 - **`project config show`**：查看 retained config metadata。
   关键参数：可选 `--project`；`--version latest-attempted|active-valid|<n>`。
   注意点：显示 runner/reward/artifact/env/secret fingerprints，但不显示 raw secret values。

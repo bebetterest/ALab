@@ -12,11 +12,12 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 - Keep only the current queue and update policy here. Do not append stale backlog; rewrite or remove queue rows as evidence closes.
 - English docs are canonical. Update the synchronized `*_cn.md` file in the same change.
 
-## Current Active Batch - 2026-05-24
+## Current Active Batch - 2026-05-30
 
-- Focus: the root dashboard batch is closed for the current worktree. `alab dashboard` is now the root-only local read-only browser dashboard for global/project/experiment/run/log/artifact/audit/feedback/system inspection.
+- Focus: report export and dashboard scale optimization is closed for the current worktree. `alab report` exports Markdown evidence for a project or a visible experiment. Dashboard global lists and high-volume detail surfaces use bounded pages instead of unbounded related-record fan-out.
+- Explicit non-goals for this batch: keep `alab feedback` unchanged; do not add JSON output; do not implement local batch execution.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
-- Next evidence to add: none for the current worktree. Reopen work only if `docs/completion_audit.md` names a concrete defect, a changed requirement makes an existing evidence row too broad to judge, or an explicit release target differs from the currently proved real-environment gates.
+- Next evidence to add: none for this batch. Reopen only if a later requirement changes report scope/output, dashboard route semantics, pagination/search behavior, or release-target validation expectations.
 
 ## Active Queue
 

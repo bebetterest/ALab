@@ -304,6 +304,7 @@ Command error matrix:
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`; `STORAGE_ERROR` exit `5` |
 | `feedback` | `CONTEXT_NOT_FOUND` exit `2` when ALab home is not initialized; invalid inputs `CONFIG_INVALID` exit `2`; storage failures `STORAGE_ERROR` exit `5` |
 | `dashboard` | invalid port or refresh values `CONFIG_INVALID` exit `2`; `AUTH_REQUIRED` or `AUTH_DENIED` exit `3`; unavailable port `RESOURCE_BUSY` exit `4`; storage failures `STORAGE_ERROR` exit `5` |
+| `report` | invalid selector or output path `CONFIG_INVALID` exit `2`; existing output `OUTPUT_EXISTS` exit `2`; `PROJECT_NOT_FOUND` or `EXPERIMENT_NOT_FOUND` exit `2` for root/admin; token not-visible-or-not-found selectors `SCOPE_VIOLATION` exit `4`; auth failures exit `3` |
 | `key create|list|revoke` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND`, `CREDENTIAL_NOT_FOUND`, or `CONFIG_INVALID` exit `2` |
 | `context show|repair` | `CONTEXT_NOT_FOUND` exit `2`; `CONTEXT_CONFLICT`, `SCOPE_VIOLATION` exit `4`; `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; invalid path `CONFIG_INVALID` exit `2` |
 | `project list|show|status` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND` exit `2`; `CONTEXT_CONFLICT` exit `4` |
@@ -367,9 +368,9 @@ Default context surfaces:
 - Project context with no explicit key: show global public commands, public safe `status`; when project policy allows public experiment creation, show public `exp create` with source bootstrap options. Hide project management, source management, config, validation, audit, cache, catalog, backup, key, and lifecycle maintenance commands.
 - Project context with explicit project admin key: show same-project project/source/config/validate/observe/experiment management commands except root-only commands.
 - Project context with explicit root key: show project admin capabilities plus root-only commands in scope.
-- Experiment context with worktree token: show global public commands, `status`, `run`, `submit`, visible observe commands, own-experiment tag commands, authorized annotations, and own-experiment run/artifact/visible-log archive or unarchive commands. Hide project/source/config/project init, experiment remove, worktree maintenance, key management, audit, cache, catalog, and backup commands.
+- Experiment context with worktree token: show global public commands, `status`, `run`, `submit`, visible observe commands, visible experiment reports, own-experiment tag commands, authorized annotations, and own-experiment run/artifact/visible-log archive or unarchive commands. Hide project/source/config/project init, experiment remove, worktree maintenance, key management, audit, cache, catalog, and backup commands.
 - Experiment context with explicit project admin or root key: unlock the matching same-project admin or root surface while preserving existing context-conflict rules for different explicit projects.
-- Inspection context with inspection token: show global public commands, `status`, visible observe commands, artifact/log export, and removal of its own inspection checkout. Hide run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, key management, audit, cache, catalog, and backup commands.
+- Inspection context with inspection token: show global public commands, `status`, visible observe commands, visible experiment reports, artifact/log export, and removal of its own inspection checkout. Hide run, submit, tag mutation, annotation mutation, project/source/config management, experiment mutation, worktree maintenance, key management, audit, cache, catalog, and backup commands.
 - Inspection context with explicit project admin or root key: unlock the matching same-project admin or root surface while preserving inspection-token read-only behavior when no explicit key is provided.
 
 ## 7. Command Groups And Aliases
@@ -381,6 +382,7 @@ Canonical groups:
 - `config`
 - `feedback`
 - `dashboard`
+- `report`
 - `key`
 - `context`
 - `project`
@@ -436,6 +438,7 @@ Primary object types:
 | `config show|set|reset|validate` | `config` |
 | `feedback` | `feedback` |
 | `dashboard` | `dashboard` |
+| `report` | `report` |
 | repeated capability rows from `config validate` | `capability` |
 | `key create|list|revoke`, `exp token list|revoke|regenerate` | `credential` |
 | `context show|repair` | `context` |
@@ -518,6 +521,21 @@ Lifecycle command rules:
 - Secret rule: API responses and static UI must not include raw root/admin keys, raw experiment tokens, raw credential verifiers/salts, or raw `secret_env` values. Secret config surfaces may expose names and fingerprints only.
 - Success fields: `url`, `host`, `port`, `refresh seconds`, `opened`, `auth scope`, `next`.
 - Exit: `0` on clean shutdown; `2` on invalid args; `3` on auth failure; `4` when the selected port is unavailable; `5` on storage failure.
+
+### Report
+
+`alab report [--project <project_id>] [--exp <exp_id>] --out <path> [--overwrite]`
+
+- Context: Global, project, experiment, or inspection.
+- Credential: Root/admin for project reports; root/admin or a visible experiment/inspection token for experiment reports.
+- Required args: `--out`; `--project` is required outside a project/experiment/inspection context.
+- Options: `--project`, `--exp`, `--out`, `--overwrite`.
+- Output rule: writes a Markdown report to `--out`; parent directory must already exist. Existing files require `--overwrite`; existing directories always fail with `OUTPUT_EXISTS`.
+- Scope rule: without `--exp`, the command exports a project report and requires root/admin. With `--exp`, the command exports one visible experiment report and applies the same visibility rules as observe commands.
+- Secret rule: reports must not contain raw root/admin keys, raw experiment tokens, credential verifiers/salts, raw `secret_env` values, hidden log contents, or artifact bytes. Root/admin reports may include hidden-log metadata; token reports omit hidden logs.
+- Content rule: reports include project/experiment metadata, safe config summaries, run/result tables, submission summary/feedback when present, artifact/log metadata, counts, and local timestamps.
+- Success fields: `project id`, `exp id`, `scope`, `out`, `wrote`, `bytes`.
+- Exit: `0`; `2` on invalid args, not found for root/admin, or output conflicts; `3` on auth failure; `4` on token visibility failures; `5` on storage/write failure.
 
 ### Auth
 

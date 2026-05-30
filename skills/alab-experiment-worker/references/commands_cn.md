@@ -16,6 +16,7 @@ alab run --message "<message>"
 alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
 alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]
 alab exp tag add|remove|list <exp_id> ...
+alab report --exp <exp_id> --out <path> [--overwrite]
 alab observe experiments list|search|show|best ...
 alab observe runs list|show ...
 alab observe artifacts list|show|export ...
@@ -59,6 +60,9 @@ Worker lifecycle 权限有意保持很窄：
 - **`alab exp tag add|remove|list`**：为当前 experiment 添加或查看 metadata tags。
   关键参数：`add`/`remove` 需要 `<exp_id> <tag>`；`list` 需要 `<exp_id>`。
   输出用途：当 controller 预期 tags 时，标记有用的 worker-local evidence，例如 `promising`、`needs-review` 或任务相关标签。Tags 不是 authorization，也不能替代 submit refs。
+- **`alab report`**：为一个 visible experiment 导出 Markdown report。
+  关键参数：必需 `--exp <exp_id> --out <path>`；可选 `--overwrite`。在 worktree context 中，`--project` 通常由 context 提供。
+  输出用途：生成本地 handoff/evidence 文件，包含 safe metadata、runs、submission text，以及可见 artifact/log metadata。Worker report 不包含 hidden logs、raw secrets、tokens 或 artifact bytes。
 - **`observe experiments list`**：查看 project 中当前 token 可见的 experiments。
   关键参数：Filters 包括 `--status`、重复 `--tag`、`--source-id`、`--name-query`、reward bounds、config version、timestamps 和 `--include-archived`；pagination 使用 `--limit`/`--offset`；sorting 使用 `--sort <field>:<asc|desc>`。
   输出用途：查找 prior attempts、similar tags、source lineage、closed experiments 和可能的 refs。

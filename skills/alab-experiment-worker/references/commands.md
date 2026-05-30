@@ -16,6 +16,7 @@ alab run --message "<message>"
 alab submit --message "<message>" --summary "<text>" --feedback "<text>" --ref none
 alab exp checkout <exp_id> --path <dir> [--commit final|latest|best|<sha>]
 alab exp tag add|remove|list <exp_id> ...
+alab report --exp <exp_id> --out <path> [--overwrite]
 alab observe experiments list|search|show|best ...
 alab observe runs list|show ...
 alab observe artifacts list|show|export ...
@@ -59,6 +60,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`alab exp tag add|remove|list`**: Add or inspect metadata tags on the current experiment.
   Parameters: `add`/`remove` require `<exp_id> <tag>`; `list` requires `<exp_id>`.
   Use the output for: Marking useful worker-local evidence such as `promising`, `needs-review`, or task-specific labels when the controller expects tags. Tags are not authorization and should not replace submit refs.
+- **`alab report`**: Export a Markdown report for a visible experiment.
+  Parameters: Required `--exp <exp_id> --out <path>`; optional `--overwrite`. In a worktree context, `--project` is usually supplied by the context.
+  Use the output for: A local handoff/evidence file containing safe metadata, runs, submission text, and visible artifact/log metadata. Worker reports cannot include hidden logs, raw secrets, tokens, or artifact bytes.
 - **`observe experiments list`**: See visible experiments in the project.
   Parameters: Filters include `--status`, repeated `--tag`, `--source-id`, `--name-query`, reward bounds, config version, timestamps, and `--include-archived`; pagination uses `--limit`/`--offset`; sorting uses `--sort <field>:<asc|desc>`.
   Use the output for: Find prior attempts, similar tags, source lineage, closed experiments, and possible refs.

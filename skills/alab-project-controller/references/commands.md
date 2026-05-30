@@ -18,6 +18,7 @@ Project controllers may use same-project admin commands:
 alab project show|archive|unarchive ...
 alab status --project <project_id>
 alab feedback --kind suggestion|question|bug|other --body "<text>"
+alab report --project <project_id> [--exp <exp_id>] --out <path> [--overwrite]
 alab project config show|export|import|set ...
 alab project env set|unset|list ...
 alab project secret set|unset|list|gc ...
@@ -48,6 +49,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`feedback`**: Leave HOME-level local feedback about ALab behavior, runner issues, docs gaps, or project-operation questions.
   Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
   Notes: Use annotations for project-visible experiment notes; use feedback for local ALab/tooling feedback that should be stored under `ALAB_HOME/feedback/`.
+- **`report`**: Export a Markdown evidence report for the project or one visible experiment.
+  Parameters: Required `--out <path>` and `--project <project_id>` outside context; optional `--exp <exp_id>` and `--overwrite`.
+  Notes: Project reports require admin/root authority. Experiment reports follow observe visibility. Reports include summaries and metadata, but not raw keys, tokens, raw secrets, hidden-log contents, or artifact bytes.
 - **`project config show`**: Inspect retained config metadata.
   Parameters: Optional `--project`; `--version latest-attempted|active-valid|<n>`.
   Notes: Shows runner/reward/artifact/env/secret fingerprints without raw secret values.

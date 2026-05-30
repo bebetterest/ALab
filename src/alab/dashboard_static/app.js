@@ -82,6 +82,11 @@ const state = {
   projects: [],
   experiments: [],
   runs: [],
+  pages: {
+    projects: null,
+    experiments: null,
+    runs: null,
+  },
   projectDetail: null,
   projectDetails: new Map(),
   charts: new Map(),
@@ -761,9 +766,13 @@ function bySearch(rows, fields) {
   }));
 }
 
-function filterMeta(shown, total, context = "") {
+function filterMeta(shown, total, context = "", page = null) {
   const query = state.search.trim();
   const parts = [`${L("Showing", "显示")} ${shown}/${total}`];
+  const pageTotal = Number(page && page.total);
+  if (Number.isFinite(pageTotal) && pageTotal > total) {
+    parts.push(`${L("loaded", "已加载")} ${total}/${pageTotal}`);
+  }
   if (context) parts.push(context);
   if (query) parts.push(`${L("search", "搜索")}: ${query}`);
   return `<div class="filter-meta">${parts.map(escapeHtml).join(" · ")}</div>`;
@@ -869,6 +878,7 @@ function renderListChrome({
   sortOptions,
   filter,
   sort,
+  page = null,
   onChange = render,
 }) {
   if (!controlsNode || !metaNode) return;
@@ -884,7 +894,7 @@ function renderListChrome({
     quickFilterLabel(filterOptions, filter),
     quickSortLabel(sortOptions, sort),
   ].filter(Boolean).join(" · ");
-  metaNode.innerHTML = filterMeta(rows.length, allRows.length, context);
+  metaNode.innerHTML = filterMeta(rows.length, allRows.length, context, page);
 }
 
 function quickFilterLabel(options, value) {
@@ -2706,16 +2716,20 @@ function countsToChartData(counts) {
 }
 
 async function loadCore() {
-  const [summary, experimentsPayload, runsPayload] = await Promise.all([
+  const [summary, projectsPayload, experimentsPayload, runsPayload] = await Promise.all([
     api("/api/summary"),
-    api("/api/experiments"),
-    api("/api/runs"),
+    api("/api/projects?limit=200"),
+    api("/api/experiments?limit=200"),
+    api("/api/runs?limit=200"),
   ]);
   state.summary = summary;
   state.refreshSeconds = state.summary.refresh_seconds ?? state.refreshSeconds;
-  state.projects = state.summary.projects || [];
+  state.projects = projectsPayload.projects || state.summary.projects || [];
   state.experiments = experimentsPayload.experiments || [];
   state.runs = runsPayload.runs || [];
+  state.pages.projects = projectsPayload.page || state.summary.projects_page || null;
+  state.pages.experiments = experimentsPayload.page || null;
+  state.pages.runs = runsPayload.page || null;
   state.projectDetails.clear();
   state.assetScope = null;
   state.lastLoadedAt = new Date();
@@ -2943,7 +2957,7 @@ function afterProjects() {
   for (const item of document.querySelectorAll(".project-signals [data-project-id]")) {
     item.addEventListener("click", () => showProject(item.dataset.projectId));
   }
-  document.getElementById("projects-meta").innerHTML = filterMeta(rows.length, state.projects.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "));
+  document.getElementById("projects-meta").innerHTML = filterMeta(rows.length, state.projects.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "), state.pages.projects);
   const target = document.getElementById("projects-cards");
   if (!rows.length) {
     target.innerHTML = emptyHtml();
@@ -3019,7 +3033,7 @@ function afterExperiments() {
   );
   document.getElementById("experiments-tag-mix").innerHTML = countListHtml(countExperimentTags(rows));
   document.getElementById("experiments-project-mix").innerHTML = countListHtml(countBy(rows, (exp) => projectName(exp.project_id)));
-  document.getElementById("experiments-meta").innerHTML = filterMeta(rows.length, state.experiments.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "));
+  document.getElementById("experiments-meta").innerHTML = filterMeta(rows.length, state.experiments.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "), state.pages.experiments);
   const target = document.getElementById("experiments-cards");
   target.innerHTML = experimentCardsHtml(rows);
   wireExperimentCards(target);
@@ -3192,7 +3206,7 @@ function afterRuns() {
   document.getElementById("runs-failure-reasons").innerHTML = failureReasonsForRunsHtml(rows);
   document.getElementById("runs-runner-mix").innerHTML = countListHtml(countBy(rows, (run) => runnerSummary(run.runner)));
   document.getElementById("runs-project-mix").innerHTML = countListHtml(countBy(rows, (run) => projectName(run.project_id)));
-  document.getElementById("runs-meta").innerHTML = filterMeta(rows.length, state.runs.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "));
+  document.getElementById("runs-meta").innerHTML = filterMeta(rows.length, state.runs.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "), state.pages.runs);
   const target = document.getElementById("runs-cards");
   target.innerHTML = runCardsHtml(rows);
   wireRunCards(target);
@@ -3290,6 +3304,7 @@ function renderAssets(kind) {
       sortOptions,
       filter,
       sort,
+      page: state.assetScope && state.assetScope.pages && state.assetScope.pages.logs,
     });
     body.innerHTML = resourceCardsHtml(rows, "logs", { total: allRows.length });
     wireResourceCards(body);
@@ -3312,6 +3327,7 @@ function renderAssets(kind) {
       sortOptions,
       filter,
       sort,
+      page: state.assetScope && state.assetScope.pages && state.assetScope.pages.artifacts,
     });
     body.innerHTML = resourceCardsHtml(rows, "artifacts", { total: allRows.length });
     wireResourceCards(body);
@@ -3412,33 +3428,40 @@ async function fetchProjectDetail(projectId) {
 
 async function ensureAssetScope() {
   const selected = state.assetProjectId || ASSET_ALL_PROJECTS;
+  const projectParam = selected === ASSET_ALL_PROJECTS ? "" : `&project=${encodeURIComponent(selected)}`;
+  const [logsPayload, artifactsPayload] = await Promise.all([
+    api(`/api/logs?limit=500${projectParam}`),
+    api(`/api/artifacts?limit=500${projectParam}`),
+  ]);
+  const logs = (logsPayload.logs || []).map((log) => ({
+    ...log,
+    project_name: log.project_id ? projectName(log.project_id) : statusLabel("none"),
+  }));
+  const artifacts = (artifactsPayload.artifacts || []).map((artifact) => ({
+    ...artifact,
+    project_name: artifact.project_id ? projectName(artifact.project_id) : statusLabel("none"),
+  }));
+  const logTotal = (logsPayload.page && logsPayload.page.total) || logs.length;
+  const artifactTotal = (artifactsPayload.page && artifactsPayload.page.total) || artifacts.length;
   if (selected === ASSET_ALL_PROJECTS) {
-    const details = await Promise.all(state.projects.map((project) => fetchProjectDetail(project.project_id)));
-    const logs = details.flatMap((detail) => (detail.logs || []).map((log) => ({
-      ...log,
-      project_name: detail.project.name || detail.project.project_id,
-    })));
-    const artifacts = details.flatMap((detail) => (detail.artifacts || []).map((artifact) => ({
-      ...artifact,
-      project_name: detail.project.name || detail.project.project_id,
-    })));
     state.assetScope = {
       label: L("All projects", "全部项目"),
-      note: `${details.length} ${L("projects loaded", "个项目已加载")} · ${logs.length} ${L("logs", "日志")} · ${artifacts.length} ${L("artifacts", "产物")}`,
-      projectCount: details.length,
+      note: `${state.projects.length} ${L("projects indexed", "个项目已索引")} · ${logs.length}/${logTotal} ${L("logs loaded", "条日志已加载")} · ${artifacts.length}/${artifactTotal} ${L("artifacts loaded", "个产物已加载")}`,
+      projectCount: state.projects.length,
       logs,
       artifacts,
+      pages: { logs: logsPayload.page || null, artifacts: artifactsPayload.page || null },
     };
     return state.assetScope;
   }
-  const detail = await fetchProjectDetail(selected);
-  const projectLabel = detail.project.name || detail.project.project_id || selected;
+  const projectLabel = projectName(selected);
   state.assetScope = {
     label: projectLabel,
-    note: `${projectLabel} · ${(detail.logs || []).length} ${L("logs", "日志")} · ${(detail.artifacts || []).length} ${L("artifacts", "产物")}`,
-    projectCount: detail.project && detail.project.project_id ? 1 : 0,
-    logs: (detail.logs || []).map((log) => ({ ...log, project_name: projectLabel })),
-    artifacts: (detail.artifacts || []).map((artifact) => ({ ...artifact, project_name: projectLabel })),
+    note: `${projectLabel} · ${logs.length}/${logTotal} ${L("logs loaded", "条日志已加载")} · ${artifacts.length}/${artifactTotal} ${L("artifacts loaded", "个产物已加载")}`,
+    projectCount: selected ? 1 : 0,
+    logs,
+    artifacts,
+    pages: { logs: logsPayload.page || null, artifacts: artifactsPayload.page || null },
   };
   return state.assetScope;
 }
@@ -3455,7 +3478,8 @@ function auditView() {
 }
 
 async function afterAudit() {
-  const allRows = (await api(`/api/audit?query=${encodeURIComponent(state.search)}`)).audit || [];
+  const payload = await api(`/api/audit?query=${encodeURIComponent(state.search)}&limit=500`);
+  const allRows = payload.audit || [];
   const options = auditFilterOptions(allRows);
   const sortOptions = auditSortOptions();
   const filter = activeFilter("audit", options);
@@ -3471,7 +3495,7 @@ async function afterAudit() {
   controlsNode.innerHTML = listControls("audit", options, sortOptions);
   wireQuickFilters(controlsNode, "audit");
   wireSortControl(controlsNode, "audit", sortOptions);
-  document.getElementById("audit-meta").innerHTML = filterMeta(rows.length, allRows.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "));
+  document.getElementById("audit-meta").innerHTML = filterMeta(rows.length, allRows.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "), payload.page);
   document.getElementById("audit-actions").innerHTML = countListHtml(countBy(rows, (row) => row.action));
   document.getElementById("audit-actors").innerHTML = countListHtml(countBy(rows, (row) => row.actor_type));
   document.getElementById("audit-objects").innerHTML = countListHtml(countBy(rows, (row) => row.object_type), objectTypeLabel);
@@ -3757,7 +3781,7 @@ function systemView() {
 }
 
 async function afterSystem() {
-  const system = await api("/api/system");
+  const system = await api("/api/system?cache_limit=500");
   const capabilityIssues = (system.capabilities || []).filter((item) => ["error", "unsupported", "failed", "invalid"].includes(item.status));
   const cacheBytes = (system.cache_entries || []).reduce((total, item) => total + Number(item.size_bytes || 0), 0);
   document.getElementById("system-kpis").innerHTML = [
@@ -3841,7 +3865,7 @@ async function afterSystem() {
   cacheControls.innerHTML = listControls("system_cache", cacheOptions, cacheSortChoices);
   wireQuickFilters(cacheControls, "system_cache", rerenderSystem);
   wireSortControl(cacheControls, "system_cache", cacheSortChoices, rerenderSystem);
-  document.getElementById("system-cache-meta").innerHTML = filterMeta(cacheRows.length, cacheRowsAll.length, [quickFilterLabel(cacheOptions, cacheFilter), quickSortLabel(cacheSortChoices, cacheSort)].filter(Boolean).join(" · "));
+  document.getElementById("system-cache-meta").innerHTML = filterMeta(cacheRows.length, cacheRowsAll.length, [quickFilterLabel(cacheOptions, cacheFilter), quickSortLabel(cacheSortChoices, cacheSort)].filter(Boolean).join(" · "), system.cache_entries_page);
   capabilityCards.innerHTML = systemCardsHtml(capabilityRows, "capabilities");
   catalogCards.innerHTML = systemCardsHtml(catalogRows, "catalogs");
   cacheCards.innerHTML = systemCardsHtml(cacheRows, "cache");
@@ -4005,6 +4029,7 @@ function renderProjectDetailTab(detail, tab) {
       sortOptions,
       filter,
       sort,
+      page: detail.pages && detail.pages.experiments,
       onChange: rerender,
     });
     const projectExpCards = document.getElementById("project-exp-cards");
@@ -4036,6 +4061,7 @@ function renderProjectDetailTab(detail, tab) {
       sortOptions,
       filter,
       sort,
+      page: detail.pages && detail.pages.runs,
       onChange: rerender,
     });
     document.getElementById("project-reward-summary").innerHTML = rewardTrendSummaryHtml(rows, detail.project.reward_direction);
@@ -4071,6 +4097,7 @@ function renderProjectDetailTab(detail, tab) {
       sortOptions: logSortChoices,
       filter: logFilter,
       sort: logSort,
+      page: detail.pages && detail.pages.logs,
       onChange: rerender,
     });
     const artifactViewKey = "project_artifacts";
@@ -4091,6 +4118,7 @@ function renderProjectDetailTab(detail, tab) {
       sortOptions: artifactSortChoices,
       filter: artifactFilter,
       sort: artifactSort,
+      page: detail.pages && detail.pages.artifacts,
       onChange: rerender,
     });
     const logCards = document.getElementById("project-log-cards");
@@ -4228,6 +4256,7 @@ async function showExperiment(expId) {
     sortOptions: runSortChoices,
     filter: runFilter,
     sort: runSort,
+    page: detail.pages && detail.pages.runs,
     onChange: rerenderExperiment,
   });
   document.getElementById("experiment-reward-summary").innerHTML = rewardTrendSummaryHtml(runRows, direction);
@@ -4253,6 +4282,7 @@ async function showExperiment(expId) {
     sortOptions: logSortChoices,
     filter: logFilter,
     sort: logSort,
+    page: detail.pages && detail.pages.logs,
     onChange: rerenderExperiment,
   });
   const artifactViewKey = "experiment_artifacts";
@@ -4273,6 +4303,7 @@ async function showExperiment(expId) {
     sortOptions: artifactSortChoices,
     filter: artifactFilter,
     sort: artifactSort,
+    page: detail.pages && detail.pages.artifacts,
     onChange: rerenderExperiment,
   });
   const expLogCards = document.getElementById("exp-log-cards");
@@ -4288,6 +4319,8 @@ async function showExperiment(expId) {
 async function showRun(runId) {
   const detail = await api(`/api/runs/${encodeURIComponent(runId)}`);
   const run = detail.run;
+  const logTotal = (detail.pages && detail.pages.logs && detail.pages.logs.total) || detail.logs.length;
+  const artifactTotal = (detail.pages && detail.pages.artifacts && detail.pages.artifacts.total) || detail.artifacts.length;
   showPanel(shortId(runId), `
     <div class="entity-summary">
       <div>
@@ -4305,7 +4338,7 @@ async function showRun(runId) {
       ${metric(L("Duration", "耗时"), runDuration(run), `${formatDate(run.started_at)} - ${formatDate(run.ended_at)}`)}
       ${metric(L("Exit", "退出码"), run.exit_code, L("process exit code", "进程退出码"))}
       ${metric(L("Warnings", "警告"), (run.warning_codes || []).length, warningSummary(run.warning_codes))}
-      ${metric(L("Artifacts", "产物"), detail.artifacts.length, `${detail.logs.length} ${L("logs", "日志")}`)}
+      ${metric(L("Artifacts", "产物"), artifactTotal, `${logTotal} ${L("logs", "日志")}`)}
     </div>
     <div class="run-overview-grid">
       ${panel(L("Run highlights", "运行要点"), runHighlightsHtml(detail))}
@@ -4356,6 +4389,7 @@ async function showRun(runId) {
     sortOptions: logSortChoices,
     filter: logFilter,
     sort: logSort,
+    page: detail.pages && detail.pages.logs,
     onChange: rerenderRun,
   });
   const artifactViewKey = "run_artifacts";
@@ -4376,6 +4410,7 @@ async function showRun(runId) {
     sortOptions: artifactSortChoices,
     filter: artifactFilter,
     sort: artifactSort,
+    page: detail.pages && detail.pages.artifacts,
     onChange: rerenderRun,
   });
   const runLogCards = document.getElementById("run-log-cards");

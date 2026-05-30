@@ -10,9 +10,11 @@ import urllib.request
 from pathlib import Path
 
 from alab import cli
-from alab.auth import create_credential
+from alab.auth import create_credential, write_token
+from alab.context import path_hash, write_marker
 from alab.dashboard import DASHBOARD_TOKEN_HEADER, read_project_detail, read_summary, read_system
 from alab.home import Home
+from alab.ids import new_id
 from alab.services import GlobalOptions, Request, cmd_dashboard
 
 _URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -43,12 +45,12 @@ def _now() -> str:
 
 
 def _seed_dashboard_data(home: Home) -> dict[str, str]:
-    project_id = "proj-dashboard-aaaaaaaaaaaaaaa"
+    project_id = "proj-dashboard-AAAAAAAAAAAAAAAAAAAAAA"
     source_id = "src-dashboard-aaaaaaaaaaaaaaaa"
-    exp_id = "exp-dashboard-aaaaaaaaaaaaaaaa"
-    run_id = "run-dashboard-aaaaaaaaaaaaaaaa"
-    log_id = "log-dashboard-aaaaaaaaaaaaaaaa"
-    artifact_id = "art-dashboard-aaaaaaaaaaaaaaaa"
+    exp_id = "exp-dashboard-AAAAAAAAAAAAAAAAAAAAAA"
+    run_id = "run-dashboard-AAAAAAAAAAAAAAAAAAAAAA"
+    log_id = "log-dashboard-AAAAAAAAAAAAAAAAAAAAAA"
+    artifact_id = "art-dashboard-AAAAAAAAAAAAAAAAAAAAAA"
     validation_id = "val-dashboard-aaaaaaaaaaaaaaaa"
     secret_value_id = "sec-dashboard-aaaaaaaaaaaaaaaa"
     audit_id = "aud-dashboard-aaaaaaaaaaaaaaaa"
@@ -180,7 +182,7 @@ def _seed_dashboard_data(home: Home) -> dict[str, str]:
               latest_commit, final_run_id, final_commit, final_run_removed_at, final_run_removed_by,
               final_run_removed_audit_id, created_at, updated_at, closed_at, archived_at)
             VALUES (?, ?, ?, 1, ?, 'abc123', 'alab/exp/dashboard', NULL, NULL, 'active',
-              'open', NULL, ?, '{"schema_version":1,"visibility":{"scope":"same_project","experiment_ids":[]}}',
+              'open', NULL, ?, ?,
               ?, 'abc123', ?, 'abc123', NULL, NULL, NULL, ?, ?, NULL, NULL)
             """,
             (
@@ -189,6 +191,15 @@ def _seed_dashboard_data(home: Home) -> dict[str, str]:
                 source_id,
                 validation_id,
                 json.dumps({"schema_version": 1, "name": "dash-exp", "name_slug": "dash-exp", "goal": "inspect"}),
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "mutable": {"include": ["**"], "exclude": []},
+                        "visibility_upper_bound": {"schema_version": 1, "scope": "same_project", "experiment_ids": []},
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
                 run_id,
                 run_id,
                 _now(),
@@ -236,6 +247,7 @@ def _seed_dashboard_data(home: Home) -> dict[str, str]:
         )
     return {
         "project_id": project_id,
+        "exp_id": exp_id,
         "run_id": run_id,
         "log_id": log_id,
         "artifact_id": artifact_id,
@@ -320,6 +332,57 @@ def test_dashboard_http_api_is_token_guarded_read_only_and_serves_content(tmp_pa
             assert payload["counts"]["feedback"] == 1
             assert payload["counts"]["runs"]["passed"] == 1
 
+        paged_endpoints = {
+            "/api/projects?limit=1": "projects",
+            "/api/experiments?limit=1": "experiments",
+            "/api/runs?limit=1": "runs",
+            "/api/logs?limit=1": "logs",
+            "/api/artifacts?limit=1": "artifacts",
+            "/api/audit?limit=1": "audit",
+        }
+        for endpoint, key in paged_endpoints.items():
+            request = urllib.request.Request(
+                base_url + endpoint,
+                headers={DASHBOARD_TOKEN_HEADER: server.api_token},
+            )
+            with _urlopen(request) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+                assert payload["page"]["limit"] == 1
+                assert payload["page"]["offset"] == 0
+                assert payload["page"]["total"] >= 1
+                assert len(payload[key]) == 1
+
+        request = urllib.request.Request(
+            base_url + f"/api/projects/{ids['project_id']}",
+            headers={DASHBOARD_TOKEN_HEADER: server.api_token},
+        )
+        with _urlopen(request) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            assert payload["pages"]["experiments"]["limit"] == 100
+            assert payload["pages"]["logs"]["total"] == 1
+
+        request = urllib.request.Request(
+            base_url + f"/api/runs/{ids['run_id']}",
+            headers={DASHBOARD_TOKEN_HEADER: server.api_token},
+        )
+        with _urlopen(request) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            assert payload["pages"]["logs"]["limit"] == 100
+            assert payload["pages"]["artifacts"]["total"] == 1
+
+        request = urllib.request.Request(
+            base_url + "/api/logs?limit=0",
+            headers={DASHBOARD_TOKEN_HEADER: server.api_token},
+        )
+        try:
+            _urlopen(request)
+        except urllib.error.HTTPError as exc:
+            payload = json.loads(exc.read().decode("utf-8"))
+            assert exc.code == 400
+            assert payload["error"] == "CONFIG_INVALID"
+        else:
+            raise AssertionError("invalid dashboard list pagination should fail")
+
         request = urllib.request.Request(
             base_url + f"/api/logs/{ids['log_id']}/content",
             headers={DASHBOARD_TOKEN_HEADER: server.api_token},
@@ -393,6 +456,120 @@ def test_dashboard_read_models_redact_raw_secrets(tmp_path: Path, capsys) -> Non
     assert secret_env == {"API_TOKEN": {"fingerprint": "hmac-sha256:dashboard"}}
 
 
+def test_report_command_exports_project_and_experiment_markdown(tmp_path: Path, capsys, monkeypatch) -> None:
+    home, root_key = _init_home(tmp_path, capsys)
+    ids = _seed_dashboard_data(home)
+    incompatible_run_id = "run-dashboard-BBBBBBBBBBBBBBBBBBBBBB"
+    project_report = tmp_path / "project-report.md"
+    exp_report = tmp_path / "experiment-report.md"
+    token_worktree = tmp_path / "token-worktree"
+    token_worktree.mkdir()
+    token_path_hash = path_hash(token_worktree)
+    with sqlite3.connect(home.db_path) as conn:
+        config_v1 = json.loads(
+            conn.execute(
+                "SELECT canonical_config_json FROM project_config_versions WHERE project_id = ? AND version = 1",
+                (ids["project_id"],),
+            ).fetchone()[0]
+        )
+        config_v2 = {**config_v1, "reward": {**config_v1["reward"], "primary_metric": "other_reward"}}
+        conn.execute(
+            """
+            INSERT INTO project_config_versions(project_id, version, canonical_config_json, config_hash,
+              baseline_required, validation_status, inherited_from_validation_id, created_at,
+              created_by_credential_id)
+            VALUES (?, 2, ?, 'sha256:dashboard-v2', 0, 'failed', NULL, ?, NULL)
+            """,
+            (ids["project_id"], json.dumps(config_v2, sort_keys=True, separators=(",", ":")), _now()),
+        )
+        conn.execute(
+            "UPDATE projects SET latest_attempted_config_version = 2 WHERE project_id = ?",
+            (ids["project_id"],),
+        )
+        conn.execute(
+            """
+            INSERT INTO runs(run_id, exp_id, project_id, commit_sha, config_version, status,
+              exit_code, reward_value, reward_parse_status, archive_status, archived_at,
+              unarchived_at, started_at, ended_at, rolled_back_auto_commit, record_json)
+            VALUES (?, ?, ?, 'def456', 2, 'passed', 0, 999.0, 'parsed', 'active',
+              NULL, NULL, ?, ?, NULL, '{"metrics":{"reward":999},"warning_codes":[]}')
+            """,
+            (incompatible_run_id, ids["exp_id"], ids["project_id"], _now(), _now()),
+        )
+        token_id, raw_token = create_credential(
+            conn,
+            credential_type="token",
+            project_id=ids["project_id"],
+            exp_id=ids["exp_id"],
+            token_mode="worktree",
+            registered_path_hash=token_path_hash,
+        )
+        home_id = conn.execute("SELECT home_id FROM homes LIMIT 1").fetchone()[0]
+        conn.execute(
+            """
+            INSERT INTO path_registry(path_registry_id, path_hash, path, context_type, home_id, project_id,
+              exp_id, token_id, status, removed_at, removed_by_credential_id, created_at, updated_at)
+            VALUES (?, ?, ?, 'experiment', ?, ?, ?, ?, 'active', NULL, NULL, ?, ?)
+            """,
+            (new_id("path", "experiment"), token_path_hash, str(token_worktree), home_id, ids["project_id"], ids["exp_id"], token_id, _now(), _now()),
+        )
+    write_marker(
+        token_worktree,
+        {
+            "marker_version": 1,
+            "home_id": home_id,
+            "context_type": "experiment",
+            "project_id": ids["project_id"],
+            "exp_id": ids["exp_id"],
+            "token_id": token_id,
+            "created_at": _now(),
+        },
+    )
+    write_token(token_worktree, raw_token)
+
+    assert cli.run(["--home", str(home.path), "--key", root_key, "report", "--project", ids["project_id"], "--out", str(project_report)]) == 0
+    fields = _field_map(capsys.readouterr().out)
+    assert fields["scope"] == "project"
+    assert fields["project id"] == ids["project_id"]
+    assert fields["out"] == str(project_report)
+    project_text = project_report.read_text(encoding="utf-8")
+    assert "# ALab Project Report" in project_text
+    assert ids["project_id"] in project_text
+    assert f"| best run | {ids['run_id']} |" in project_text
+    assert f"| best run | {incompatible_run_id} |" not in project_text
+    assert "RAW_SECRET_SHOULD_NOT_LEAK" not in project_text
+    assert "hidden diagnostic log" not in project_text
+
+    monkeypatch.chdir(token_worktree)
+    assert (
+        cli.run(
+            [
+                "--home",
+                str(home.path),
+                "report",
+                "--exp",
+                ids["exp_id"],
+                "--out",
+                str(exp_report),
+            ]
+        )
+        == 0
+    )
+    fields = _field_map(capsys.readouterr().out)
+    assert fields["scope"] == "experiment"
+    assert fields["exp id"] == ids["exp_id"]
+    exp_text = exp_report.read_text(encoding="utf-8")
+    assert "# ALab Experiment Report" in exp_text
+    assert ids["run_id"] in exp_text
+    assert f"| best run | {ids['run_id']} |" in exp_text
+    assert f"| best run | {incompatible_run_id} |" not in exp_text
+    assert ids["log_id"] not in exp_text
+    assert "hidden diagnostic log" not in exp_text
+
+    assert cli.run(["--home", str(home.path), "--key", root_key, "report", "--project", ids["project_id"], "--out", str(project_report)]) == 2
+    assert "OUTPUT_EXISTS" in capsys.readouterr().err
+
+
 def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs() -> None:
     root = Path(__file__).resolve().parents[1] / "src" / "alab" / "dashboard_static"
     index = (root / "index.html").read_text(encoding="utf-8")
@@ -416,8 +593,16 @@ def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs()
     assert 'L("No records are available for this section.", "此区域暂无可显示记录。")' in app
     assert "options.unfiltered" in app
     assert "resourceCardsHtml(rows, kind, options = {})" in app
-    assert 'resourceCardsHtml(logRows, "logs", { total: logRowsAll.length })' in app
-    assert 'resourceCardsHtml(artifactRows, "artifacts", { total: artifactRowsAll.length })' in app
+    assert 'resourceCardsHtml(rows, "logs", { total: allRows.length })' in app
+    assert 'resourceCardsHtml(rows, "artifacts", { total: allRows.length })' in app
+    assert "state.pages.projects" in app
+    assert 'L("loaded", "已加载")' in app
+    assert "page: detail.pages && detail.pages.logs" in app
+    assert "page: detail.pages && detail.pages.runs" in app
+    assert "page: state.assetScope && state.assetScope.pages && state.assetScope.pages.artifacts" in app
+    assert 'api(`/api/logs?limit=500${projectParam}`)' in app
+    assert 'api(`/api/artifacts?limit=500${projectParam}`)' in app
+    assert "Promise.all(state.projects.map((project) => fetchProjectDetail(project.project_id)))" not in app
     assert "formatCompactDate" in app
     assert "month: \"numeric\"" in app
     assert "hour12: false" in app

@@ -88,6 +88,7 @@ OBSERVE_READ: set[PathTuple] = {
     ("exp", "search"),
     ("exp", "show"),
     ("exp", "best"),
+    ("report",),
     ("observe", "experiments", "list"),
     ("observe", "experiments", "search"),
     ("observe", "experiments", "show"),

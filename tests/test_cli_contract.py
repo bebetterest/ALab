@@ -527,6 +527,7 @@ _SYNCED_SUCCESS_FIELD_COMMANDS = (
     "config set",
     "config reset",
     "feedback",
+    "report",
     "key create",
     "key list --root",
     "key list --project",
