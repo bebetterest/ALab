@@ -259,7 +259,7 @@ ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=http
 - `uv.lock` 会被 tracked，因为 CI 和本地 validation 使用 `uv run --locked`。
 - 本地 cache/output paths 应保持 ignored（`.uv-cache/`、`.pytest_cache/`、`.ruff_cache/`、`.alab-demo/`、`.env`）。
 - GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 pytest suite；真实 Docker 和 live/networked SkyDiscover gates 仍是 manual workflow inputs。
-- 推送到 `main` 时会检查 PyPI 是否已有当前 `pyproject.toml` package version；如果缺少该精确版本，CI 会通过 PyPI Trusted Publishing 构建并发布，否则跳过发布。
+- 推送到 `main` 时会检查 PyPI 是否已有当前 `pyproject.toml` package version；如果缺少该精确版本，CI 会通过 PyPI Trusted Publishing 构建并发布，然后从 [CHANGELOG.md](CHANGELOG.md) 中匹配的版本段落创建 `v<version>` GitHub Release。如果 PyPI 已有该版本，则跳过发布和 release creation。
 - 首次自动发布前，PyPI `alab-cli` project 需要信任 repository `bebetterest/ALab`、workflow `ci.yml` 和 environment `pypi`。
 
 ## Security And Data Model
@@ -318,6 +318,8 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 │   └── test_runner_skydiscover.py
 ├── LICENSE
 ├── .env.example
+├── CHANGELOG.md
+├── CHANGELOG_cn.md
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md
@@ -335,6 +337,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 - [docs/spec_cli.md](docs/spec_cli.md)、[docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md)、[docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md)、[docs/spec_lifecycle.md](docs/spec_lifecycle.md)、[docs/spec_runners_adapters.md](docs/spec_runners_adapters.md)、[docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md)、[docs/spec_dashboard.md](docs/spec_dashboard.md) 和 [docs/spec_tests.md](docs/spec_tests.md) 定义 subsystem contracts。
 - [docs/progress.md](docs/progress.md)、[docs/progress_pipeline.md](docs/progress_pipeline.md)、[docs/progress_closed_gaps.md](docs/progress_closed_gaps.md) 和 [docs/progress_log.md](docs/progress_log.md) 跟踪 current state、active queues、closed gaps 和 history。
 - [docs/completion_audit.md](docs/completion_audit.md) 跟踪 requirement-level evidence。
+- [CHANGELOG.md](CHANGELOG.md) 记录面向 release 的变更，并由 CI 用来生成 GitHub Release notes。
 
 ## Contributing
 

@@ -7867,3 +7867,19 @@ Validation:
 - CLI/docs contract focused subset: `.venv/bin/pytest tests/test_cli_contract.py::test_command_registry_object_types_follow_cli_contract_table tests/test_cli_contract.py::test_cli_primary_object_type_tables_are_synchronized tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_capability_surfaces_reference_registered_commands_with_expected_credentials tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale -q`
 - Focused lint: `.venv/bin/ruff check src/alab/dashboard.py src/alab/services.py src/alab/registry.py src/alab/cli.py tests/test_dashboard.py tests/test_cli_contract.py`
 - `git diff --check`
+
+## 2026-05-30 Release Notes Automation
+
+Implemented:
+
+- Added synchronized `CHANGELOG.md` and `CHANGELOG_cn.md` release notes for version `0.1.2`.
+- Added a PyPI project metadata `Changelog` URL so PyPI users can find release-facing changes.
+- Updated the `publish-python` GitHub Actions job to create a `v<version>` GitHub Release after a successful new-version PyPI publish, using the matching `CHANGELOG.md` section as the release notes.
+- Kept publish skip behavior unchanged when PyPI already has the current `pyproject.toml` version.
+- Updated README/README_cn release workflow and repository layout notes.
+
+Validation:
+
+- Parsed `.github/workflows/ci.yml` with Python YAML loader.
+- Exercised the changelog extraction regex for `PACKAGE_VERSION=0.1.2`.
+- `git diff --check`

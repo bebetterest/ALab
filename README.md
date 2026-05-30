@@ -259,7 +259,7 @@ Notes:
 - `uv.lock` is tracked because CI and local validation use `uv run --locked`.
 - Keep local cache/output paths ignored (`.uv-cache/`, `.pytest_cache/`, `.ruff_cache/`, `.alab-demo/`, `.env`).
 - GitHub Actions runs the default lint and pytest suite on pull requests and pushes to `main`; real Docker and live/networked SkyDiscover gates remain manual workflow inputs.
-- Pushes to `main` check PyPI for the current `pyproject.toml` package version; if that exact version is missing, CI builds and publishes through PyPI Trusted Publishing, otherwise it skips publishing.
+- Pushes to `main` check PyPI for the current `pyproject.toml` package version; if that exact version is missing, CI builds and publishes through PyPI Trusted Publishing, then creates a `v<version>` GitHub Release from the matching [CHANGELOG.md](CHANGELOG.md) section. If PyPI already has that version, publishing and release creation are skipped.
 - The PyPI `alab-cli` project must trust repository `bebetterest/ALab`, workflow `ci.yml`, and environment `pypi` before the first automated publish can succeed.
 
 ## Security And Data Model
@@ -318,6 +318,8 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 │   └── test_runner_skydiscover.py
 ├── LICENSE
 ├── .env.example
+├── CHANGELOG.md
+├── CHANGELOG_cn.md
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md
@@ -335,6 +337,7 @@ Local-only agent notes such as `AGENTS.md` and `CORE.md` are intentionally git-i
 - [docs/spec_cli.md](docs/spec_cli.md), [docs/spec_storage_auth_context.md](docs/spec_storage_auth_context.md), [docs/spec_project_source_experiment.md](docs/spec_project_source_experiment.md), [docs/spec_lifecycle.md](docs/spec_lifecycle.md), [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_observe_collaboration.md](docs/spec_observe_collaboration.md), [docs/spec_dashboard.md](docs/spec_dashboard.md), and [docs/spec_tests.md](docs/spec_tests.md) define subsystem contracts.
 - [docs/progress.md](docs/progress.md), [docs/progress_pipeline.md](docs/progress_pipeline.md), [docs/progress_closed_gaps.md](docs/progress_closed_gaps.md), and [docs/progress_log.md](docs/progress_log.md) track current state, active queues, closed gaps, and history.
 - [docs/completion_audit.md](docs/completion_audit.md) tracks requirement-level evidence.
+- [CHANGELOG.md](CHANGELOG.md) records release-facing changes and is used by CI for GitHub Release notes.
 
 ## Contributing
 
