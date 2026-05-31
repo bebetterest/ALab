@@ -644,7 +644,7 @@ _SUCCESS_FIELD_SCOPE_CONTRACTS = {
 _HELPER_OPTION_USAGE = {
     "_annotation_private_exp_selector": {"--private", "--private-to-exp"},
     "_credential_selector_sql": {"--all", "--mode", "--token-id"},
-    "_experiment_best_rows_with_warning_count": {"--limit", "--offset"},
+    "_experiment_best_rows_with_excluded_count": {"--limit", "--offset"},
     "_experiment_list_search_rows_with_best": {"--limit", "--offset", "--sort"},
     "_experiment_mutable_override": {"--mutable-exclude", "--mutable-include"},
     "_experiment_visibility_override": {"--visibility-scope", "--visible-exp"},
@@ -874,7 +874,7 @@ _TYPED_VALUE_HELPER_INVALID_OPTIONS = {
         **_EXPERIMENT_QUERY_STRUCTURED_INVALID_OPTIONS,
         **_PAGINATION_INVALID_VALUE_OPTIONS,
     },
-    "_experiment_best_rows_with_warning_count": {
+    "_experiment_best_rows_with_excluded_count": {
         **_EXPERIMENT_QUERY_STRUCTURED_INVALID_OPTIONS,
         **_PAGINATION_INVALID_VALUE_OPTIONS,
     },

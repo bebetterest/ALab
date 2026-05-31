@@ -7966,7 +7966,7 @@ def _incomparable_best_run_count(
     return int(row["count"] if row else 0)
 
 
-def _experiment_best_rows_with_warning_count(
+def _experiment_best_rows_with_excluded_count(
     conn,
     project_id: str,
     actor: Actor,
@@ -8265,7 +8265,7 @@ def cmd_exp_best(args: list[str], req: Request) -> list[ResultBlock]:
         reward_min = _parse_float_option(args, "--reward-min")
         reward_max = _parse_float_option(args, "--reward-max")
         _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        rows_with_best, excluded_count = _experiment_best_rows_with_warning_count(
+        rows_with_best, excluded_count = _experiment_best_rows_with_excluded_count(
             conn,
             project_id,
             actor,
