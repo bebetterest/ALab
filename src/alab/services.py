@@ -7281,6 +7281,10 @@ def _sql_casefold_contains(value: Any, query: Any) -> int:
     return int(str(query).casefold() in str(value or "").casefold())
 
 
+def _sql_casefold(value: Any) -> str:
+    return str(value or "").casefold()
+
+
 def _sql_record_json_field_casefold_contains(record_json: Any, field: Any, query: Any) -> int:
     try:
         record = json.loads(str(record_json))
@@ -7292,6 +7296,7 @@ def _sql_record_json_field_casefold_contains(record_json: Any, field: Any, query
 
 
 def _register_observe_text_predicates(conn: sqlite3.Connection) -> None:
+    conn.create_function("alab_casefold", 1, _sql_casefold)
     conn.create_function("alab_casefold_contains", 2, _sql_casefold_contains)
     conn.create_function("alab_record_json_field_casefold_contains", 3, _sql_record_json_field_casefold_contains)
 
@@ -7407,15 +7412,24 @@ def _visible_exp_ids(conn, project_id: str, actor: Actor) -> set[str] | None:
 
 
 def _append_visible_exp_clause(conn, project_id: str, actor: Actor, clauses: list[str], params: list[Any], *, column: str = "exp_id") -> None:
-    visible = _visible_exp_ids(conn, project_id, actor)
-    if visible is None:
+    if actor.actor_type in {"root", "admin"}:
         return
-    if not visible:
+    if not actor.exp_id:
         clauses.append("1 = 0")
         return
-    placeholders = ", ".join("?" for _ in visible)
-    clauses.append(f"{column} IN ({placeholders})")
-    params.extend(sorted(visible))
+    project = _project_row(conn, project_id)
+    source_exp = _exp_row(conn, project_id, actor.exp_id)
+    policy = experiment_policy_json_obj(source_exp["policy_json"]).get("visibility_upper_bound") or {"scope": "none", "experiment_ids": []}
+    scope, explicit_ids = _intersect_visibility(_current_visibility_policy(conn, project), policy)
+    if scope == "same_project":
+        clauses.append(f"{column} IS NOT NULL")
+        return
+    visible = {actor.exp_id}
+    if scope == "explicit":
+        visible.update(explicit_ids)
+    visible_clause, visible_params = _sql_in_clause(column, visible)
+    clauses.append(visible_clause)
+    params.extend(visible_params)
 
 
 def _exp_visible(conn, project_id: str, actor: Actor, exp_id: str | None) -> bool:
@@ -7489,6 +7503,538 @@ def _best_run_for_experiment(
     return (comparable[0] if comparable else None), excluded
 
 
+def _sql_in_clause(column: str, values: list[Any] | set[Any]) -> tuple[str, tuple[Any, ...]]:
+    ordered = sorted(values)
+    if not ordered:
+        return "1 = 0", ()
+    clauses: list[str] = []
+    params: list[Any] = []
+    for idx in range(0, len(ordered), 900):
+        chunk = ordered[idx : idx + 900]
+        placeholders = ", ".join("?" for _ in chunk)
+        clauses.append(f"{column} IN ({placeholders})")
+        params.extend(chunk)
+    return f"({' OR '.join(clauses)})", tuple(params)
+
+
+def _reward_identity_config_versions(conn, project_id: str, reward_identity: str | None) -> list[int] | None:
+    if reward_identity is None:
+        return None
+    versions: list[int] = []
+    for row in all_rows(conn, "SELECT version, canonical_config_json FROM project_config_versions WHERE project_id = ?", (project_id,)):
+        config_json = project_config_json_obj(row["canonical_config_json"])
+        if _reward_identity_from_config_json(config_json) == reward_identity:
+            versions.append(int(row["version"]))
+    return versions
+
+
+def _best_run_window_order(direction: str, run_alias: str = "r") -> str:
+    reward_direction = "DESC" if direction == "maximize" else "ASC"
+    return f"{run_alias}.reward_value {reward_direction}, {run_alias}.ended_at DESC, {run_alias}.exp_id ASC, {run_alias}.rowid ASC"
+
+
+def _best_run_sql_clauses(
+    *,
+    project_id: str,
+    config_version: int | None,
+    reward_config_versions: list[int] | None,
+    include_archived_runs: bool,
+    exp_ids: list[str] | None = None,
+    run_alias: str = "r",
+) -> tuple[list[str], list[Any]]:
+    prefix = f"{run_alias}."
+    clauses = [
+        f"{prefix}project_id = ?",
+        f"{prefix}status = 'passed'",
+        f"{prefix}reward_parse_status = 'parsed'",
+        f"{prefix}reward_value IS NOT NULL",
+    ]
+    params: list[Any] = [project_id]
+    if exp_ids is not None:
+        exp_clause, exp_params = _sql_in_clause(f"{prefix}exp_id", exp_ids)
+        clauses.append(exp_clause)
+        params.extend(exp_params)
+    if config_version is not None:
+        clauses.append(f"{prefix}config_version = ?")
+        params.append(config_version)
+    elif reward_config_versions is not None:
+        version_clause, version_params = _sql_in_clause(f"{prefix}config_version", reward_config_versions)
+        clauses.append(version_clause)
+        params.extend(version_params)
+    if not include_archived_runs:
+        clauses.append(f"{prefix}archive_status = 'active'")
+    return clauses, params
+
+
+def _append_experiment_search_clause(conn, clauses: list[str], params: list[Any], exp_alias: str, actor: Actor, query: str) -> None:
+    _register_observe_text_predicates(conn)
+    prefix = f"{exp_alias}."
+    search_clauses = [
+        f"alab_record_json_field_casefold_contains({prefix}metadata_json, 'name', ?) = 1",
+        f"alab_record_json_field_casefold_contains({prefix}metadata_json, 'goal', ?) = 1",
+        f"""
+        EXISTS (
+          SELECT 1 FROM project_config_versions pcv
+          WHERE pcv.project_id = {prefix}project_id
+            AND pcv.version = {prefix}bound_config_version
+            AND (
+              alab_casefold_contains(json_extract(pcv.canonical_config_json, '$.project.name'), ?) = 1
+              OR alab_casefold_contains(json_extract(pcv.canonical_config_json, '$.project.task'), ?) = 1
+              OR alab_casefold_contains(json_extract(pcv.canonical_config_json, '$.project.goal'), ?) = 1
+            )
+        )
+        """,
+        f"""
+        EXISTS (
+          SELECT 1 FROM experiment_tags et
+          WHERE et.project_id = {prefix}project_id
+            AND et.exp_id = {prefix}exp_id
+            AND alab_casefold_contains(et.tag_slug, ?) = 1
+        )
+        """,
+        f"""
+        EXISTS (
+          SELECT 1 FROM experiment_submissions es
+          WHERE es.project_id = {prefix}project_id
+            AND es.exp_id = {prefix}exp_id
+            AND (
+              alab_casefold_contains(es.summary, ?) = 1
+              OR alab_casefold_contains(es.feedback, ?) = 1
+            )
+        )
+        """,
+    ]
+    params.extend([query, query, query, query, query, query, query, query])
+    if actor.actor_type in {"root", "admin"}:
+        annotation_visibility_sql = "1 = 1"
+        annotation_params: list[Any] = []
+    else:
+        annotation_visibility_sql = """
+        (
+          json_extract(a.visibility_json, '$.scope') = 'project'
+          OR (
+            json_extract(a.visibility_json, '$.scope') = 'private'
+            AND json_extract(a.visibility_json, '$.creator_exp_id') = ?
+          )
+        )
+        """
+        annotation_params = [actor.exp_id]
+    search_clauses.append(
+        f"""
+        EXISTS (
+          SELECT 1
+          FROM annotations a
+          JOIN annotation_revisions ar
+            ON ar.annotation_id = a.annotation_id
+           AND ar.revision = a.current_revision
+          WHERE a.project_id = {prefix}project_id
+            AND a.status = 'active'
+            AND (a.target_id = {prefix}exp_id OR json_extract(a.target_json, '$.exp_id') = {prefix}exp_id)
+            AND {annotation_visibility_sql}
+            AND alab_casefold_contains(ar.body, ?) = 1
+        )
+        """
+    )
+    params.extend(annotation_params)
+    params.append(query)
+    clauses.append(f"({' OR '.join(search_clauses)})")
+
+
+def _experiment_query_clauses(
+    conn,
+    project_id: str,
+    actor: Actor,
+    args: list[str],
+    *,
+    table_alias: str = "e",
+    search_query: str | None = None,
+) -> tuple[list[str], list[Any]]:
+    prefix = f"{table_alias}."
+    clauses = [f"{prefix}project_id = ?"]
+    params: list[Any] = [project_id]
+    _append_visible_exp_clause(conn, project_id, actor, clauses, params, column=f"{prefix}exp_id")
+    if not flag(args, "--include-archived"):
+        clauses.append(f"{prefix}status != 'archived'")
+    status = _require_option_choice(command_arg(args, "--status"), "--status", EXPERIMENT_STATUSES)
+    if status:
+        clauses.append(f"{prefix}status = ?")
+        params.append(status)
+    source_id_filter = _complete_id_option(args, "--source-id", "src")
+    if source_id_filter:
+        clauses.append(f"{prefix}source_id = ?")
+        params.append(source_id_filter)
+    config_version_filter = _parse_positive_int_option(args, "--config-version")
+    if config_version_filter is not None:
+        clauses.append(f"{prefix}bound_config_version = ?")
+        params.append(config_version_filter)
+    _require_ordered_time_range(args, "--created-after", "--created-before")
+    _require_ordered_time_range(args, "--updated-after", "--updated-before")
+    for option, column, op in [
+        ("--created-after", "created_at", ">="),
+        ("--created-before", "created_at", "<="),
+        ("--updated-after", "updated_at", ">="),
+        ("--updated-before", "updated_at", "<="),
+    ]:
+        value = command_arg(args, option)
+        if value:
+            clauses.append(f"{prefix}{column} {op} ?")
+            params.append(parse_rfc3339_utc(value))
+    for tag in command_args(args, "--tag"):
+        tag_slug = _tag_slug(tag)
+        clauses.append(
+            f"""
+            EXISTS (
+              SELECT 1 FROM experiment_tags et
+              WHERE et.project_id = {prefix}project_id
+                AND et.exp_id = {prefix}exp_id
+                AND et.tag_slug = ?
+            )
+            """
+        )
+        params.append(tag_slug)
+    name_query = command_arg(args, "--name-query") or ""
+    if name_query:
+        _register_observe_text_predicates(conn)
+        clauses.append(f"alab_record_json_field_casefold_contains({prefix}metadata_json, 'name', ?) = 1")
+        params.append(name_query)
+    if search_query is not None:
+        _append_experiment_search_clause(conn, clauses, params, table_alias, actor, search_query)
+    return clauses, params
+
+
+def _experiment_candidate_sql(conn, project_id: str, actor: Actor, args: list[str], *, search_query: str | None = None) -> tuple[str, list[Any]]:
+    clauses, params = _experiment_query_clauses(conn, project_id, actor, args, search_query=search_query)
+    return f"SELECT e.rowid AS alab_exp_rowid, e.* FROM experiments e WHERE {' AND '.join(clauses)}", params
+
+
+def _experiment_requested_sort_field(args: list[str], *, default: str) -> str:
+    sort_text = command_arg(args, "--sort", default=default) or default
+    field, _sep, _direction = sort_text.partition(":")
+    return field
+
+
+def _experiment_order_limit_clause(
+    args: list[str],
+    *,
+    default: str,
+    exp_alias: str,
+    rowid_expression: str,
+    reward_expression: str | None = None,
+) -> tuple[str, tuple[Any, ...]]:
+    allowed = {
+        "created": f"{exp_alias}.created_at",
+        "updated": f"{exp_alias}.updated_at",
+        "name": f"alab_casefold(json_extract({exp_alias}.metadata_json, '$.name'))",
+        "status": f"LOWER({exp_alias}.status)",
+    }
+    if reward_expression is not None:
+        allowed["reward"] = reward_expression
+    return _sql_order_limit_clause(
+        args,
+        default=default,
+        allowed=allowed,
+        subject="experiments",
+        tie_breakers=(rowid_expression,),
+    )
+
+
+def _best_run_from_joined_experiment_row(row: Any) -> dict[str, Any] | None:
+    if row["alab_best_run_id"] is None:
+        return None
+    return {
+        "run_id": row["alab_best_run_id"],
+        "exp_id": row["exp_id"],
+        "commit_sha": row["alab_best_commit_sha"],
+        "config_version": row["alab_best_config_version"],
+        "reward_value": row["alab_best_reward_value"],
+        "reward_parse_status": row["alab_best_reward_parse_status"],
+        "archive_status": row["alab_best_archive_status"],
+        "ended_at": row["alab_best_ended_at"],
+    }
+
+
+def _reward_bound_sql(column: str, reward_min: float | None, reward_max: float | None) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if reward_min is not None:
+        clauses.append(f"{column} >= ?")
+        params.append(reward_min)
+    if reward_max is not None:
+        clauses.append(f"{column} <= ?")
+        params.append(reward_max)
+    return clauses, params
+
+
+def _best_runs_for_experiments(
+    conn,
+    *,
+    project_id: str,
+    exp_ids: list[str],
+    direction: str,
+    config_version: int | None = None,
+    reward_config_versions: list[int] | None = None,
+    include_archived_runs: bool = False,
+) -> dict[str, Any]:
+    if not exp_ids:
+        return {}
+    run_clauses, run_params = _best_run_sql_clauses(
+        project_id=project_id,
+        config_version=config_version,
+        reward_config_versions=reward_config_versions,
+        include_archived_runs=include_archived_runs,
+        exp_ids=exp_ids,
+    )
+    rows = all_rows(
+        conn,
+        f"""
+        SELECT * FROM (
+          SELECT r.*,
+            ROW_NUMBER() OVER (
+              PARTITION BY r.exp_id
+              ORDER BY {_best_run_window_order(direction)}
+            ) AS alab_best_rank
+          FROM runs r
+          WHERE {' AND '.join(run_clauses)}
+        )
+        WHERE alab_best_rank = 1
+        """,
+        tuple(run_params),
+    )
+    return {row["exp_id"]: row for row in rows}
+
+
+def _experiment_page_rows(
+    conn,
+    project_id: str,
+    actor: Actor,
+    args: list[str],
+    *,
+    search_query: str | None,
+    sort_default: str,
+) -> list[Any]:
+    _register_observe_text_predicates(conn)
+    candidate_sql, candidate_params = _experiment_candidate_sql(conn, project_id, actor, args, search_query=search_query)
+    order_sql, order_params = _experiment_order_limit_clause(
+        args,
+        default=sort_default,
+        exp_alias="e",
+        rowid_expression="e.rowid",
+    )
+    return all_rows(conn, f"{candidate_sql} {order_sql}", (*candidate_params, *order_params))
+
+
+def _experiment_rows_with_ranked_best(
+    conn,
+    project_id: str,
+    actor: Actor,
+    args: list[str],
+    *,
+    direction: str,
+    config_version: int | None,
+    reward_config_versions: list[int] | None,
+    include_archived_runs: bool,
+    reward_min: float | None,
+    reward_max: float | None,
+    search_query: str | None,
+    sort_default: str,
+) -> list[tuple[Any, dict[str, Any] | None]]:
+    _register_observe_text_predicates(conn)
+    candidate_sql, candidate_params = _experiment_candidate_sql(conn, project_id, actor, args, search_query=search_query)
+    run_clauses, run_params = _best_run_sql_clauses(
+        project_id=project_id,
+        config_version=config_version,
+        reward_config_versions=reward_config_versions,
+        include_archived_runs=include_archived_runs,
+    )
+    outer_clauses, outer_params = _reward_bound_sql("rb.reward_value", reward_min, reward_max)
+    outer_where = f"WHERE {' AND '.join(outer_clauses)}" if outer_clauses else ""
+    order_sql, order_params = _experiment_order_limit_clause(
+        args,
+        default=sort_default,
+        exp_alias="ce",
+        rowid_expression="ce.alab_exp_rowid",
+        reward_expression="rb.reward_value",
+    )
+    rows = all_rows(
+        conn,
+        f"""
+        WITH candidate_experiments AS (
+          {candidate_sql}
+        ),
+        ranked_best_runs AS (
+          SELECT r.run_id, r.exp_id, r.commit_sha, r.config_version, r.reward_value,
+                 r.reward_parse_status, r.archive_status, r.ended_at,
+            ROW_NUMBER() OVER (
+              PARTITION BY r.exp_id
+              ORDER BY {_best_run_window_order(direction)}
+            ) AS alab_best_rank
+          FROM runs r
+          JOIN candidate_experiments ce ON ce.exp_id = r.exp_id
+          WHERE {' AND '.join(run_clauses)}
+        )
+        SELECT ce.*,
+               rb.run_id AS alab_best_run_id,
+               rb.commit_sha AS alab_best_commit_sha,
+               rb.config_version AS alab_best_config_version,
+               rb.reward_value AS alab_best_reward_value,
+               rb.reward_parse_status AS alab_best_reward_parse_status,
+               rb.archive_status AS alab_best_archive_status,
+               rb.ended_at AS alab_best_ended_at
+        FROM candidate_experiments ce
+        LEFT JOIN ranked_best_runs rb ON rb.exp_id = ce.exp_id AND rb.alab_best_rank = 1
+        {outer_where}
+        {order_sql}
+        """,
+        (*candidate_params, *run_params, *outer_params, *order_params),
+    )
+    return [(row, _best_run_from_joined_experiment_row(row)) for row in rows]
+
+
+def _experiment_list_search_rows_with_best(
+    conn,
+    project_id: str,
+    actor: Actor,
+    args: list[str],
+    *,
+    direction: str,
+    reward_config_versions: list[int] | None,
+    reward_min: float | None,
+    reward_max: float | None,
+    search_query: str | None,
+    sort_default: str,
+) -> list[tuple[Any, Any | None]]:
+    sort_field = _experiment_requested_sort_field(args, default=sort_default)
+    if sort_field == "reward" or reward_min is not None or reward_max is not None:
+        return _experiment_rows_with_ranked_best(
+            conn,
+            project_id,
+            actor,
+            args,
+            direction=direction,
+            config_version=None,
+            reward_config_versions=reward_config_versions,
+            include_archived_runs=False,
+            reward_min=reward_min,
+            reward_max=reward_max,
+            search_query=search_query,
+            sort_default=sort_default,
+        )
+    rows = _experiment_page_rows(conn, project_id, actor, args, search_query=search_query, sort_default=sort_default)
+    exp_ids = [row["exp_id"] for row in rows]
+    best_by_exp = _best_runs_for_experiments(
+        conn,
+        project_id=project_id,
+        exp_ids=exp_ids,
+        direction=direction,
+        reward_config_versions=reward_config_versions,
+    )
+    return [(row, best_by_exp.get(row["exp_id"])) for row in rows]
+
+
+def _incomparable_best_run_count(
+    conn,
+    *,
+    candidate_sql: str,
+    candidate_params: list[Any],
+    project_id: str,
+    reward_config_versions: list[int] | None,
+    include_archived_runs: bool,
+) -> int:
+    if reward_config_versions is None:
+        return 0
+    run_clauses, run_params = _best_run_sql_clauses(
+        project_id=project_id,
+        config_version=None,
+        reward_config_versions=None,
+        include_archived_runs=include_archived_runs,
+    )
+    version_clause, version_params = _sql_in_clause("r.config_version", reward_config_versions)
+    run_clauses.append(f"NOT ({version_clause})")
+    row = one(
+        conn,
+        f"""
+        WITH candidate_experiments AS (
+          {candidate_sql}
+        )
+        SELECT COUNT(*) AS count
+        FROM runs r
+        JOIN candidate_experiments ce ON ce.exp_id = r.exp_id
+        WHERE {' AND '.join(run_clauses)}
+        """,
+        (*candidate_params, *run_params, *version_params),
+    )
+    return int(row["count"] if row else 0)
+
+
+def _experiment_best_rows_with_warning_count(
+    conn,
+    project_id: str,
+    actor: Actor,
+    args: list[str],
+    *,
+    direction: str,
+    config_version: int | None,
+    reward_config_versions: list[int] | None,
+    include_archived_runs: bool,
+    reward_min: float | None,
+    reward_max: float | None,
+) -> tuple[list[tuple[Any, dict[str, Any] | None]], int]:
+    _register_observe_text_predicates(conn)
+    candidate_sql, candidate_params = _experiment_candidate_sql(conn, project_id, actor, args)
+    excluded_count = _incomparable_best_run_count(
+        conn,
+        candidate_sql=candidate_sql,
+        candidate_params=candidate_params,
+        project_id=project_id,
+        reward_config_versions=reward_config_versions,
+        include_archived_runs=include_archived_runs,
+    )
+    run_clauses, run_params = _best_run_sql_clauses(
+        project_id=project_id,
+        config_version=config_version,
+        reward_config_versions=reward_config_versions,
+        include_archived_runs=include_archived_runs,
+    )
+    outer_clauses, outer_params = _reward_bound_sql("rb.reward_value", reward_min, reward_max)
+    outer_where = f"WHERE {' AND '.join(outer_clauses)}" if outer_clauses else ""
+    reward_direction = "DESC" if direction == "maximize" else "ASC"
+    limit, offset = _parse_limit_offset(args)
+    rows = all_rows(
+        conn,
+        f"""
+        WITH candidate_experiments AS (
+          {candidate_sql}
+        ),
+        ranked_best_runs AS (
+          SELECT r.run_id, r.exp_id, r.commit_sha, r.config_version, r.reward_value,
+                 r.reward_parse_status, r.archive_status, r.ended_at,
+            ROW_NUMBER() OVER (
+              PARTITION BY r.exp_id
+              ORDER BY {_best_run_window_order(direction)}
+            ) AS alab_best_rank
+          FROM runs r
+          JOIN candidate_experiments ce ON ce.exp_id = r.exp_id
+          WHERE {' AND '.join(run_clauses)}
+        )
+        SELECT ce.*,
+               rb.run_id AS alab_best_run_id,
+               rb.commit_sha AS alab_best_commit_sha,
+               rb.config_version AS alab_best_config_version,
+               rb.reward_value AS alab_best_reward_value,
+               rb.reward_parse_status AS alab_best_reward_parse_status,
+               rb.archive_status AS alab_best_archive_status,
+               rb.ended_at AS alab_best_ended_at
+        FROM candidate_experiments ce
+        JOIN ranked_best_runs rb ON rb.exp_id = ce.exp_id AND rb.alab_best_rank = 1
+        {outer_where}
+        ORDER BY rb.reward_value {reward_direction}, rb.ended_at DESC, ce.exp_id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (*candidate_params, *run_params, *outer_params, limit, offset),
+    )
+    return [(row, _best_run_from_joined_experiment_row(row)) for row in rows], excluded_count
+
+
 def _experiment_result_block(
     conn,
     row: Any,
@@ -7499,8 +8045,6 @@ def _experiment_result_block(
     meta = experiment_metadata_obj(row["metadata_json"])
     source = one(conn, "SELECT source_ref FROM sources WHERE source_id = ?", (row["source_id"],))
     tags = _tag_values(conn, row["exp_id"])
-    if best_run is None and row["latest_run_id"]:
-        best_run = one(conn, "SELECT * FROM runs WHERE run_id = ?", (row["latest_run_id"],))
     return ResultBlock(
         "experiment",
         [
@@ -7526,43 +8070,6 @@ def _experiment_result_block(
     )
 
 
-def _experiment_rows(conn, project_id: str, actor: Actor, args: list[str]) -> list[Any]:
-    require_options_at_most_once(args, ("--include-archived", "--status", "--name-query"))
-    clauses = ["project_id = ?"]
-    params: list[Any] = [project_id]
-    _append_visible_exp_clause(conn, project_id, actor, clauses, params)
-    if not flag(args, "--include-archived"):
-        clauses.append("status != 'archived'")
-    status = _require_option_choice(command_arg(args, "--status"), "--status", EXPERIMENT_STATUSES)
-    if status:
-        clauses.append("status = ?")
-        params.append(status)
-    source_id_filter = _complete_id_option(args, "--source-id", "src")
-    if source_id_filter:
-        clauses.append("source_id = ?")
-        params.append(source_id_filter)
-    config_version_filter = _parse_positive_int_option(args, "--config-version")
-    if config_version_filter is not None:
-        clauses.append("bound_config_version = ?")
-        params.append(config_version_filter)
-    _require_ordered_time_range(args, "--created-after", "--created-before")
-    _require_ordered_time_range(args, "--updated-after", "--updated-before")
-    for name, column in [("--created-after", "created_at"), ("--created-before", "created_at"), ("--updated-after", "updated_at"), ("--updated-before", "updated_at")]:
-        value = command_arg(args, name)
-        if value:
-            clauses.append(f"{column} {'>=' if name.endswith('after') else '<='} ?")
-            params.append(parse_rfc3339_utc(value))
-    rows = [dict(row) for row in all_rows(conn, f"SELECT * FROM experiments WHERE {' AND '.join(clauses)}", tuple(params))]
-    tags = command_args(args, "--tag")
-    if tags:
-        wanted = {_tag_slug(tag) for tag in tags}
-        rows = [row for row in rows if wanted.issubset(set(_tag_values(conn, row["exp_id"])))]
-    name_query = (command_arg(args, "--name-query") or "").casefold()
-    if name_query:
-        rows = [row for row in rows if name_query in str(experiment_metadata_obj(row["metadata_json"]).get("name") or "").casefold()]
-    return rows
-
-
 def _require_experiment_query_options_at_most_once(args: list[str], *, allow_sort: bool) -> None:
     options = [
         "--include-archived",
@@ -7582,68 +8089,6 @@ def _require_experiment_query_options_at_most_once(args: list[str], *, allow_sor
     if allow_sort:
         options.append("--sort")
     require_options_at_most_once(args, tuple(options))
-
-
-def _experiment_search_corpus(conn, project_id: str, row: Any, actor: Actor, visible_exp_ids: set[str] | None) -> str:
-    meta = experiment_metadata_obj(row["metadata_json"])
-    parts = [str(meta.get("name") or ""), str(meta.get("goal") or "")]
-    try:
-        config_json = _config_json_for_version(conn, project_id, int(row["bound_config_version"]))
-        project_config = config_json.get("project") or {}
-        parts.extend([str(project_config.get("name") or ""), str(project_config.get("task") or ""), str(project_config.get("goal") or "")])
-    except AlabError:
-        pass
-    parts.extend(_tag_values(conn, row["exp_id"]))
-    submission = one(conn, "SELECT summary, feedback FROM experiment_submissions WHERE exp_id = ?", (row["exp_id"],))
-    if submission:
-        parts.extend([submission["summary"], submission["feedback"]])
-    ann_rows = all_rows(
-        conn,
-        """
-        SELECT a.*, ar.body
-        FROM annotations a
-        JOIN annotation_revisions ar ON ar.annotation_id = a.annotation_id AND ar.revision = a.current_revision
-        WHERE a.project_id = ? AND a.status = 'active' AND (a.target_id = ? OR json_extract(a.target_json, '$.exp_id') = ?)
-        """,
-        (project_id, row["exp_id"], row["exp_id"]),
-    )
-    parts.extend(ann["body"] for ann in ann_rows if _annotation_visible(ann, actor, visible_exp_ids))
-    return "\n".join(part for part in parts if part)
-
-
-def _sort_experiment_blocks(rows_with_best: list[tuple[Any, Any | None]], args: list[str], *, default: str) -> list[tuple[Any, Any | None]]:
-    require_options_at_most_once(args, ("--sort",))
-    sort_text = command_arg(args, "--sort", default=default) or default
-    field, sep, direction = sort_text.partition(":")
-    if not sep:
-        direction = "desc"
-    if direction not in {"asc", "desc"}:
-        raise AlabError("CONFIG_INVALID", "--sort direction must be asc or desc")
-    allowed = {"created", "updated", "name", "status", "reward"}
-    if field not in allowed:
-        raise AlabError("CONFIG_INVALID", "--sort field is not supported for experiments")
-    concrete: list[tuple[Any, tuple[Any, Any | None]]] = []
-    nulls: list[tuple[Any, Any | None]] = []
-    for item in rows_with_best:
-        row, best = item
-        meta = experiment_metadata_obj(row["metadata_json"])
-        if field == "created":
-            value = row["created_at"]
-        elif field == "updated":
-            value = row["updated_at"]
-        elif field == "name":
-            value = str(meta.get("name") or "").casefold()
-        elif field == "status":
-            value = row["status"]
-        else:
-            value = best["reward_value"] if best else None
-        if value is None:
-            nulls.append(item)
-            continue
-        concrete.append((float(value) if field == "reward" else value, item))
-
-    concrete.sort(key=lambda pair: pair[0], reverse=direction == "desc")
-    return [item for _value, item in concrete] + nulls
 
 
 def cmd_exp_list(args: list[str], req: Request) -> list[ResultBlock]:
@@ -7676,20 +8121,23 @@ def cmd_exp_list(args: list[str], req: Request) -> list[ResultBlock]:
     try:
         project = _project_row(conn, project_id)
         identity, direction = _optional_best_context(conn, project)
+        reward_config_versions = _reward_identity_config_versions(conn, project_id, identity)
         reward_min = _parse_float_option(args, "--reward-min")
         reward_max = _parse_float_option(args, "--reward-max")
         _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        rows_with_best: list[tuple[Any, Any | None]] = []
-        for row in _experiment_rows(conn, project_id, actor, args):
-            best, _excluded = _best_run_for_experiment(conn, project_id=project_id, exp_id=row["exp_id"], direction=direction, reward_identity=identity)
-            if reward_min is not None and (best is None or float(best["reward_value"]) < reward_min):
-                continue
-            if reward_max is not None and (best is None or float(best["reward_value"]) > reward_max):
-                continue
-            rows_with_best.append((row, best))
-        rows_with_best = _sort_experiment_blocks(rows_with_best, args, default="updated:desc")
-        limit, offset = _parse_limit_offset(args)
-        return [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best[offset : offset + limit]]
+        rows_with_best = _experiment_list_search_rows_with_best(
+            conn,
+            project_id,
+            actor,
+            args,
+            direction=direction,
+            reward_config_versions=reward_config_versions,
+            reward_min=reward_min,
+            reward_max=reward_max,
+            search_query=None,
+            sort_default="updated:desc",
+        )
+        return [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best]
     finally:
         conn.close()
 
@@ -7735,23 +8183,23 @@ def cmd_exp_search(args: list[str], req: Request) -> list[ResultBlock]:
     try:
         project = _project_row(conn, project_id)
         identity, direction = _optional_best_context(conn, project)
+        reward_config_versions = _reward_identity_config_versions(conn, project_id, identity)
         reward_min = _parse_float_option(args, "--reward-min")
         reward_max = _parse_float_option(args, "--reward-max")
         _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        visible_exp_ids = _visible_exp_ids(conn, project_id, actor)
-        rows_with_best: list[tuple[Any, Any | None]] = []
-        for row in _experiment_rows(conn, project_id, actor, args):
-            if query not in _experiment_search_corpus(conn, project_id, row, actor, visible_exp_ids).casefold():
-                continue
-            best, _excluded = _best_run_for_experiment(conn, project_id=project_id, exp_id=row["exp_id"], direction=direction, reward_identity=identity)
-            if reward_min is not None and (best is None or float(best["reward_value"]) < reward_min):
-                continue
-            if reward_max is not None and (best is None or float(best["reward_value"]) > reward_max):
-                continue
-            rows_with_best.append((row, best))
-        rows_with_best = _sort_experiment_blocks(rows_with_best, args, default="updated:desc")
-        limit, offset = _parse_limit_offset(args)
-        return [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best[offset : offset + limit]]
+        rows_with_best = _experiment_list_search_rows_with_best(
+            conn,
+            project_id,
+            actor,
+            args,
+            direction=direction,
+            reward_config_versions=reward_config_versions,
+            reward_min=reward_min,
+            reward_max=reward_max,
+            search_query=query,
+            sort_default="updated:desc",
+        )
+        return [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best]
     finally:
         conn.close()
 
@@ -7813,35 +8261,23 @@ def cmd_exp_best(args: list[str], req: Request) -> list[ResultBlock]:
     try:
         project = _project_row(conn, project_id)
         config_version, identity, direction = _best_context(conn, project, args)
+        reward_config_versions = _reward_identity_config_versions(conn, project_id, identity)
         reward_min = _parse_float_option(args, "--reward-min")
         reward_max = _parse_float_option(args, "--reward-max")
         _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        rows_with_best: list[tuple[Any, Any | None]] = []
-        excluded_count = 0
-        for row in _experiment_rows(conn, project_id, actor, args):
-            best, excluded = _best_run_for_experiment(
-                conn,
-                project_id=project_id,
-                exp_id=row["exp_id"],
-                direction=direction,
-                config_version=config_version,
-                reward_identity=identity,
-                include_archived_runs=flag(args, "--include-archived"),
-            )
-            excluded_count += excluded
-            if best is None:
-                continue
-            reward = float(best["reward_value"])
-            if reward_min is not None and reward < reward_min:
-                continue
-            if reward_max is not None and reward > reward_max:
-                continue
-            rows_with_best.append((row, best))
-        rows_with_best.sort(key=lambda item: item[0]["exp_id"])
-        rows_with_best.sort(key=lambda item: item[1]["ended_at"] if item[1] else "", reverse=True)
-        rows_with_best.sort(key=lambda item: float(item[1]["reward_value"]) if item[1] else float("inf"), reverse=direction == "maximize")
-        limit, offset = _parse_limit_offset(args)
-        blocks = [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best[offset : offset + limit]]
+        rows_with_best, excluded_count = _experiment_best_rows_with_warning_count(
+            conn,
+            project_id,
+            actor,
+            args,
+            direction=direction,
+            config_version=config_version,
+            reward_config_versions=reward_config_versions,
+            include_archived_runs=flag(args, "--include-archived"),
+            reward_min=reward_min,
+            reward_max=reward_max,
+        )
+        blocks = [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best]
         if excluded_count:
             blocks.append(
                 ResultBlock(

@@ -644,6 +644,8 @@ _SUCCESS_FIELD_SCOPE_CONTRACTS = {
 _HELPER_OPTION_USAGE = {
     "_annotation_private_exp_selector": {"--private", "--private-to-exp"},
     "_credential_selector_sql": {"--all", "--mode", "--token-id"},
+    "_experiment_best_rows_with_warning_count": {"--limit", "--offset"},
+    "_experiment_list_search_rows_with_best": {"--limit", "--offset", "--sort"},
     "_experiment_mutable_override": {"--mutable-exclude", "--mutable-include"},
     "_experiment_visibility_override": {"--visibility-scope", "--visible-exp"},
     "_lifecycle_reason": {"--reason"},
@@ -653,7 +655,6 @@ _HELPER_OPTION_USAGE = {
     "_read_annotation_body": {"--body", "--body-file", "--body-stdin"},
     "_read_secret_input": {"--value-file", "--value-stdin"},
     "_require_project_admin": {"--project"},
-    "_sort_experiment_blocks": {"--sort"},
     "_sort_rows": {"--sort"},
     "_source_import_limits": {"--max-file-bytes", "--max-files", "--max-total-bytes"},
     "_source_origin_mode": {"--git-ref", "--source-empty", "--source-git", "--source-path", "--source-subdir"},
@@ -719,7 +720,6 @@ _HELPER_AT_MOST_ONCE_OPTIONS = {
     },
     "_require_project_admin": {"--project"},
     "_resolve_annotation_target": {"--target"},
-    "_sort_experiment_blocks": {"--sort"},
     "_sort_rows": {"--sort"},
     "_source_import_limits": {"--max-file-bytes", "--max-files", "--max-total-bytes"},
     "_source_origin_mode": {"--git-ref", "--source-empty", "--source-git", "--source-path", "--source-subdir"},
@@ -864,13 +864,19 @@ _TYPED_VALUE_HELPER_INVALID_OPTIONS = {
         "--commit": ("HEAD", "commit selector must be latest, final, best, or a commit SHA"),
         "--from-commit": ("HEAD", "commit selector must be latest, final, best, or a commit SHA"),
     },
-    "_experiment_rows": {
+    "_experiment_list_search_rows_with_best": {
+        "--sort": ("unsupported:desc", "--sort field is not supported for experiments"),
         "--config-version": [
             ("not-an-integer", "--config-version must be an integer"),
             ("0", "--config-version must be a positive integer"),
             ("-1", "--config-version must be a positive integer"),
         ],
         **_EXPERIMENT_QUERY_STRUCTURED_INVALID_OPTIONS,
+        **_PAGINATION_INVALID_VALUE_OPTIONS,
+    },
+    "_experiment_best_rows_with_warning_count": {
+        **_EXPERIMENT_QUERY_STRUCTURED_INVALID_OPTIONS,
+        **_PAGINATION_INVALID_VALUE_OPTIONS,
     },
     "_paginate_rows": _PAGINATION_INVALID_VALUE_OPTIONS,
     "_parse_audit_limit_offset": _AUDIT_PAGINATION_INVALID_VALUE_OPTIONS,
@@ -883,9 +889,6 @@ _TYPED_VALUE_HELPER_INVALID_OPTIONS = {
             ("0", "invalid config version selector"),
             ("-1", "invalid config version selector"),
         ],
-    },
-    "_sort_experiment_blocks": {
-        "--sort": ("unsupported:desc", "--sort field is not supported for experiments"),
     },
     "_sql_order_limit_clause": _PAGINATION_INVALID_VALUE_OPTIONS,
     "_source_import_limits": _SOURCE_LIMIT_INVALID_VALUE_OPTIONS,

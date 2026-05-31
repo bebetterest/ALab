@@ -3,20 +3,23 @@
 ALab 的重要变更记录在这里。每次发布改变用户可见行为时，都要与
 `CHANGELOG.md` 保持同步。
 
-## [0.1.2] - 2026-05-30
+## [0.1.2] - 2026-05-31
 
 ### 新增
 
 - 新增 `alab report`，用于安全导出 project 和 visible experiment 的 Markdown evidence report。
 - 新增有界 dashboard list APIs，以及 top-level log/artifact APIs，以支持更大的本地 home 数据规模。
 - 新增 dashboard loaded/total metadata，用于 paginated list 和 detail views。
+- 新增 paginated/searchable dashboard feedback reads。
 
 ### 变更
 
 - Version metadata 现在会把 PyPI 用户指向本 changelog。
 - Dashboard project、experiment 和 run detail payloads 现在会限制高容量 related rows。
+- Observe run、artifact、log 和 annotation list paths 现在会在 SQL 中执行 filtering、whitelisted sorting、null-last ordering 和 pagination，以支持高容量 home，同时保持 CLI output contracts 不变。
+- Experiment list/search/best paths 现在会把 visible filtering、search matching、reward bounds、sorting、pagination 和 best-run selection 下推到 SQL-backed queries，以支持更大的 projects。
 
 ### 修复
 
 - Report best-run selection 现在使用 active valid reward-policy identity，并排除不可比 runs。
-
+- `config validate --refresh-capabilities` 现在会为 unsupported 或 error runtime capability checks 渲染可操作的 `next` remediation。

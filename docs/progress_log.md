@@ -7905,3 +7905,17 @@ Validation:
 - Docker platform diagnostic next action: `.venv/bin/python -m pytest -q tests/test_runner_docker.py::test_docker_platform_probe_uses_native_architecture_when_buildx_unavailable`
 - Focused docs sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized` and `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized`
 - Full default suite with loopback socket access for dashboard tests: `.venv/bin/python -m pytest -q`
+
+## 2026-05-31 Documentation Ledger Cleanup
+
+Implemented:
+
+- Updated the P0 full default-suite evidence row in `docs/completion_audit.md` to reflect the current 2026-05-31 full-suite pass instead of the older stale-after-2026-05-30 wording.
+- Updated the P0 documentation consistency row to point at the current cleanup and focused documentation checks.
+- Added the 2026-05-31 observe SQL pushdown, experiment list/search/best SQL-backed query optimization, dashboard feedback pagination/search, and runtime diagnostic UX changes to the `0.1.2` changelog section.
+- Synchronized the matching Chinese documents.
+
+Validation:
+
+- Focused docs sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized`
+- `git diff --check`
