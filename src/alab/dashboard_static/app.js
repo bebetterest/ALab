@@ -3714,7 +3714,8 @@ function feedbackView() {
 }
 
 async function afterFeedback() {
-  const rows = (await api("/api/feedback")).feedback || [];
+  const payload = await api(`/api/feedback?query=${encodeURIComponent(state.search)}&limit=500`);
+  const rows = payload.feedback || [];
   const searched = bySearch(rows, ["body", (row) => row.metadata && row.metadata.title, (row) => row.metadata && row.metadata.kind, (row) => row.metadata && row.metadata.role]);
   const options = feedbackFilterOptions(searched);
   const sortOptions = feedbackSortOptions();
@@ -3734,7 +3735,7 @@ async function afterFeedback() {
   document.getElementById("feedback-kinds").innerHTML = countListHtml(countBy(filtered, (row) => row.metadata && row.metadata.kind));
   document.getElementById("feedback-roles").innerHTML = countListHtml(countBy(filtered, (row) => row.metadata && row.metadata.role));
   document.getElementById("feedback-recency").innerHTML = countListHtml(countBy(filtered, feedbackDay));
-  document.getElementById("feedback-meta").innerHTML = filterMeta(filtered.length, rows.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "));
+  document.getElementById("feedback-meta").innerHTML = filterMeta(filtered.length, rows.length, [quickFilterLabel(options, filter), quickSortLabel(sortOptions, sort)].filter(Boolean).join(" · "), payload.page);
   const feed = document.getElementById("feedback-feed");
   if (!filtered.length) {
     feed.innerHTML = emptyHtml();

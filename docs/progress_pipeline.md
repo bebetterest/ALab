@@ -12,12 +12,12 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 - Keep only the current queue and update policy here. Do not append stale backlog; rewrite or remove queue rows as evidence closes.
 - English docs are canonical. Update the synchronized `*_cn.md` file in the same change.
 
-## Current Active Batch - 2026-05-30
+## Current Active Batch - 2026-05-31
 
-- Focus: report export and dashboard scale optimization is closed for the current worktree. `alab report` exports Markdown evidence for a project or a visible experiment. Dashboard global lists and high-volume detail surfaces use bounded pages instead of unbounded related-record fan-out.
-- Explicit non-goals for this batch: keep `alab feedback` unchanged; do not add JSON output; do not implement local batch execution.
+- Focus: observe list SQL pushdown, dashboard feedback pagination/search, and runtime diagnostic UX are closed for the current worktree. Run/artifact/log/annotation list filters, whitelisted sorting, null-last ordering, and pagination now execute in SQL for high-volume paths; dashboard feedback now uses a paginated/searchable API; `config validate` capability rows now include actionable remediation in `next`.
+- Explicit non-goals for this batch: do not add JSON CLI output, local batch execution, hosted/remote dashboard behavior, or new runner families.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
-- Next evidence to add: none for this batch. Reopen only if a later requirement changes report scope/output, dashboard route semantics, pagination/search behavior, or release-target validation expectations.
+- Next evidence to add: none for this batch. Reopen only if a later requirement changes observe filtering/sorting semantics, dashboard route semantics, runtime capability diagnostics, or release-target validation expectations.
 
 ## Active Queue
 

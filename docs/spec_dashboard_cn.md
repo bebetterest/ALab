@@ -101,7 +101,7 @@ API routes：
 - `/api/feedback`
 - `/api/system`
 
-除 download responses 外，所有 API output 都是 JSON；download responses 返回 bytes、content type 和 download filename。Project、experiment、run、log、artifact 和 audit record 的 list routes 接受 `limit` 和 `offset`，最大 `limit` 为 `500`；返回原有 top-level array field，并额外包含 `page` metadata：`limit`、`offset`、`total` 和 `next_offset`。Top-level `projects`、`experiments`、`runs`、`logs`、`artifacts` 和 `audit` list routes 在适用时接受 `query`；`experiments`、`runs`、`logs`、`artifacts` 和 `audit` 接受 `project`；`runs`、`logs` 和 `artifacts` 在适用时接受更窄的 `exp` 或 `run` filters。Project、experiment 和 run detail routes 返回有界 recent related arrays，并附带高容量 related records 的 page totals。API queries 使用 parameterized SQLite queries 和 explicit JSON sanitizers。File reads 必须 resolve 到 ALab-owned project artifact/log storage root 下，并拒绝 path traversal。
+除 download responses 外，所有 API output 都是 JSON；download responses 返回 bytes、content type 和 download filename。Project、experiment、run、log、artifact、audit 和 feedback record 的 list routes 接受 `limit` 和 `offset`，最大 `limit` 为 `500`；返回原有 top-level array field，并额外包含 `page` metadata：`limit`、`offset`、`total` 和 `next_offset`。Top-level `projects`、`experiments`、`runs`、`logs`、`artifacts`、`audit` 和 `feedback` list routes 在适用时接受 `query`；`experiments`、`runs`、`logs`、`artifacts` 和 `audit` 接受 `project`；`runs`、`logs` 和 `artifacts` 在适用时接受更窄的 `exp` 或 `run` filters。Project、experiment 和 run detail routes 返回有界 recent related arrays，并附带高容量 related records 的 page totals。API queries 使用 parameterized SQLite queries 和 explicit JSON sanitizers。File reads 必须 resolve 到 ALab-owned project artifact/log storage root 下，并拒绝 path traversal。
 
 ## 5. Read Model
 
@@ -114,7 +114,7 @@ Dashboard read model 应暴露：
 - Experiments：status、tags、source binding、config binding、worktree state、latest/final run、submission 和 reward trend。
 - Runs：status、reward、warnings、runner metadata、stdout/stderr/hidden log references、artifact references、commit/config context 和 failure reasons。
 - Logs and artifacts：paginated global/project-scoped metadata lists、chunked full log reads、text/image previews、binary metadata 和 raw downloads。
-- Audit、feedback 和 system：searchable audit rows、HOME feedback entries、global config、locks、runtime capabilities、catalogs 和 paginated cache entries。
+- Audit、feedback 和 system：searchable audit rows、可搜索且分页的 HOME feedback entries、global config、locks、runtime capabilities、catalogs 和 paginated cache entries。
 
 Reward values 只能在 compatible project/reward-policy context 内比较。Global dashboard 不得展示跨 project leaderboard。
 

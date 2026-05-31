@@ -591,6 +591,7 @@ Lifecycle command rules：
 - Options：`--refresh-capabilities`。
 - Success fields for object `config`：`config valid`、`next`。
 - Success fields for object `capability`：`capability`、`fingerprint`、`status`、`checked at`、`next`。
+- Runtime diagnostic rule：supported capabilities 渲染 `next: none`；unsupported 或 errored capabilities 渲染安全且可操作的 `next`，说明 local remediation 类型，并提示 operator 在修复 runtime 后重跑 `alab config validate --refresh-capabilities`。
 - 当 global config invalid 时，这组命令仍可运行以修复配置。
 
 `alab key create --project <project_id> [--role admin]`

@@ -303,7 +303,12 @@ class _DashboardHandler(BaseHTTPRequestHandler):
                 "page": _page_meta(total, limit, offset),
             }
         if segments == ["feedback"]:
-            return {"feedback": read_feedback(self.server.home)}
+            limit, offset = _list_limit_offset(params)
+            total = count_feedback(self.server.home, query=_first(params, "query"))
+            return {
+                "feedback": read_feedback(self.server.home, query=_first(params, "query"), limit=limit, offset=offset),
+                "page": _page_meta(total, limit, offset),
+            }
         if segments == ["system"]:
             return read_system(
                 self.server.home,
@@ -773,20 +778,59 @@ def count_audit(home: Home, *, project_id: str | None = None, query: str | None 
         conn.close()
 
 
-def read_feedback(home: Home) -> list[dict[str, Any]]:
+def _feedback_metadata_rows(home: Home) -> list[tuple[dict[str, Any], Path]]:
     if not home.feedback_path.exists():
         return []
-    entries: list[dict[str, Any]] = []
+    rows: list[tuple[dict[str, Any], Path]] = []
     for metadata_path in home.feedback_path.glob("*/metadata.json"):
         try:
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            body_path = metadata_path.with_name("body.md")
-            body = body_path.read_text(encoding="utf-8") if body_path.exists() else ""
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             continue
-        entries.append({"metadata": _clean_dict(metadata), "body": body})
-    entries.sort(key=lambda item: str(item["metadata"].get("created_at") or ""), reverse=True)
+        rows.append((_clean_dict(metadata), metadata_path.with_name("body.md")))
+    rows.sort(key=lambda item: str(item[0].get("created_at") or ""), reverse=True)
+    return rows
+
+
+def _read_feedback_body(body_path: Path) -> str:
+    try:
+        return body_path.read_text(encoding="utf-8") if body_path.exists() else ""
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _feedback_matches(metadata: dict[str, Any], body: str, query: str | None) -> bool:
+    if not query:
+        return True
+    needle = query.casefold()
+    metadata_text = json.dumps(metadata, ensure_ascii=False, sort_keys=True)
+    return needle in metadata_text.casefold() or needle in body.casefold()
+
+
+def read_feedback(home: Home, *, query: str | None = None, limit: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
+    rows = _feedback_metadata_rows(home)
+    entries: list[dict[str, Any]] = []
+    if query:
+        for metadata, body_path in rows:
+            body = _read_feedback_body(body_path)
+            if _feedback_matches(metadata, body, query):
+                entries.append({"metadata": metadata, "body": body})
+        return entries[offset : offset + limit] if limit is not None else entries
+    paged_rows = rows[offset : offset + limit] if limit is not None else rows
+    for metadata, body_path in paged_rows:
+        entries.append({"metadata": metadata, "body": _read_feedback_body(body_path)})
     return entries
+
+
+def count_feedback(home: Home, *, query: str | None = None) -> int:
+    rows = _feedback_metadata_rows(home)
+    if not query:
+        return len(rows)
+    total = 0
+    for metadata, body_path in rows:
+        if _feedback_matches(metadata, _read_feedback_body(body_path), query):
+            total += 1
+    return total
 
 
 def read_system(home: Home, *, cache_limit: int = MAX_LIST_LIMIT, cache_offset: int = 0) -> dict[str, Any]:

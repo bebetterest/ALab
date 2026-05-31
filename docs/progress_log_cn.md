@@ -7877,3 +7877,25 @@
 - 使用 Python YAML loader 解析 `.github/workflows/ci.yml`。
 - 针对 `PACKAGE_VERSION=0.1.2` 运行 changelog extraction regex。
 - `git diff --check`
+
+## 2026-05-31 Observe SQL Pushdown、Dashboard Feedback Paging 和 Diagnostics UX
+
+已实现：
+
+- 将 observe run/artifact/log/annotation list filtering、whitelisted sorting、null-last ordering 和 `limit`/`offset` slicing 下推到 SQL，用于高容量 list paths。
+- 保持现有 observe output 与 option contracts 不变，包括 runner/failure filters、validation/run/experiment scoping、annotation visibility 和 archive inclusion behavior。
+- 保留 run failure 和 annotation body filters 的 literal casefold query semantics，包括 `_`/`%` 字符；并保留 SQL-pushed list ties 在相同 timestamp 下原先的 insertion-order behavior。
+- 为 dashboard `/api/feedback` 增加 paginated/searchable reads 和 page metadata，并更新 frontend feedback view 使用有界 API。
+- 改进 `alab config validate --refresh-capabilities` capability rows，使 unsupported/error runtime checks 的 `next` 渲染可操作 remediation，同时保持 capability field order 不变。
+- 更新 CLI/dashboard specs、global-admin skill references、completion audit、progress dashboard/pipeline/log，并同步中文文档。
+
+验证：
+
+- Observe pagination/filter/sort smoke：`.venv/bin/python -m pytest -q tests/test_smoke.py::test_observe_list_pagination_contracts`
+- CLI typed-value contract matrix：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Dashboard static contract：`.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- Dashboard HTTP API contract with loopback socket access：`.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`
+- Docker capability diagnostics：`.venv/bin/python -m pytest -q tests/test_runner_docker.py::test_config_validate_refreshes_docker_capability_cache`
+- Docker platform diagnostic next action：`.venv/bin/python -m pytest -q tests/test_runner_docker.py::test_docker_platform_probe_uses_native_architecture_when_buildx_unavailable`
+- Focused docs sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized` 和 `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized`
+- Full default suite with loopback socket access for dashboard tests：`.venv/bin/python -m pytest -q`

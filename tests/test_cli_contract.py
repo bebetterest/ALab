@@ -887,6 +887,7 @@ _TYPED_VALUE_HELPER_INVALID_OPTIONS = {
     "_sort_experiment_blocks": {
         "--sort": ("unsupported:desc", "--sort field is not supported for experiments"),
     },
+    "_sql_order_limit_clause": _PAGINATION_INVALID_VALUE_OPTIONS,
     "_source_import_limits": _SOURCE_LIMIT_INVALID_VALUE_OPTIONS,
 }
 
@@ -2063,6 +2064,13 @@ def _typed_value_invalid_options(spec: registry.CommandSpec) -> list[tuple[str, 
             if option and prefix:
                 cases.add((option, f"{prefix}-short", "object ids must be complete"))
         if function_name == "_sort_rows":
+            subject = next(
+                (keyword.value.value for keyword in node.keywords if keyword.arg == "subject" and isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str)),
+                None,
+            )
+            if subject:
+                cases.add(("--sort", "unsupported:desc", f"--sort field is not supported for {subject}"))
+        if function_name == "_sql_order_limit_clause":
             subject = next(
                 (keyword.value.value for keyword in node.keywords if keyword.arg == "subject" and isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str)),
                 None,

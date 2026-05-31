@@ -11987,6 +11987,12 @@ globs = ["run:artifact-a.txt", "run:artifact-b.txt", "workspace:main.py"]
         conn.commit()
         first_run = dict(conn.execute("SELECT * FROM runs WHERE run_id = ?", (first_run_id,)).fetchone())
         failed_run = dict(conn.execute("SELECT * FROM runs WHERE run_id = ?", (failed_run_id,)).fetchone())
+        failed_record = json.loads(failed_run["record_json"])
+        failed_record["failure"] = "process exited with code 7 and literal 100Xneedle"
+        failed_record_json = services.canonical_json(failed_record)
+        conn.execute("UPDATE runs SET record_json = ? WHERE run_id = ?", (failed_record_json, failed_run_id))
+        failed_run["record_json"] = failed_record_json
+        conn.commit()
         validation_id = conn.execute("SELECT validation_id FROM project_validations WHERE project_id = ? ORDER BY started_at DESC LIMIT 1", (project_id,)).fetchone()[0]
         artifact_a = dict(
             conn.execute(
@@ -12033,6 +12039,8 @@ globs = ["run:artifact-a.txt", "run:artifact-b.txt", "workspace:main.py"]
     failed_filtered_runs = capsys.readouterr().out
     assert field_values(failed_filtered_runs, "run id") == [failed_run_id]
     assert "run status: failed" in failed_filtered_runs
+    assert run(["--home", str(home), "runs", "list", "--status", "failed", "--failure-reason-query", "100_needle"]) == 0
+    assert field_values(capsys.readouterr().out, "run id") == []
     assert run(["--home", str(home), "runs", "list", "--config-version", str(first_run["config_version"]), "--commit", first_run["commit_sha"][:8], "--runner-type", "local", "--sort", "started:asc"]) == 0
     run_commit_filtered = capsys.readouterr().out
     assert field_values(run_commit_filtered, "run id") == [first_run_id]
@@ -12226,6 +12234,12 @@ globs = ["run:artifact-a.txt", "run:artifact-b.txt", "workspace:main.py"]
     assert field_values(annotation_time_filtered, "annotation id") == [exp_annotation_id]
     assert run(["--home", str(home), "annotations", "list", "--sort", "updated:asc"]) == 0
     assert field_values(capsys.readouterr().out, "annotation id")[:3] == [exp_annotation_id, path_annotation_id, private_annotation_id]
+    assert run(["--home", str(home), "annotate", "add", "--target", f"exp:{exp_id}", "--body", "wildcard body 100Xneedle", "--author", "Wild"]) == 0
+    wildcard_annotation_id = _field(capsys.readouterr().out, "annotation id")
+    assert run(["--home", str(home), "annotations", "list", "--query", "100_needle"]) == 0
+    wildcard_query_annotations = capsys.readouterr().out
+    assert field_values(wildcard_query_annotations, "annotation id") == []
+    assert wildcard_annotation_id not in wildcard_query_annotations
 
     assert run(["--home", str(home), "runs", "archive", failed_run_id]) == 0
     capsys.readouterr()

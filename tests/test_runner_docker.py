@@ -1119,6 +1119,7 @@ raise SystemExit(2)
     assert run(["--home", str(home), "config", "validate", "--refresh-capabilities"]) == 0
     out = capsys.readouterr().out
     assert "capability: docker.platform.linux/arm64" in out
+    assert "next: linux/amd64 container platform not reported by Docker; enable the required Docker platform or choose a supported runner platform, then run alab config validate --refresh-capabilities after fixing the runtime" in out
     with sqlite3.connect(home / "alab.db") as conn:
         rows = dict(conn.execute("SELECT capability_key, status FROM runtime_capabilities").fetchall())
         details = {

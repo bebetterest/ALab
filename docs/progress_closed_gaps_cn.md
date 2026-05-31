@@ -53,6 +53,7 @@
 
 ## 最近关闭
 
+- 2026-05-31：observe/dashboard/diagnostic optimization proof，覆盖 SQL-backed observe run/artifact/log/annotation list filtering/sorting/pagination、paginated/searchable dashboard feedback reads、可操作的 `config validate --refresh-capabilities` capability `next` remediation、focused observe/dashboard/Docker diagnostic tests，以及 focused CLI/docs synchronization checks。
 - 2026-05-30：report/dashboard scale proof，覆盖 `alab report` project 与 visible-experiment Markdown exports、有界 dashboard list/detail payloads、top-level log/artifact APIs、frontend loaded/total metadata、CLI/docs synchronization、focused dashboard tests、focused CLI/docs tests、focused lint 和 `git diff --check`。
 - 2026-05-24：root dashboard command/server/frontend proof，覆盖 root-only startup、invalid option preflight、loopback binding、token-gated APIs、non-mutating method rejection、hidden log access、artifact preview、secret redaction、CSP-compatible static assets、browser smoke 和 full default-suite validation。
 - 2026-05-24：HOME feedback command proof，覆盖所有 initialized-home roles、no-HOME failure without HOME creation、per-record plaintext metadata/body files、session priority/null fallback、Git/non-Git metadata，以及 side-effect-free invalid input handling。

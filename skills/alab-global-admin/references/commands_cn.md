@@ -55,7 +55,7 @@ alab audit list|show ...
   注意点：用于从坏的 local config values 中恢复；不需要 root key。
 - **`config validate`**：校验 home config，并可刷新 runtime capability checks。
   关键参数：可选 `--refresh-capabilities`。
-  注意点：Docker/runner-sensitive work 前或环境变化后使用。
+  注意点：Docker/runner-sensitive work 前或环境变化后使用。Unsupported/error capability rows 会包含可操作的 `next` 修复提示；修复 local runtime 后应再次 refresh。
 - **`feedback`**：为 ALab operation、docs、environment issues 或 bugs 留 HOME-level feedback。
   关键参数：`--body <text>` 或 `--body-file <path>` 二选一；可选 `--kind suggestion|question|bug|other` 和 `--title <text>`。
   注意点：Feedback 是 `ALAB_HOME/feedback/` 下的 plaintext，不创建 SQLite audit rows。

@@ -12,12 +12,12 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-05-30
+## 当前 Active Batch - 2026-05-31
 
-- Focus：report export 和 dashboard scale optimization 已对当前 worktree 关闭。`alab report` 可导出 project 或 visible experiment 的 Markdown evidence。Dashboard global lists 和高容量 detail surfaces 使用有界 pages，而不是无界 related-record fan-out。
-- 本 batch 明确 non-goals：保持 `alab feedback` 不变；不新增 JSON output；不实现 local batch execution。
+- Focus：observe list SQL pushdown、dashboard feedback pagination/search 和 runtime diagnostic UX 已对当前 worktree 关闭。Run/artifact/log/annotation list filters、whitelisted sorting、null-last ordering 和 pagination 已在高容量 paths 下推到 SQL；dashboard feedback 现在使用 paginated/searchable API；`config validate` capability rows 的 `next` 现在包含可操作 remediation。
+- 本 batch 明确 non-goals：不新增 JSON CLI output、local batch execution、hosted/remote dashboard behavior 或新的 runner families。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
-- 下一步 evidence：本 batch 无剩余。只有后续 requirement 改变 report scope/output、dashboard route semantics、pagination/search behavior 或 release-target validation expectations 时才重开。
+- 下一步 evidence：本 batch 无剩余。只有后续 requirement 改变 observe filtering/sorting semantics、dashboard route semantics、runtime capability diagnostics 或 release-target validation expectations 时才重开。
 
 ## Active Queue
 

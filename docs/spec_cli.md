@@ -596,6 +596,7 @@ Lifecycle command rules:
 - Options: `--refresh-capabilities`.
 - Success fields for object `config`: `config valid`, `next`.
 - Success fields for object `capability`: `capability`, `fingerprint`, `status`, `checked at`, `next`.
+- Runtime diagnostic rule: supported capabilities render `next: none`; unsupported or errored capabilities render a safe, actionable `next` that names the local remediation class and tells the operator to rerun `alab config validate --refresh-capabilities` after fixing the runtime.
 - Exit: `0` when valid; `2` with `CONFIG_INVALID` when invalid; `5` on storage failure.
 
 ### Keys

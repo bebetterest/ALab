@@ -53,6 +53,7 @@ Do not spend another batch on these families unless a spec or implementation cha
 
 ## Recently Closed
 
+- 2026-05-31: observe/dashboard/diagnostic optimization proof for SQL-backed observe run/artifact/log/annotation list filtering/sorting/pagination, paginated/searchable dashboard feedback reads, actionable `config validate --refresh-capabilities` capability `next` remediation, focused observe/dashboard/Docker diagnostic tests, and focused CLI/docs synchronization checks.
 - 2026-05-30: report/dashboard scale proof for `alab report` project and visible-experiment Markdown exports, bounded dashboard list/detail payloads, top-level log/artifact APIs, frontend loaded/total metadata, CLI/docs synchronization, focused dashboard tests, focused CLI/docs tests, focused lint, and `git diff --check`.
 - 2026-05-24: root dashboard command/server/frontend proof for root-only startup, invalid option preflight, loopback binding, token-gated APIs, non-mutating method rejection, hidden log access, artifact preview, secret redaction, CSP-compatible static assets, browser smoke, and full default-suite validation.
 - 2026-05-24: HOME feedback command proof for all initialized-home roles, no-HOME failure without HOME creation, per-record plaintext metadata/body files, session priority/null fallback, Git/non-Git metadata, and side-effect-free invalid input handling.

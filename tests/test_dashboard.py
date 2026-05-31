@@ -339,6 +339,7 @@ def test_dashboard_http_api_is_token_guarded_read_only_and_serves_content(tmp_pa
             "/api/logs?limit=1": "logs",
             "/api/artifacts?limit=1": "artifacts",
             "/api/audit?limit=1": "audit",
+            "/api/feedback?limit=1&query=dashboard": "feedback",
         }
         for endpoint, key in paged_endpoints.items():
             request = urllib.request.Request(

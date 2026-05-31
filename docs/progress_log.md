@@ -7883,3 +7883,25 @@ Validation:
 - Parsed `.github/workflows/ci.yml` with Python YAML loader.
 - Exercised the changelog extraction regex for `PACKAGE_VERSION=0.1.2`.
 - `git diff --check`
+
+## 2026-05-31 Observe SQL Pushdown, Dashboard Feedback Paging, And Diagnostics UX
+
+Implemented:
+
+- Moved observe run/artifact/log/annotation list filtering, whitelisted sorting, null-last ordering, and `limit`/`offset` slicing into SQL for the high-volume list paths.
+- Kept the existing observe output and option contracts intact, including runner/failure filters, validation/run/experiment scoping, annotation visibility, and archive inclusion behavior.
+- Preserved literal casefold query semantics for run failure and annotation body filters, including `_`/`%` characters, and preserved previous same-timestamp insertion-order behavior for SQL-pushed list ties.
+- Added paginated and searchable `/api/feedback` dashboard reads with page metadata, and updated the frontend feedback view to use the bounded API.
+- Improved `alab config validate --refresh-capabilities` capability rows so unsupported/error runtime checks render actionable `next` remediation while preserving the capability field order.
+- Updated CLI/dashboard specs, global-admin skill references, completion audit, progress dashboard/pipeline/log, and synchronized Chinese documents.
+
+Validation:
+
+- Observe pagination/filter/sort smoke: `.venv/bin/python -m pytest -q tests/test_smoke.py::test_observe_list_pagination_contracts`
+- CLI typed-value contract matrix: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Dashboard static contract: `.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- Dashboard HTTP API contract with loopback socket access: `.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`
+- Docker capability diagnostics: `.venv/bin/python -m pytest -q tests/test_runner_docker.py::test_config_validate_refreshes_docker_capability_cache`
+- Docker platform diagnostic next action: `.venv/bin/python -m pytest -q tests/test_runner_docker.py::test_docker_platform_probe_uses_native_architecture_when_buildx_unavailable`
+- Focused docs sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized` and `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_english_and_chinese_command_option_contracts_are_synchronized tests/test_cli_contract.py::test_english_and_chinese_command_surface_coverage_is_synchronized`
+- Full default suite with loopback socket access for dashboard tests: `.venv/bin/python -m pytest -q`

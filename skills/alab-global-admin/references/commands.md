@@ -55,7 +55,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Use to recover from bad local config values; no root key required.
 - **`config validate`**: Validate home config and optionally refresh runtime capability checks.
   Parameters: Optional `--refresh-capabilities`.
-  Notes: Use before Docker/runner-sensitive work or after environment changes.
+  Notes: Use before Docker/runner-sensitive work or after environment changes. Unsupported/error capability rows include an actionable `next` remediation and should be refreshed again after the local runtime is fixed.
 - **`feedback`**: Leave HOME-level feedback about ALab operation, docs, environment issues, or bugs.
   Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
   Notes: Feedback is plaintext under `ALAB_HOME/feedback/` and does not create SQLite audit rows.

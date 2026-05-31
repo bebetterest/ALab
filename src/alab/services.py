@@ -1415,6 +1415,25 @@ def _validate_docker_config_capabilities(conn, config: ProjectConfig, *, allow_p
     )
 
 
+def _capability_next_action(capability: dict[str, Any]) -> str:
+    if capability["status"] == "supported":
+        return "none"
+    details = capability.get("details", {})
+    summary = str(details.get("safe_summary") or "inspect local runtime")
+    code = details.get("error_code")
+    key = str(capability.get("capability_key") or "")
+    refresh = "run alab config validate --refresh-capabilities after fixing the runtime"
+    if code == "DOCKER_NOT_FOUND":
+        return f"{summary}; install Docker or add docker to PATH, then {refresh}"
+    if code == "DOCKER_PROBE_TIMEOUT":
+        return f"{summary}; start Docker or retry when it is responsive, then {refresh}"
+    if key.startswith("docker.platform."):
+        return f"{summary}; enable the required Docker platform or choose a supported runner platform, then {refresh}"
+    if key.startswith("docker.resource."):
+        return f"{summary}; remove the related runner resource requirement or use a Docker version that reports the flag, then {refresh}"
+    return f"{summary}; {refresh}"
+
+
 def cmd_config_validate(args: list[str], req: Request) -> list[ResultBlock]:
     require_known_options(args, ("--refresh-capabilities",))
     require_options_at_most_once(args, ("--refresh-capabilities",))
@@ -1432,8 +1451,6 @@ def cmd_config_validate(args: list[str], req: Request) -> list[ResultBlock]:
     with Database(req.globals.home).tx() as conn:
         capabilities = _refresh_docker_capability_rows(conn, refresh=flag(args, "--refresh-capabilities"))
     for capability in capabilities:
-        details = capability.get("details", {})
-        next_action = "none" if capability["status"] == "supported" else details.get("safe_summary", "inspect local runtime")
         blocks.append(
             ResultBlock(
                 "capability",
@@ -1442,7 +1459,7 @@ def cmd_config_validate(args: list[str], req: Request) -> list[ResultBlock]:
                     ("fingerprint", capability["fingerprint"]),
                     ("status", capability["status"]),
                     ("checked at", capability["checked_at"]),
-                    ("next", next_action),
+                    ("next", _capability_next_action(capability)),
                 ],
             )
         )
@@ -7260,6 +7277,50 @@ def _sort_rows(
     return [row for _value, row in values] + nulls
 
 
+def _sql_casefold_contains(value: Any, query: Any) -> int:
+    return int(str(query).casefold() in str(value or "").casefold())
+
+
+def _sql_record_json_field_casefold_contains(record_json: Any, field: Any, query: Any) -> int:
+    try:
+        record = json.loads(str(record_json))
+    except (TypeError, json.JSONDecodeError):
+        return 0
+    if not isinstance(record, dict):
+        return 0
+    return _sql_casefold_contains(record.get(str(field)), query)
+
+
+def _register_observe_text_predicates(conn: sqlite3.Connection) -> None:
+    conn.create_function("alab_casefold_contains", 2, _sql_casefold_contains)
+    conn.create_function("alab_record_json_field_casefold_contains", 3, _sql_record_json_field_casefold_contains)
+
+
+def _sql_order_limit_clause(
+    args: list[str],
+    *,
+    default: str,
+    allowed: dict[str, str],
+    subject: str,
+    tie_breakers: tuple[str, ...] = (),
+) -> tuple[str, tuple[Any, ...]]:
+    require_options_at_most_once(args, ("--sort",))
+    sort_text = command_arg(args, "--sort", default=default) or default
+    field, sep, direction = sort_text.partition(":")
+    if not field:
+        raise AlabError("CONFIG_INVALID", "--sort field is required")
+    if not sep:
+        direction = "desc"
+    if direction not in {"asc", "desc"}:
+        raise AlabError("CONFIG_INVALID", "--sort direction must be asc or desc")
+    if field not in allowed:
+        raise AlabError("CONFIG_INVALID", f"--sort field is not supported for {subject}")
+    limit, offset = _parse_limit_offset(args)
+    expression = allowed[field]
+    terms = [f"{expression} IS NULL ASC", f"{expression} {direction.upper()}", *tie_breakers]
+    return f"ORDER BY {', '.join(terms)} LIMIT ? OFFSET ?", (limit, offset)
+
+
 def _reward_identity_from_config_json(config_json: dict[str, Any]) -> str:
     reward = config_json.get("reward") or {}
     comparable = {
@@ -9059,34 +9120,31 @@ def cmd_observe_runs_list(args: list[str], req: Request) -> list[ResultBlock]:
             _append_time_filter(args, clauses, params, option, column, op)
         if not include_archived:
             clauses.append("archive_status = 'active'")
-        rows = all_rows(conn, f"SELECT * FROM runs WHERE {' AND '.join(clauses)} ORDER BY started_at DESC", tuple(params))
         runner_type = _require_option_choice(command_arg(args, "--runner-type"), "--runner-type", RUNNER_TYPES)
-        failure_query = (command_arg(args, "--failure-reason-query") or "").casefold()
-        if runner_type or failure_query:
-            filtered = []
-            for row in rows:
-                record = execution_record_json_obj(row["record_json"])
-                if runner_type and (record.get("runner") or {}).get("type") != runner_type:
-                    continue
-                if failure_query and failure_query not in str(record.get("failure") or "").casefold():
-                    continue
-                filtered.append(row)
-            rows = filtered
-        rows = _sort_rows(
+        if runner_type:
+            clauses.append("record_json LIKE ?")
+            params.append(f'%"runner":{{%"type":"{runner_type}"%')
+        failure_query = command_arg(args, "--failure-reason-query")
+        if failure_query:
+            _register_observe_text_predicates(conn)
+            clauses.append("alab_record_json_field_casefold_contains(record_json, 'failure', ?) = 1")
+            params.append(failure_query)
+        order_sql, order_params = _sql_order_limit_clause(
             args,
-            list(rows),
             default="started:desc",
             subject="runs",
             allowed={
-                "started": lambda row: row["started_at"],
-                "ended": lambda row: row["ended_at"],
-                "reward": lambda row: row["reward_value"],
-                "status": lambda row: row["status"],
-                "config-version": lambda row: row["config_version"],
-                "exit-code": lambda row: row["exit_code"],
+                "started": "started_at",
+                "ended": "ended_at",
+                "reward": "reward_value",
+                "status": "LOWER(status)",
+                "config-version": "config_version",
+                "exit-code": "exit_code",
             },
+            tie_breakers=("started_at DESC", "rowid ASC"),
         )
-        return [_run_result_block(conn, row) for row in _paginate_rows(args, list(rows))]
+        rows = all_rows(conn, f"SELECT * FROM runs WHERE {' AND '.join(clauses)} {order_sql}", (*params, *order_params))
+        return [_run_result_block(conn, row) for row in rows]
     finally:
         conn.close()
 
@@ -9311,21 +9369,21 @@ def cmd_observe_artifacts_list(args: list[str], req: Request) -> list[ResultBloc
         _append_time_filter(args, clauses, params, "--created-before", "created_at", "<=")
         if not flag(args, "--include-archived"):
             clauses.append("archive_status = 'active'")
-        rows = all_rows(conn, f"SELECT * FROM artifacts WHERE {' AND '.join(clauses)} ORDER BY created_at DESC", tuple(params))
-        rows = _sort_rows(
+        order_sql, order_params = _sql_order_limit_clause(
             args,
-            list(rows),
             default="created:desc",
             subject="artifacts",
             allowed={
-                "created": lambda row: row["created_at"],
-                "path": lambda row: row["relative_path"],
-                "size": lambda row: row["size_bytes"],
-                "status": lambda row: row["status"],
-                "content-hash": lambda row: row["content_hash"],
+                "created": "created_at",
+                "path": "LOWER(relative_path)",
+                "size": "size_bytes",
+                "status": "LOWER(status)",
+                "content-hash": "content_hash",
             },
+            tie_breakers=("created_at DESC", "rowid ASC"),
         )
-        return [_artifact_block(row) for row in _paginate_rows(args, list(rows))]
+        rows = all_rows(conn, f"SELECT * FROM artifacts WHERE {' AND '.join(clauses)} {order_sql}", (*params, *order_params))
+        return [_artifact_block(row) for row in rows]
     finally:
         conn.close()
 
@@ -9518,22 +9576,22 @@ def cmd_observe_logs_list(args: list[str], req: Request) -> list[ResultBlock]:
         _append_time_filter(args, clauses, params, "--created-before", "created_at", "<=")
         if not flag(args, "--include-archived"):
             clauses.append("archive_status = 'active'")
-        rows = all_rows(conn, f"SELECT * FROM log_streams WHERE {' AND '.join(clauses)} ORDER BY created_at DESC", tuple(params))
-        rows = _sort_rows(
+        order_sql, order_params = _sql_order_limit_clause(
             args,
-            list(rows),
             default="created:desc",
             subject="logs",
             allowed={
-                "created": lambda row: row["created_at"],
-                "stream": lambda row: row["stream"],
-                "size": lambda row: row["size_bytes"],
-                "stored-bytes": lambda row: row["stored_bytes"],
-                "hidden": lambda row: bool(row["hidden"]),
-                "truncated": lambda row: bool(row["truncated"]),
+                "created": "created_at",
+                "stream": "LOWER(stream)",
+                "size": "size_bytes",
+                "stored-bytes": "stored_bytes",
+                "hidden": "hidden",
+                "truncated": "truncated",
             },
+            tie_breakers=("created_at DESC", "rowid ASC"),
         )
-        return [_log_block(row) for row in _paginate_rows(args, list(rows))]
+        rows = all_rows(conn, f"SELECT * FROM log_streams WHERE {' AND '.join(clauses)} {order_sql}", (*params, *order_params))
+        return [_log_block(row) for row in rows]
     finally:
         conn.close()
 
@@ -10883,63 +10941,82 @@ def cmd_observe_annotations_list(args: list[str], req: Request) -> list[ResultBl
         raise AlabError("CONFIG_INVALID", "annotations list accepts only one of --target-id or --target")
     conn = require_home(req.globals.home)
     try:
-        clauses = ["project_id = ?"]
+        clauses = ["a.project_id = ?"]
         params: list[Any] = [project_id]
         if not flag(args, "--include-archived"):
-            clauses.append("status = 'active'")
+            clauses.append("a.status = 'active'")
         target_type = _require_option_choice(command_arg(args, "--target-type"), "--target-type", ANNOTATION_TARGET_TYPES)
         if target_type:
-            clauses.append("target_type = ?")
+            clauses.append("a.target_type = ?")
             params.append(target_type)
         target_id = _annotation_target_id_filter(target_type, command_arg(args, "--target-id") or command_arg(args, "--target"))
         if target_id:
-            clauses.append("target_id = ?")
+            clauses.append("a.target_id = ?")
             params.append(target_id)
         created_by = _annotation_created_by_filter(command_arg(args, "--created-by"))
         if created_by:
-            clauses.append("created_by_id = ?")
+            clauses.append("a.created_by_id = ?")
             params.append(created_by)
         _require_ordered_time_range(args, "--created-after", "--created-before")
         _require_ordered_time_range(args, "--updated-after", "--updated-before")
         for option, column, op in [
-            ("--created-after", "created_at", ">="),
-            ("--created-before", "created_at", "<="),
-            ("--updated-after", "updated_at", ">="),
-            ("--updated-before", "updated_at", "<="),
+            ("--created-after", "a.created_at", ">="),
+            ("--created-before", "a.created_at", "<="),
+            ("--updated-after", "a.updated_at", ">="),
+            ("--updated-before", "a.updated_at", "<="),
         ]:
             _append_time_filter(args, clauses, params, option, column, op)
-        rows = all_rows(conn, f"SELECT * FROM annotations WHERE {' AND '.join(clauses)} ORDER BY updated_at DESC", tuple(params))
         visible_ids = _visible_exp_ids(conn, project_id, actor)
-        filtered = [row for row in rows if _annotation_visible(row, actor, visible_ids)]
+        if visible_ids is not None:
+            if not visible_ids:
+                clauses.append("1 = 0")
+            else:
+                target_clauses = []
+                for visible_exp_id in sorted(visible_ids):
+                    target_clauses.append("a.target_json LIKE ?")
+                    params.append(f'%"exp_id":"{visible_exp_id}"%')
+                clauses.append(f"({' OR '.join(target_clauses)})")
+                clauses.append(
+                    "(a.visibility_json LIKE ? OR (a.visibility_json LIKE ? AND a.visibility_json LIKE ?))"
+                )
+                params.extend(
+                    (
+                        '%"scope":"project"%',
+                        '%"scope":"private"%',
+                        f'%"creator_exp_id":"{actor.exp_id}"%',
+                    )
+                )
         if flag(args, "--private"):
-            filtered = [row for row in filtered if annotation_visibility_json_obj(row["visibility_json"]).get("scope") == "private"]
+            clauses.append("a.visibility_json LIKE ?")
+            params.append('%"scope":"private"%')
         author = command_arg(args, "--author")
-        query = (command_arg(args, "--query") or "").casefold()
+        query = command_arg(args, "--query")
+        join_revision = bool(author or query)
         if author or query:
-            next_rows = []
-            for row in filtered:
-                revision = one(conn, "SELECT * FROM annotation_revisions WHERE annotation_id = ? AND revision = ?", (row["annotation_id"], row["current_revision"]))
-                if author and (revision is None or revision["author_label"] != author):
-                    continue
-                if query and (revision is None or query not in revision["body"].casefold()):
-                    continue
-                next_rows.append(row)
-            filtered = next_rows
-        filtered = _sort_rows(
+            if author:
+                clauses.append("ar.author_label = ?")
+                params.append(author)
+            if query:
+                _register_observe_text_predicates(conn)
+                clauses.append("alab_casefold_contains(ar.body, ?) = 1")
+                params.append(query)
+        order_sql, order_params = _sql_order_limit_clause(
             args,
-            filtered,
             default="updated:desc",
             subject="annotations",
             allowed={
-                "created": lambda row: row["created_at"],
-                "updated": lambda row: row["updated_at"],
-                "target-type": lambda row: row["target_type"],
-                "target-id": lambda row: row["target_id"],
-                "status": lambda row: row["status"],
-                "created-by": lambda row: row["created_by_id"],
+                "created": "a.created_at",
+                "updated": "a.updated_at",
+                "target-type": "LOWER(a.target_type)",
+                "target-id": "a.target_id",
+                "status": "LOWER(a.status)",
+                "created-by": "a.created_by_id",
             },
+            tie_breakers=("a.updated_at DESC", "a.rowid ASC"),
         )
-        return [_annotation_block(conn, row, history=flag(args, "--history")) for row in _paginate_rows(args, filtered)]
+        join_sql = " JOIN annotation_revisions ar ON ar.annotation_id = a.annotation_id AND ar.revision = a.current_revision" if join_revision else ""
+        rows = all_rows(conn, f"SELECT a.* FROM annotations a{join_sql} WHERE {' AND '.join(clauses)} {order_sql}", (*params, *order_params))
+        return [_annotation_block(conn, row, history=flag(args, "--history")) for row in rows]
     finally:
         conn.close()
 
