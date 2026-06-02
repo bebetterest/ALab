@@ -12,27 +12,27 @@
 
 Blueprint 和 subsystem specs 仍是规范性产品契约。
 
-## 当前位置 - 2026-05-31
+## 当前位置 - 2026-06-02
 
 ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、HOME-level agent feedback capture、root-only local read-only dashboard、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
-当前 active focus 的短摘要：2026-05-31 optimization batch 已经落地。当前 worktree 最新 changed edge 将 observe run/artifact/log/annotation list filtering、whitelisted sorting、null-last ordering 和 pagination 下推到 SQL；为 dashboard feedback reads 增加 pagination/search；并让 `config validate` capability `next` 在 unsupported/error runtime checks 下给出可操作 remediation。JSON CLI output、local batch execution、hosted/remote dashboard behavior 和新的 runner families 仍不属于本范围。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
+当前 active focus 的短摘要：2026-06-02 feedback lifecycle batch 已经落地。当前 worktree 最新 changed edge 为 file-backed HOME feedback records 新增 root-only `feedback list`、`feedback show` 和幂等 `feedback archive`，同时保留 public submit availability，并避免为 feedback archive 引入 SQLite/audit persistence。Feedback deletion、project-admin feedback reads、JSON CLI output、hosted/remote dashboard behavior 和新的 runner families 仍不属于本范围。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
 
-当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在最新 2026-05-31 implementation/test changes 后重跑。当前 evidence ledger 没有已知缺失实现：
+当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在最新 2026-06-02 implementation/test changes 后重跑。当前 evidence ledger 没有已知缺失实现：
 
-- `docs/completion_audit.md` 已为 observe SQL pushdown、dashboard feedback pagination/search 和 runtime diagnostic UX edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- Latest full default-suite closeout gate 已在 2026-05-31 implementation/test changes 后通过。
+- `docs/completion_audit.md` 已为 feedback file-backed lifecycle edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
+- Latest full default-suite closeout gate 已在 2026-06-02 implementation/test changes 后通过。该 suite 在 sandbox 外重跑，因为 dashboard tests 需要绑定 loopback ports，而 managed sandbox 会以 `PermissionError` 拒绝。
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
-- 2026-05-31 batch 的 focused observe、dashboard、Docker diagnostic 和 CLI/docs contract checks 已通过。Full default suite 也已在 review fixes 后对当前 worktree 通过。
+- 2026-06-02 batch 的 focused feedback lifecycle、CLI registry/spec/error-code/capability、documentation、dashboard 和 full default-suite checks 已通过。
 
 ## Gate 快照
 
 | Gate | State | Completion blocker |
 | --- | --- | --- |
-| Requirement evidence | 2026-05-31 focused edge 为 `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
+| Requirement evidence | 2026-06-02 feedback lifecycle edge 为 `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
 | Full default suite | `PASSED` | 如果 release claim 前还有额外 implementation/test changes，需要重跑。 |
 | CLI contract completeness | focused docs/typed-value checks `PASSED` | 当前 registered CLI surfaces 已由 generated parser/capability/output matrices、docs-derived success schemas、saved result-failure/system-error checks 和 completion-audit consistency guard 证明；commands 或 output variants 变化时重跑/更新。 |
-| Non-CLI hardening | Observe/dashboard/Docker diagnostic focused tests `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |
+| Non-CLI hardening | Feedback lifecycle no-SQLite/audit checks 和 dashboard focused tests `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |
 | Real-environment runners | Docker-backed、real Docker capability-refresh、live catalog 与 SkyDiscover Python dependency subsets 在 all-opt-in suite 中 `PASSED` 且 `skipped=0` | 如果 release-target host/platform/Python/network/upstream catalog behavior 变化，重跑 opt-in gates。 |
 | Documentation consistency | focused docs/CLI contract checks `PASSED` | Release claim 前重跑更宽的 docs checks。 |
 

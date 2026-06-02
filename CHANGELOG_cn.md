@@ -11,10 +11,12 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 - 新增有界 dashboard list APIs，以及 top-level log/artifact APIs，以支持更大的本地 home 数据规模。
 - 新增 dashboard loaded/total metadata，用于 paginated list 和 detail views。
 - 新增 paginated/searchable dashboard feedback reads。
+- 新增 root-only `feedback list`、`feedback show` 和幂等 `feedback archive` commands，用于 file-backed HOME feedback records。
 
 ### 变更
 
 - Version metadata 现在会把 PyPI 用户指向本 changelog。
+- Feedback file metadata 现在记录 active/archived status，同时保留既有 public submit command 和 plaintext file-backed storage model。
 - Dashboard project、experiment 和 run detail payloads 现在会限制高容量 related rows。
 - Observe run、artifact、log 和 annotation list paths 现在会在 SQL 中执行 filtering、whitelisted sorting、null-last ordering 和 pagination，以支持高容量 home，同时保持 CLI output contracts 不变。
 - Experiment list/search/best paths 现在会把 visible filtering、search matching、reward bounds、sorting、pagination 和 best-run selection 下推到 SQL-backed queries，以支持更大的 projects。

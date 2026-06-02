@@ -12,27 +12,27 @@ Default read order:
 
 The blueprint and subsystem specs remain the normative product contract.
 
-## Current Position - 2026-05-31
+## Current Position - 2026-06-02
 
 ALab has a broad runnable V1 implementation across the local CLI, SQLite home/auth/context foundations, HOME-level agent feedback capture, root-only local read-only dashboard, project/source/experiment lifecycle, local/Docker/Harbor/SkyDiscover runners and adapters, observe/collaboration surfaces, audit, cleanup, and default contract tests.
 
-Current active focus, in summary only: the 2026-05-31 optimization batch has landed. The latest changed edge moves observe run/artifact/log/annotation list filtering, whitelisted sorting, null-last ordering, and pagination into SQL for high-volume paths; adds paginated/searchable dashboard feedback reads; and makes `config validate` capability `next` values actionable for unsupported/error runtime checks. JSON CLI output, local batch execution, hosted/remote dashboard behavior, and new runner families remain out of scope. Recently closed proof families are tracked in `docs/progress_closed_gaps.md`; do not restart them unless `docs/completion_audit.md` names a new concrete edge or the release target differs from the currently proved host/platform/upstream gates. The detailed queue state lives in `docs/progress_pipeline.md`.
+Current active focus, in summary only: the 2026-06-02 feedback lifecycle batch has landed. The latest changed edge adds root-only `feedback list`, `feedback show`, and idempotent `feedback archive` for file-backed HOME feedback records while preserving public submit availability and avoiding SQLite/audit persistence for feedback archive. Feedback deletion, project-admin feedback reads, JSON CLI output, hosted/remote dashboard behavior, and new runner families remain out of scope. Recently closed proof families are tracked in `docs/progress_closed_gaps.md`; do not restart them unless `docs/completion_audit.md` names a new concrete edge or the release target differs from the currently proved host/platform/upstream gates. The detailed queue state lives in `docs/progress_pipeline.md`.
 
-The default/local runnable V1 implementation remains broad, and the default suite has been rerun after the latest 2026-05-31 implementation/test changes. There is no known missing implementation in the current evidence ledger:
+The default/local runnable V1 implementation remains broad, and the default suite has been rerun after the latest 2026-06-02 implementation/test changes. There is no known missing implementation in the current evidence ledger:
 
-- `docs/completion_audit.md` has current evidence rows for the observe SQL pushdown, dashboard feedback pagination/search, and runtime diagnostic UX edge and no known active `PARTIAL`, `PENDING`, or `ENV-GATED` V1 requirement row outside the status legend and future-state instructions.
-- The latest full default-suite closeout gate passed after the 2026-05-31 implementation/test changes.
+- `docs/completion_audit.md` has current evidence rows for the feedback file-backed lifecycle edge and no known active `PARTIAL`, `PENDING`, or `ENV-GATED` V1 requirement row outside the status legend and future-state instructions.
+- The latest full default-suite closeout gate passed after the 2026-06-02 implementation/test changes. It was rerun outside the sandbox because the dashboard tests bind loopback ports that the managed sandbox rejected with `PermissionError`.
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior, real Docker capability refresh, SkyDiscover Python local-wheel/network/native dependency behavior, and live SkyDiscover catalog behavior have current opt-in validation on this Darwin/Docker Desktop worktree and current network; the all-opt-in full suite passed with JUnit `tests=390`, `skipped=0`, `failures=0`, and `errors=0`.
-- Focused observe, dashboard, Docker diagnostic, and CLI/docs contract checks passed for the 2026-05-31 batch. The full default suite also passed for the current worktree after the review fixes.
+- Focused feedback lifecycle, CLI registry/spec/error-code/capability, documentation, dashboard, and full default-suite checks passed for the 2026-06-02 batch.
 
 ## Gate Snapshot
 
 | Gate | State | Completion blocker |
 | --- | --- | --- |
-| Requirement evidence | `PASSED` for the 2026-05-31 focused edge | Reopen only when a changed requirement or environment creates a named evidence gap in `docs/completion_audit.md`. |
+| Requirement evidence | `PASSED` for the 2026-06-02 feedback lifecycle edge | Reopen only when a changed requirement or environment creates a named evidence gap in `docs/completion_audit.md`. |
 | Full default suite | `PASSED` | Re-run if additional implementation/test changes land before a release claim. |
 | CLI contract completeness | focused docs/typed-value checks `PASSED` | Current registered CLI surfaces are proved by generated parser/capability/output matrices, docs-derived success schemas, saved result-failure/system-error checks, and the completion-audit consistency guard; rerun/update when commands or output variants change. |
-| Non-CLI hardening | Observe/dashboard/Docker diagnostic focused tests `PASSED` | Reopen only if `docs/completion_audit.md` names a concrete non-CLI edge or a release target differs from the currently proved host/platform/upstream gates. |
+| Non-CLI hardening | Feedback lifecycle no-SQLite/audit checks and dashboard focused tests `PASSED` | Reopen only if `docs/completion_audit.md` names a concrete non-CLI edge or a release target differs from the currently proved host/platform/upstream gates. |
 | Real-environment runners | Docker-backed, real Docker capability-refresh, live catalog, and SkyDiscover Python dependency subsets `PASSED` with `skipped=0` in the all-opt-in suite | Re-run opt-in gates on release-target hosts if host/platform/Python/network/upstream catalog behavior changes. |
 | Documentation consistency | focused docs/CLI contract checks `PASSED` | Rerun broader docs checks before a release claim. |
 

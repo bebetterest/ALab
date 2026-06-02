@@ -11,10 +11,12 @@ All notable ALab changes are recorded here. Keep this file in sync with
 - Added bounded dashboard list APIs and top-level log/artifact APIs for large local homes.
 - Added dashboard loaded/total metadata for paginated list and detail views.
 - Added paginated and searchable dashboard feedback reads.
+- Added root-only `feedback list`, `feedback show`, and idempotent `feedback archive` commands for file-backed HOME feedback records.
 
 ### Changed
 
 - Version metadata now points PyPI users to this changelog.
+- Feedback file metadata now records active/archived status while preserving the existing public submit command and plaintext file-backed storage model.
 - Dashboard project, experiment, and run detail payloads now keep high-volume related rows bounded.
 - Observe run, artifact, log, and annotation list paths now execute filtering, whitelisted sorting, null-last ordering, and pagination in SQL for high-volume homes while preserving CLI output contracts.
 - Experiment list/search/best paths now push visible filtering, search matching, reward bounds, sorting, pagination, and best-run selection into SQL-backed queries for larger projects.

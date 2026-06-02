@@ -82,6 +82,7 @@ def test_documented_not_found_errors_exit_two() -> None:
         "AUDIT_NOT_FOUND",
         "CATALOG_NOT_FOUND",
         "CACHE_NOT_FOUND",
+        "FEEDBACK_NOT_FOUND",
     }
 
     assert expected <= set(ERROR_EXIT_CODES)

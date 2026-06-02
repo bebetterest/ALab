@@ -12,12 +12,12 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-05-31
+## 当前 Active Batch - 2026-06-02
 
-- Focus：observe list SQL pushdown、dashboard feedback pagination/search 和 runtime diagnostic UX 已对当前 worktree 关闭。Run/artifact/log/annotation list filters、whitelisted sorting、null-last ordering 和 pagination 已在高容量 paths 下推到 SQL；dashboard feedback 现在使用 paginated/searchable API；`config validate` capability rows 的 `next` 现在包含可操作 remediation。
-- 本 batch 明确 non-goals：不新增 JSON CLI output、local batch execution、hosted/remote dashboard behavior 或新的 runner families。
+- Focus：当前 worktree 已关闭 HOME-level feedback file records 的 root-only file-backed lifecycle surface。Feedback 现在有 `list`、`show` 和幂等 `archive`，同时不改变 public submit availability，也不引入 SQLite/audit persistence。
+- 本 batch 明确 non-goals：不新增 feedback deletion、SQLite feedback rows、feedback archive audit rows、project-admin scoped feedback reads、JSON CLI output、hosted/remote dashboard behavior 或新的 runner families。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
-- 下一步 evidence：本 batch 无剩余。只有后续 requirement 改变 observe filtering/sorting semantics、dashboard route semantics、runtime capability diagnostics 或 release-target validation expectations 时才重开。
+- 已新增 evidence：focused feedback lifecycle CLI tests、CLI registry/spec sync checks、error-code sync checks、capability/help checks、docs checks、elevated dashboard regression、elevated full default suite 和 `git diff --check`。
 
 ## Active Queue
 

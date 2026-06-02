@@ -7919,3 +7919,23 @@ Validation:
 
 - Focused docs sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized`
 - `git diff --check`
+
+## 2026-06-02 Feedback File-Backed Lifecycle
+
+Implemented:
+
+- Added root-only `alab feedback list`, `alab feedback show`, and idempotent `alab feedback archive` while preserving the existing public initialized-HOME `alab feedback --body|--body-file` submit command.
+- Added feedback metadata status fields for new records and defaulted older file records without archive keys to active during reads.
+- Skipped hidden feedback temp write directories during root lifecycle reads so interrupted or in-progress atomic writes are not listed.
+- Kept feedback lifecycle file-backed only: archive updates `metadata.json` and does not create SQLite rows or audit events.
+- Added `FEEDBACK_NOT_FOUND` to the stable error-code catalog and synced CLI specs, storage spec, README, changelog, global-admin skill references, completion audit, pipeline, and dashboard docs.
+
+Validation:
+
+- Focused feedback tests: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_feedback_submission_writes_file_record_with_session_and_git_metadata tests/test_cli_contract.py::test_feedback_body_file_non_git_and_missing_session_are_recorded_as_null tests/test_cli_contract.py::test_feedback_only_requires_initialized_home_not_valid_global_config tests/test_cli_contract.py::test_feedback_experiment_context_does_not_require_token_file tests/test_cli_contract.py::test_feedback_is_executable_from_all_context_roles tests/test_cli_contract.py::test_feedback_root_lifecycle_is_file_backed_and_idempotent tests/test_cli_contract.py::test_feedback_invalid_inputs_are_side_effect_free`
+- CLI/error/spec/position/capability contract checks: focused `tests/test_errors.py` plus selected `tests/test_cli_contract.py` registry, success-field, parser, selector, not-found, and capability tests.
+- Documentation checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests tests/test_cli_contract.py::test_local_agent_notes_and_env_files_are_gitignored tests/test_cli_contract.py::test_env_example_documents_setup_environment_variables`
+- Full default suite first failed inside the managed sandbox because dashboard tests could not bind loopback ports (`PermissionError`); the lifecycle evidence-map failure was fixed by adding feedback archive evidence.
+- Elevated dashboard regression: `/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`
+- Elevated full default suite with loopback socket access: `/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m pytest -q`
+- After final temp-directory cleanup, reran focused feedback/lifecycle checks, `git diff --check`, and the elevated full default suite again.

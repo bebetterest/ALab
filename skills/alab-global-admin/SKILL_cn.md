@@ -25,7 +25,7 @@ description: 当需要使用 root key 管理 ALab home，包括 home bootstrap�
 这是一份能力指南，不是固定步骤。根据 administrative objective 使用合适能力：
 
 - 只有 ALab home 不存在时才用 `alab auth init` bootstrap；用 `alab config show` 或 `alab config validate` 检查 home health。
-- 对 local ALab/tooling suggestion、question 或 bug report，使用 `alab feedback` 存到 home 下，不新增数据库 rows。
+- 对 local ALab/tooling suggestion、question 或 bug report，使用 `alab feedback` 存到 home 下，不新增数据库 rows；使用 root-only `alab feedback list|show|archive` triage 这些 file-backed records。
 - 当 root 用户需要在 browser 中只读查看 local home 时，使用 `alab dashboard`。Dashboard 只用于 local-only inspection；不要分享 token URL，也不要把它用于 mutation workflow。
 - 谨慎管理 root credentials。只有明确需要时才 rotate root，并把 replacement keys 视为只渲染一次的 secrets。
 - 为 project controllers 创建、列出和 revoke project admin keys。Revoke 前先识别 key id、project scope 和预期影响。

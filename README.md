@@ -189,6 +189,7 @@ Useful next commands:
 ```sh
 alab help
 alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
+alab --key <root-key> feedback list
 alab --key <root-key> dashboard --no-open
 alab --key <admin-or-root-key> report --project <project-id> --out ./alab-project-report.md
 alab observe experiments list
@@ -204,7 +205,7 @@ alab observe experiments best
 - **Experiment**: isolated Git branch/worktree bound to exactly one source and one config version.
 - **Run**: one evaluator execution for an experiment commit, with status, reward, logs, artifacts, and warning codes.
 - **Submit**: closes an experiment with final summary, feedback, final run, final commit, and explicit refs.
-- **Feedback**: HOME-level plaintext notes for suggestions, questions, bugs, or other agent observations, stored as one directory per entry under `feedback/`.
+- **Feedback**: HOME-level plaintext notes for suggestions, questions, bugs, or other agent observations, stored as one directory per entry under `feedback/`. Any initialized-home role can submit feedback; root can list, show, and archive records without creating SQLite or audit rows.
 - **Dashboard**: root-only local browser panel for read-only inspection. It binds to `127.0.0.1`, uses a random browser session token, serves bounded paginated read models for large homes, and writes no ALab records.
 - **Reports**: Markdown evidence exports for project-level owner handoffs or visible experiment contexts, without raw secrets, hidden log contents, or artifact bytes.
 - **Inspection checkout**: read-only checkout for observing/exporting scoped experiment evidence without becoming submit-capable.

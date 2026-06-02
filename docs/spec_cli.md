@@ -199,6 +199,7 @@ Stable error codes:
 - `AUDIT_NOT_FOUND`
 - `CATALOG_NOT_FOUND`
 - `CACHE_NOT_FOUND`
+- `FEEDBACK_NOT_FOUND`
 - `COMMAND_UNAVAILABLE`
 - `NAME_CONFLICT`
 - `SCOPE_VIOLATION`
@@ -253,6 +254,7 @@ Stable error-code exit mapping:
 | `AUDIT_NOT_FOUND` | 2 |
 | `CATALOG_NOT_FOUND` | 2 |
 | `CACHE_NOT_FOUND` | 2 |
+| `FEEDBACK_NOT_FOUND` | 2 |
 | `COMMAND_UNAVAILABLE` | 4 |
 | `NAME_CONFLICT` | 2 |
 | `SCOPE_VIOLATION` | 4 |
@@ -279,7 +281,7 @@ Rules:
 
 Input normalization and lookup rules:
 
-- ALab object id parameters require complete ids. This includes home, project, source, experiment, run, validation, artifact, log, annotation, credential, token, audit, catalog, and cache ids.
+- ALab object id parameters require complete ids. This includes home, project, source, experiment, run, validation, artifact, log, annotation, credential, token, audit, catalog, cache, and feedback ids.
 - Git commit selectors may be full SHAs or unambiguous abbreviated SHAs when the command explicitly accepts a commit selector.
 - Time filter options such as `--created-after`, `--created-before`, `--started-after`, and `--ended-before` accept only RFC 3339 timestamps with `Z` or an explicit numeric offset. ALab normalizes accepted times to UTC `Z` for queries and output. When a matching `after` and `before` pair is supplied for the same field family, the `after` value must be less than or equal to the `before` value.
 - Export output paths that already exist as directories fail with `OUTPUT_EXISTS`, even when `--overwrite` is supplied; `--overwrite` may replace files, not directories.
@@ -303,6 +305,7 @@ Command error matrix:
 | `auth root regenerate` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`; `STORAGE_ERROR` exit `5` |
 | `feedback` | `CONTEXT_NOT_FOUND` exit `2` when ALab home is not initialized; invalid inputs `CONFIG_INVALID` exit `2`; storage failures `STORAGE_ERROR` exit `5` |
+| `feedback list|show|archive` | `AUTH_REQUIRED` or `AUTH_DENIED` exit `3`; invalid filters or arguments `CONFIG_INVALID` exit `2`; missing feedback selectors `FEEDBACK_NOT_FOUND` exit `2`; storage failures `STORAGE_ERROR` exit `5`; already archived feedback exits `0` |
 | `dashboard` | invalid port or refresh values `CONFIG_INVALID` exit `2`; `AUTH_REQUIRED` or `AUTH_DENIED` exit `3`; unavailable port `RESOURCE_BUSY` exit `4`; storage failures `STORAGE_ERROR` exit `5` |
 | `report` | invalid selector or output path `CONFIG_INVALID` exit `2`; existing output `OUTPUT_EXISTS` exit `2`; `PROJECT_NOT_FOUND` or `EXPERIMENT_NOT_FOUND` exit `2` for root/admin; token not-visible-or-not-found selectors `SCOPE_VIOLATION` exit `4`; auth failures exit `3` |
 | `key create|list|revoke` | `AUTH_REQUIRED`, `AUTH_DENIED` exit `3`; `PROJECT_NOT_FOUND`, `CREDENTIAL_NOT_FOUND`, or `CONFIG_INVALID` exit `2` |
@@ -436,7 +439,7 @@ Primary object types:
 | repeated command rows from help output | `help_command` |
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
-| `feedback` | `feedback` |
+| `feedback`, `feedback list|show|archive` | `feedback` |
 | `dashboard` | `dashboard` |
 | `report` | `report` |
 | repeated capability rows from `config validate` | `capability` |
@@ -487,7 +490,7 @@ Lifecycle command rules:
 - `--explain` rule: includes `capability source` and any safe explanatory `summary`; without `--explain`, `capability source` may render as `none`.
 - Exit: `0`; `2` on invalid help options/selectors or invalid global config; `5` on storage failure.
 
-### Feedback
+### Feedback Submit
 
 `alab feedback --body <text>|--body-file <path> [--kind suggestion|question|bug|other] [--title <text>]`
 
@@ -499,11 +502,52 @@ Lifecycle command rules:
 - Conflicts: `--body` with `--body-file`.
 - Body rule: feedback body must be non-empty UTF-8 text no longer than 65536 bytes.
 - Title rule: when provided, title must be non-empty UTF-8 text no longer than 120 bytes.
-- Storage rule: each feedback creates one directory under `ALAB_HOME/feedback/` with `metadata.json` and `body.md`; ALab does not create an uninitialized home for feedback.
+- Storage rule: each feedback creates one directory under `ALAB_HOME/feedback/` with `metadata.json` and `body.md`; ALab does not create an uninitialized home for feedback. New records include `status: active`, `archived_at: null`, `archived_by: null`, and `archive_reason: null`. Older file records without these keys are read as active.
 - Global config rule: invalid or missing global config does not block feedback once the home database is initialized.
 - Metadata rule: missing role, session, context, actor, or Git information is stored as JSON `null`.
 - Success fields: `feedback id`, `kind`, `title`, `created at`, `role`, `session id`, `commit`, `path`, `metadata path`, `body path`.
 - Exit: `0`; `2` on missing home or invalid input; `5` on storage failure.
+
+### Feedback List
+
+`alab feedback list [--kind suggestion|question|bug|other] [--query <text>] [--limit <n>] [--offset <n>] [--include-archived]`
+
+- Context: Any initialized ALab home.
+- Credential: Root.
+- Required args: none.
+- Options: `--kind`, `--query`, `--limit`, `--offset`, `--include-archived`.
+- Defaults: `--limit 100`, `--offset 0`.
+- Credential rule: requires an explicit root key because feedback bodies can include local paths, session ids, and operational notes outside project visibility boundaries.
+- List rule: `feedback list` returns active records by default in newest-first order; `--include-archived` includes archived records. `--limit` defaults to `100`, `--offset` defaults to `0`, and `--limit` must be `1..500`.
+- Query rule: `--query` matches case-insensitively against metadata JSON and body text. `--kind` restricts to one feedback kind.
+- Success fields: `feedback id`, `kind`, `title`, `status`, `created at`, `archived at`, `role`, `session id`, `commit`, `path`.
+- Exit: `0`; `2` on invalid filters; `3` on auth failure; `5` on storage failure.
+
+### Feedback Show
+
+`alab feedback show <feedback_id>`
+
+- Context: Any initialized ALab home.
+- Credential: Root.
+- Required args: `<feedback_id>`.
+- Options: none.
+- Credential rule: requires an explicit root key because feedback bodies can include local paths, session ids, and operational notes outside project visibility boundaries.
+- Show rule: `feedback show <feedback_id>` reads active or archived records by exact complete feedback id and renders the body.
+- Success fields: `feedback id`, `kind`, `title`, `status`, `created at`, `archived at`, `archive reason`, `role`, `session id`, `commit`, `path`, `metadata path`, `body path`, `body`.
+- Exit: `0`; `2` on missing feedback or invalid selector; `3` on auth failure; `5` on storage failure.
+
+### Feedback Archive
+
+`alab feedback archive <feedback_id> [--reason <text>]`
+
+- Context: Any initialized ALab home.
+- Credential: Root.
+- Required args: `<feedback_id>`.
+- Options: `--reason`.
+- Credential rule: requires an explicit root key because feedback bodies can include local paths, session ids, and operational notes outside project visibility boundaries.
+- Archive rule: `feedback archive <feedback_id>` updates only the file-backed `metadata.json`, sets status to `archived`, stores `archived_at`, `archived_by`, and optional `archive_reason`, and does not write SQLite rows or audit events. Repeating archive is idempotent and preserves the original archive timestamp and reason.
+- Success fields: `feedback id`, `previous status`, `status`, `archived at`, `archive reason`, `path`, `metadata path`.
+- Exit: `0`; `2` on missing feedback or invalid selector; `3` on auth failure; `5` on storage failure.
 
 ### Dashboard
 

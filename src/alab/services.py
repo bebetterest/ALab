@@ -13,8 +13,6 @@ import socket
 import sqlite3
 import sys
 import tomllib
-from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -79,54 +77,90 @@ from .source_import import (
     init_snapshot_repo,
     reject_gitlinks,
 )
+from .service_args import (
+    EMPTY_COMMAND_VALUE_ALLOWED,
+    OPTIONS_WITH_VALUES,
+    _append_time_filter,
+    _commit_sha_filter,
+    _content_hash_filter,
+    _exp_commit_selector_filter,
+    _full_commit_sha_filter,
+    _is_commit_sha_selector,
+    _parse_audit_limit_offset,
+    _parse_bool_option,
+    _parse_float_option,
+    _parse_int_option,
+    _parse_limit_offset,
+    _parse_non_negative_int_option,
+    _parse_positive_int_option,
+    _register_observe_text_predicates,
+    _require_option_choice,
+    _require_ordered_range,
+    _require_ordered_time_range,
+    _sort_rows,
+    _sql_order_limit_clause,
+    command_arg,
+    command_args,
+    flag,
+    option_count,
+    optional_positional_selector,
+    positional,
+    require_dry_run_skip_baseline_compatible,
+    require_dry_run_unforced,
+    require_exactly_one_option_pair,
+    require_force_confirm,
+    require_known_options,
+    require_options_at_most_once,
+    require_positional_count,
+)
+from .service_contracts import (
+    _assert_annotation_repo_path,
+    _execution_record_nested_obj,
+    annotation_target_json_obj,
+    annotation_visibility_json_obj,
+    audit_deleted_ids_json_obj,
+    audit_metadata_json_obj,
+    cache_metadata_json_obj,
+    catalog_metadata_json_obj,
+    execution_record_json_obj,
+    experiment_metadata_obj,
+    experiment_policy_json_obj,
+    runtime_capability_details_json_obj,
+    source_origin_metadata_obj,
+    submission_refs_json_obj,
+)
+from .service_models import (
+    ANNOTATION_TARGET_ID_PREFIXES,
+    ANNOTATION_TARGET_TYPES,
+    ARTIFACT_ROOTS,
+    AUDIT_ACTIONS,
+    AUDIT_METADATA_KEYS,
+    AUDIT_OBJECT_ID_LITERALS,
+    AUDIT_OBJECT_ID_PREFIXES,
+    AUDIT_OBJECT_TYPES,
+    DEFAULT_SOURCE_IMPORT_LIMITS,
+    EXPERIMENT_STATUSES,
+    KEY_ROLES,
+    LOG_STREAMS,
+    RUNNER_TYPES,
+    SOURCE_ORIGIN_TYPES,
+    TOKEN_MODES,
+    VISIBILITY_SCOPES,
+    AdapterDerivedSource,
+    ExperimentOperationLock,
+    FilesystemRemovalTarget,
+    GitRefDeletion,
+    GlobalOptions,
+    LongRunningResult,
+    PreparedSource,
+    Request,
+    ResolvedRemovalTarget as _ResolvedRemovalTarget,
+    RunExecutionSummary,
+    SourceImportLimits,
+    SourceImportResult,
+    TrashStage,
+)
 from .timeutil import parse_rfc3339_utc, utc_now
-
-
-@dataclass
-class GlobalOptions:
-    home: Home
-    output: str = "text"
-    key: str | None = None
-    key_source: str | None = None
-
-
-@dataclass
-class Request:
-    globals: GlobalOptions
-    context: Context | None
-    actor: Actor | None = None
-
-
-@dataclass
-class LongRunningResult:
-    blocks: list[ResultBlock]
-    run: Callable[[], int]
-    close: Callable[[], None] | None = None
-
-
-@dataclass
-class AdapterDerivedSource:
-    origin_type: str
-    source_path: Path | None
-    empty: bool
-    safe_summary: str
-    exact: dict[str, Any]
-
-
-@dataclass
-class RunExecutionSummary:
-    run_id: str
-    commit: str
-    created_commit: bool
-    status: str
-    reward: float | None
-    reward_parse_status: str
-    exit_code: int | None
-    stdout_preview: str | None
-    stderr_preview: str | None
-    artifact_count: int
-    failure_reason: str | None
-    warning_codes: list[str]
 
 
 def _failure_fields(code: str, reason: str, next_action: str) -> list[tuple[str, Any]]:
@@ -248,219 +282,6 @@ def _lifecycle_reason(args: list[str]) -> str | None:
     return reason
 
 
-@dataclass
-class PreparedSource:
-    origin_type: str
-    source_work: Path
-    origin_records: list[dict[str, Any]]
-
-
-@dataclass(frozen=True)
-class SourceImportLimits:
-    max_files: int
-    max_total_bytes: int
-    max_file_bytes: int
-
-
-@dataclass
-class SourceImportResult:
-    source_id: str
-    source_ref: str
-    name: str
-    source_commit: str
-    tree_hash: str
-    deduped: bool
-    warnings: list[str]
-
-
-@dataclass(frozen=True)
-class ExperimentOperationLock:
-    lock_name: str
-    owner_operation_id: str
-
-
-@dataclass
-class TrashStage:
-    audit_id: str
-    original_path: Path | None
-    trash_path: Path | None
-    audit_label: str | None
-    mode: str
-    moved: bool
-    already_absent: bool
-
-
-@dataclass
-class FilesystemRemovalTarget:
-    kind: str
-    object_id: str
-    path: Path
-
-
-@dataclass
-class _ResolvedRemovalTarget:
-    target: FilesystemRemovalTarget
-    resolved: Path
-    order: int
-
-
-@dataclass
-class GitRefDeletion:
-    branch_ref: str
-    commit: str | None
-    deleted: bool
-    already_absent: bool
-
-
-DEFAULT_SOURCE_IMPORT_LIMITS = SourceImportLimits(
-    max_files=100000,
-    max_total_bytes=1073741824,
-    max_file_bytes=104857600,
-)
-SOURCE_ORIGIN_TYPES = {"local", "git", "empty", "harbor", "skydiscover"}
-RUNNER_TYPES = {"local", "docker", "harbor", "skydiscover_docker", "skydiscover_python"}
-ARTIFACT_ROOTS = {"workspace", "run"}
-LOG_STREAMS = {"stdout", "stderr", "hidden_stdout", "hidden_stderr"}
-TOKEN_MODES = {"worktree", "inspection"}
-VISIBILITY_SCOPES = {"none", "same_project", "explicit"}
-EXPERIMENT_STATUSES = {"open", "closed", "archived"}
-KEY_ROLES = {"admin"}
-AUDIT_OBJECT_TYPES = {
-    "annotation",
-    "artifact",
-    "backup",
-    "cache",
-    "catalog",
-    "credential",
-    "experiment",
-    "inspection_checkout",
-    "lock",
-    "log",
-    "project",
-    "run",
-    "secret_value",
-    "source",
-    "validation",
-    "worktree",
-}
-AUDIT_METADATA_KEYS = {
-    "schema_version",
-    "active_dependent_artifact_count",
-    "active_dependent_log_count",
-    "annotation_status",
-    "archive_status",
-    "archived_at",
-    "blockers",
-    "branch",
-    "branch_ref",
-    "branch_ref_already_absent",
-    "branch_ref_commit",
-    "branch_ref_deleted",
-    "cache_kinds",
-    "cleared_count",
-    "config",
-    "context_type",
-    "created_credential_id",
-    "created_for_path_hash",
-    "created_registry_row",
-    "created_token_id",
-    "credential",
-    "credential_status",
-    "credential_type",
-    "deleted_artifact_count",
-    "deleted_count",
-    "deleted_log_count",
-    "deleted_revision_count",
-    "dirty_state",
-    "experiment_status",
-    "filesystem",
-    "filesystem_absent_count",
-    "filesystem_path_already_absent",
-    "filesystem_target_count",
-    "final_run_removed",
-    "inspection_commit",
-    "latest_run_id_after",
-    "latest_run_id_before",
-    "path_registry_id",
-    "pinned_commit",
-    "previous_archive_status",
-    "previous_path_hash",
-    "previous_status",
-    "project_status",
-    "pruned_count",
-    "registered_path_hash",
-    "repair_mode",
-    "repaired_at",
-    "repaired_path_hash",
-    "requested_ref",
-    "restored_path_hash",
-    "revoked_at",
-    "revoked_credential_id",
-    "revoked_token_id",
-    "role",
-    "safe_summary",
-    "source_status",
-    "token_mode",
-    "token_revocation_target",
-    "trash",
-    "unarchived_at",
-    "warning_count",
-    "worktree_state",
-}
-
-
-def audit_deleted_ids_json_obj(text: str) -> dict[str, Any]:
-    deleted = contract_json_obj(
-        text,
-        label="audit_events.deleted_ids_json",
-        allowed_keys={"schema_version", "counts", "ids"},
-        required_keys={"counts", "ids"},
-    )
-    counts = deleted["counts"]
-    ids = deleted["ids"]
-    if not isinstance(counts, dict):
-        raise AlabError("STORAGE_ERROR", "audit_events.deleted_ids_json counts must be a JSON object")
-    if not isinstance(ids, dict):
-        raise AlabError("STORAGE_ERROR", "audit_events.deleted_ids_json ids must be a JSON object")
-    unknown = sorted((set(counts) | set(ids)) - AUDIT_OBJECT_TYPES)
-    if unknown:
-        raise AlabError("STORAGE_ERROR", f"audit_events.deleted_ids_json contains unknown object types: {', '.join(unknown)}")
-    result_counts: dict[str, int] = {}
-    result_ids: dict[str, list[str]] = {}
-    for object_type in sorted(set(counts) | set(ids)):
-        count = counts.get(object_type, 0)
-        id_values = ids.get(object_type, [])
-        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
-            raise AlabError("STORAGE_ERROR", "audit_events.deleted_ids_json counts must be non-negative integers")
-        if not isinstance(id_values, list) or not all(isinstance(object_id, str) for object_id in id_values):
-            raise AlabError("STORAGE_ERROR", "audit_events.deleted_ids_json ids must be string arrays")
-        sorted_ids = sorted(set(id_values))
-        if count != len(sorted_ids):
-            raise AlabError("STORAGE_ERROR", "audit_events.deleted_ids_json counts must match ids")
-        result_counts[object_type] = count
-        result_ids[object_type] = sorted_ids
-    return {**deleted, "counts": result_counts, "ids": result_ids}
-
-
-def audit_metadata_json_obj(text: str) -> dict[str, Any]:
-    metadata = contract_json_obj(
-        text,
-        label="audit_events.metadata_json",
-        allowed_keys=AUDIT_METADATA_KEYS,
-        required_keys=set(),
-    )
-    if "trash" in metadata and not isinstance(metadata["trash"], (dict, list)):
-        raise AlabError("STORAGE_ERROR", "audit_events.metadata_json trash must be an object or array")
-    if "blockers" in metadata and (not isinstance(metadata["blockers"], list) or not all(isinstance(blocker, str) for blocker in metadata["blockers"])):
-        raise AlabError("STORAGE_ERROR", "audit_events.metadata_json blockers must be a string array")
-    if "cache_kinds" in metadata and (not isinstance(metadata["cache_kinds"], list) or not all(isinstance(kind, str) for kind in metadata["cache_kinds"])):
-        raise AlabError("STORAGE_ERROR", "audit_events.metadata_json cache_kinds must be a string array")
-    for key in ("config", "credential", "filesystem"):
-        if key in metadata and not isinstance(metadata[key], dict):
-            raise AlabError("STORAGE_ERROR", f"audit_events.metadata_json {key} must be a JSON object")
-    return metadata
-
-
 def audit(
     conn,
     *,
@@ -530,221 +351,6 @@ def cmd_help(args: list[str], req: Request) -> list[ResultBlock]:
     raise AlabError("CONFIG_INVALID", "help is handled by the CLI help renderer")
 
 
-def command_arg(args: list[str], name: str, *, required: bool = False, default: str | None = None) -> str | None:
-    if name in args:
-        idx = args.index(name)
-        if idx + 1 >= len(args) or args[idx + 1].startswith("--"):
-            raise AlabError("CONFIG_INVALID", f"{name} requires a value")
-        return _command_value(name, args[idx + 1])
-    if required:
-        raise AlabError("CONFIG_INVALID", f"missing required option {name}")
-    return default
-
-
-def command_args(args: list[str], name: str) -> list[str]:
-    values: list[str] = []
-    for idx, item in enumerate(args):
-        if item == name:
-            if idx + 1 >= len(args) or args[idx + 1].startswith("--"):
-                raise AlabError("CONFIG_INVALID", f"{name} requires a value")
-            values.append(_command_value(name, args[idx + 1]))
-    return values
-
-
-def option_count(args: list[str], name: str) -> int:
-    return sum(1 for item in args if item == name)
-
-
-OPTIONS_WITH_VALUES = {
-    "--home",
-    "--output",
-    "--key",
-    "--role",
-    "--config",
-    "--project",
-    "--source-path",
-    "--source-git",
-    "--source-ref",
-    "--from-exp",
-    "--from-commit",
-    "--git-ref",
-    "--source-subdir",
-    "--mutable-include",
-    "--mutable-exclude",
-    "--visibility-scope",
-    "--visible-exp",
-    "--name",
-    "--task",
-    "--goal",
-    "--path",
-    "--message",
-    "--summary",
-    "--summary-file",
-    "--feedback",
-    "--feedback-file",
-    "--ref",
-    "--out",
-    "--version",
-    "--confirm",
-    "--reason",
-    "--body",
-    "--body-file",
-    "--kind",
-    "--title",
-    "--target",
-    "--tag",
-    "--limit",
-    "--offset",
-    "--query",
-    "--run",
-    "--exp",
-    "--validation",
-    "--object-type",
-    "--object-id",
-    "--action",
-    "--actor",
-    "--created-after",
-    "--created-before",
-    "--updated-after",
-    "--updated-before",
-    "--started-after",
-    "--started-before",
-    "--ended-after",
-    "--ended-before",
-    "--max-files",
-    "--max-total-bytes",
-    "--max-file-bytes",
-    "--status",
-    "--source-id",
-    "--name-query",
-    "--reward-min",
-    "--reward-max",
-    "--runner-type",
-    "--exit-code",
-    "--failure-reason-query",
-    "--content-hash",
-    "--path-query",
-    "--root",
-    "--stream",
-    "--sort",
-    "--config-version",
-    "--token-id",
-    "--mode",
-    "--size-min",
-    "--size-max",
-    "--truncated",
-    "--value-file",
-    "--commit",
-    "--private-to-exp",
-    "--author",
-    "--target-type",
-    "--target-id",
-    "--created-by",
-    "--keep",
-    "--older-than",
-    "--origin-url",
-    "--port",
-    "--refresh-seconds",
-}
-
-
-EMPTY_COMMAND_VALUE_ALLOWED = {
-    "--author",
-    "--body",
-    "--failure-reason-query",
-    "--feedback",
-    "--goal",
-    "--message",
-    "--name-query",
-    "--path-query",
-    "--query",
-    "--reason",
-    "--summary",
-}
-
-
-def _command_value(name: str, value: str) -> str:
-    if value == "" and name not in EMPTY_COMMAND_VALUE_ALLOWED:
-        raise AlabError("CONFIG_INVALID", f"{name} requires a non-empty value")
-    return value
-
-
-def require_options_at_most_once(args: list[str], options: tuple[str, ...]) -> None:
-    for option in options:
-        if option_count(args, option) > 1:
-            raise AlabError("CONFIG_INVALID", f"{option} may be provided once")
-
-
-def require_known_options(args: list[str], allowed_options: tuple[str, ...]) -> None:
-    allowed = set(allowed_options)
-    for item in args:
-        if item == "--":
-            break
-        if item.startswith("--") and item not in allowed:
-            raise AlabError("CONFIG_INVALID", f"unsupported option {item}")
-
-
-def require_exactly_one_option_pair(args: list[str], first: str, second: str, message: str) -> None:
-    require_options_at_most_once(args, (first, second))
-    if option_count(args, first) + option_count(args, second) != 1:
-        raise AlabError("CONFIG_INVALID", message)
-
-
-def require_force_confirm(args: list[str], expected_confirm: str, message: str) -> None:
-    require_options_at_most_once(args, ("--force", "--confirm"))
-    if option_count(args, "--force") != 1 or option_count(args, "--confirm") != 1 or command_arg(args, "--confirm") != expected_confirm:
-        raise AlabError("CONFIG_INVALID", message)
-
-
-def require_dry_run_unforced(args: list[str]) -> None:
-    require_options_at_most_once(args, ("--force", "--confirm"))
-    if flag(args, "--dry-run") and (flag(args, "--force") or option_count(args, "--confirm")):
-        raise AlabError("CONFIG_INVALID", "--dry-run conflicts with --force/--confirm")
-
-
-def require_dry_run_skip_baseline_compatible(args: list[str]) -> None:
-    if flag(args, "--dry-run") and flag(args, "--skip-baseline-test"):
-        raise AlabError("CONFIG_INVALID", "--dry-run conflicts with --skip-baseline-test")
-
-
-def require_positional_count(args: list[str], count: int, message: str, *, options_with_values: tuple[str, ...] | None = None) -> list[str]:
-    pos = positional(args, options_with_values=options_with_values)
-    if len(pos) != count:
-        raise AlabError("CONFIG_INVALID", message)
-    return pos
-
-
-def optional_positional_selector(args: list[str], message: str, *, options_with_values: tuple[str, ...] | None = None) -> str | None:
-    pos = positional(args, options_with_values=options_with_values)
-    if len(pos) > 1:
-        raise AlabError("CONFIG_INVALID", message)
-    return pos[0] if pos else None
-
-
-def flag(args: list[str], name: str) -> bool:
-    return name in args
-
-
-def positional(args: list[str], *, options_with_values: tuple[str, ...] | None = None) -> list[str]:
-    result: list[str] = []
-    skip = False
-    value_options = OPTIONS_WITH_VALUES if options_with_values is None else set(options_with_values)
-    for idx, item in enumerate(args):
-        if skip:
-            skip = False
-            continue
-        if item in value_options:
-            if idx + 1 >= len(args) or args[idx + 1].startswith("--"):
-                raise AlabError("CONFIG_INVALID", f"{item} requires a value")
-            _command_value(item, args[idx + 1])
-            skip = True
-            continue
-        if item.startswith("--"):
-            continue
-        result.append(item)
-    return result
-
-
 def cmd_auth_init(args: list[str], req: Request) -> list[ResultBlock]:
     require_known_options(args, ())
     require_positional_count(args, 0, "auth init accepts no positional arguments")
@@ -786,6 +392,9 @@ FEEDBACK_SESSION_ENV_KEYS = (
     "CURSOR_SESSION_ID",
     "TERM_SESSION_ID",
 )
+FEEDBACK_STATUSES = {"active", "archived"}
+FEEDBACK_LIST_DEFAULT_LIMIT = 100
+FEEDBACK_LIST_MAX_LIMIT = 500
 
 
 def _feedback_role(req: Request) -> str:
@@ -870,6 +479,106 @@ def _write_feedback_record(home: Home, *, metadata: dict[str, Any], body: str) -
     return final_dir
 
 
+def _feedback_metadata_path(record_dir: Path) -> Path:
+    return record_dir / "metadata.json"
+
+
+def _feedback_body_path(record_dir: Path) -> Path:
+    return record_dir / "body.md"
+
+
+def _feedback_metadata_with_defaults(metadata: dict[str, Any], *, record_dir: Path) -> dict[str, Any]:
+    cleaned = dict(metadata)
+    status = cleaned.get("status")
+    if status not in FEEDBACK_STATUSES:
+        status = "active"
+    cleaned["status"] = status
+    cleaned.setdefault("archived_at", None)
+    cleaned.setdefault("archived_by", None)
+    cleaned.setdefault("archive_reason", None)
+    cleaned.setdefault("body_path", str(_feedback_body_path(record_dir)))
+    return cleaned
+
+
+def _feedback_metadata_rows(home: Home) -> list[tuple[dict[str, Any], Path]]:
+    if not home.feedback_path.exists():
+        return []
+    rows: list[tuple[dict[str, Any], Path]] = []
+    for metadata_path in home.feedback_path.glob("*/metadata.json"):
+        if metadata_path.parent.name.startswith("."):
+            continue
+        try:
+            raw = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if not isinstance(raw, dict):
+            continue
+        metadata = _feedback_metadata_with_defaults(raw, record_dir=metadata_path.parent)
+        feedback_id = metadata.get("feedback_id")
+        created_at = metadata.get("created_at")
+        if not isinstance(feedback_id, str) or not feedback_id or not isinstance(created_at, str):
+            continue
+        rows.append((metadata, metadata_path.parent))
+    rows.sort(key=lambda item: (str(item[0].get("created_at") or ""), item[1].name), reverse=True)
+    return rows
+
+
+def _find_feedback_record(home: Home, feedback_id: str) -> tuple[dict[str, Any], Path]:
+    require_complete_id(feedback_id, "fb")
+    for metadata, record_dir in _feedback_metadata_rows(home):
+        if metadata.get("feedback_id") == feedback_id:
+            return metadata, record_dir
+    raise AlabError("FEEDBACK_NOT_FOUND", "feedback id is required" if not feedback_id else "feedback not found")
+
+
+def _read_feedback_body(record_dir: Path) -> str:
+    try:
+        return _feedback_body_path(record_dir).read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise AlabError("STORAGE_ERROR", "feedback body file is missing") from exc
+    except UnicodeDecodeError as exc:
+        raise AlabError("STORAGE_ERROR", "feedback body file must be UTF-8") from exc
+    except OSError as exc:
+        raise AlabError("STORAGE_ERROR", f"failed to read feedback body: {exc}") from exc
+
+
+def _write_feedback_metadata(record_dir: Path, metadata: dict[str, Any]) -> None:
+    metadata_path = _feedback_metadata_path(record_dir)
+    tmp_path = record_dir / f".metadata.json.tmp-{secrets.token_hex(8)}"
+    try:
+        tmp_path.write_text(
+            json.dumps(metadata, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        tmp_path.replace(metadata_path)
+    except OSError as exc:
+        tmp_path.unlink(missing_ok=True)
+        raise AlabError("STORAGE_ERROR", f"failed to update feedback metadata: {exc}") from exc
+
+
+def _feedback_matches(metadata: dict[str, Any], body: str, query: str | None) -> bool:
+    if query is None:
+        return True
+    needle = query.casefold()
+    metadata_text = json.dumps(metadata, ensure_ascii=False, sort_keys=True)
+    return needle in metadata_text.casefold() or needle in body.casefold()
+
+
+def _feedback_result_fields(metadata: dict[str, Any], record_dir: Path) -> list[tuple[str, Any]]:
+    return [
+        ("feedback id", metadata.get("feedback_id")),
+        ("kind", metadata.get("kind")),
+        ("title", metadata.get("title")),
+        ("status", metadata.get("status")),
+        ("created at", metadata.get("created_at")),
+        ("archived at", metadata.get("archived_at")),
+        ("role", metadata.get("role")),
+        ("session id", metadata.get("session_id")),
+        ("commit", metadata.get("git_commit")),
+        ("path", str(record_dir)),
+    ]
+
+
 def cmd_feedback(args: list[str], req: Request) -> list[ResultBlock]:
     require_known_options(args, ("--body", "--body-file", "--kind", "--title"))
     require_options_at_most_once(args, ("--body", "--body-file", "--kind", "--title"))
@@ -902,6 +611,10 @@ def cmd_feedback(args: list[str], req: Request) -> list[ResultBlock]:
         "kind": kind,
         "title": title,
         "created_at": created_at,
+        "status": "active",
+        "archived_at": None,
+        "archived_by": None,
+        "archive_reason": None,
         "role": role,
         "actor_type": req.actor.actor_type if req.actor else None,
         "actor_credential_id": req.actor.credential_id if req.actor else None,
@@ -938,6 +651,106 @@ def cmd_feedback(args: list[str], req: Request) -> list[ResultBlock]:
                 ("path", str(final_dir)),
                 ("metadata path", str(metadata_path)),
                 ("body path", str(body_path)),
+            ],
+        )
+    ]
+
+
+def cmd_feedback_list(args: list[str], req: Request) -> list[ResultBlock]:
+    require_known_options(args, ("--kind", "--query", "--limit", "--offset", "--include-archived"))
+    require_options_at_most_once(args, ("--kind", "--query", "--limit", "--offset", "--include-archived"))
+    require_actor(req, "root")
+    require_positional_count(args, 0, "feedback list accepts no positional arguments", options_with_values=("--kind", "--query", "--limit", "--offset"))
+    kind = command_arg(args, "--kind")
+    if kind is not None:
+        kind = _require_option_choice(kind, "--kind", FEEDBACK_KINDS)
+    query = command_arg(args, "--query")
+    limit = _parse_int_option(args, "--limit")
+    if limit is None:
+        limit = FEEDBACK_LIST_DEFAULT_LIMIT
+    if limit < 1 or limit > FEEDBACK_LIST_MAX_LIMIT:
+        raise AlabError("CONFIG_INVALID", f"--limit must be between 1 and {FEEDBACK_LIST_MAX_LIMIT}")
+    offset = _parse_int_option(args, "--offset")
+    if offset is None:
+        offset = 0
+    if offset < 0:
+        raise AlabError("CONFIG_INVALID", "--offset must be non-negative")
+    include_archived = flag(args, "--include-archived")
+
+    rows: list[tuple[dict[str, Any], Path]] = []
+    for metadata, record_dir in _feedback_metadata_rows(req.globals.home):
+        if not include_archived and metadata.get("status") == "archived":
+            continue
+        if kind is not None and metadata.get("kind") != kind:
+            continue
+        body = _read_feedback_body(record_dir) if query is not None else ""
+        if not _feedback_matches(metadata, body, query):
+            continue
+        rows.append((metadata, record_dir))
+    selected = rows[offset : offset + limit]
+    return [ResultBlock("feedback", _feedback_result_fields(metadata, record_dir)) for metadata, record_dir in selected]
+
+
+def cmd_feedback_show(args: list[str], req: Request) -> list[ResultBlock]:
+    require_known_options(args, ())
+    require_actor(req, "root")
+    feedback_id = optional_positional_selector(args, "feedback show accepts exactly one feedback id")
+    if feedback_id is None:
+        raise AlabError("FEEDBACK_NOT_FOUND", "feedback id is required")
+    metadata, record_dir = _find_feedback_record(req.globals.home, feedback_id)
+    body = _read_feedback_body(record_dir)
+    metadata_path = _feedback_metadata_path(record_dir)
+    body_path = _feedback_body_path(record_dir)
+    return [
+        ResultBlock(
+            "feedback",
+            [
+                ("feedback id", metadata.get("feedback_id")),
+                ("kind", metadata.get("kind")),
+                ("title", metadata.get("title")),
+                ("status", metadata.get("status")),
+                ("created at", metadata.get("created_at")),
+                ("archived at", metadata.get("archived_at")),
+                ("archive reason", metadata.get("archive_reason")),
+                ("role", metadata.get("role")),
+                ("session id", metadata.get("session_id")),
+                ("commit", metadata.get("git_commit")),
+                ("path", str(record_dir)),
+                ("metadata path", str(metadata_path)),
+                ("body path", str(body_path)),
+                ("body", multiline_text(body)),
+            ],
+        )
+    ]
+
+
+def cmd_feedback_archive(args: list[str], req: Request) -> list[ResultBlock]:
+    require_known_options(args, ("--reason",))
+    actor = require_actor(req, "root")
+    reason = _lifecycle_reason(args)
+    feedback_id = optional_positional_selector(args, "feedback archive accepts exactly one feedback id", options_with_values=("--reason",))
+    if feedback_id is None:
+        raise AlabError("FEEDBACK_NOT_FOUND", "feedback id is required")
+    metadata, record_dir = _find_feedback_record(req.globals.home, feedback_id)
+    previous_status = str(metadata.get("status") or "active")
+    if previous_status != "archived":
+        metadata["status"] = "archived"
+        metadata["archived_at"] = utc_now()
+        metadata["archived_by"] = actor.credential_id
+        metadata["archive_reason"] = reason
+        _write_feedback_metadata(record_dir, metadata)
+    metadata_path = _feedback_metadata_path(record_dir)
+    return [
+        ResultBlock(
+            "feedback",
+            [
+                ("feedback id", metadata.get("feedback_id")),
+                ("previous status", previous_status),
+                ("status", metadata.get("status")),
+                ("archived at", metadata.get("archived_at")),
+                ("archive reason", metadata.get("archive_reason")),
+                ("path", str(record_dir)),
+                ("metadata path", str(metadata_path)),
             ],
         )
     ]
@@ -1257,62 +1070,6 @@ def cmd_config_reset(args: list[str], req: Request) -> list[ResultBlock]:
     _validate_global_config_data(data)
     req.globals.home.config_path.write_text(dumps_toml(data), encoding="utf-8")
     return [ResultBlock("config", [("reset", "field"), ("field", field), ("value", "default"), ("config valid", True)])]
-
-
-def _stored_string_array(value: Any, *, label: str) -> list[str]:
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a string array")
-    return list(value)
-
-
-def runtime_capability_details_json_obj(text: str) -> dict[str, Any]:
-    details = contract_json_obj(
-        text,
-        label="runtime_capabilities.details_json",
-        allowed_keys={"schema_version", "capability", "safe_summary", "probed_values", "error_code"},
-        required_keys={"capability", "safe_summary", "probed_values"},
-    )
-    if not isinstance(details["capability"], str) or not details["capability"]:
-        raise AlabError("STORAGE_ERROR", "runtime_capabilities.details_json capability must be a non-empty string")
-    if not isinstance(details["safe_summary"], str):
-        raise AlabError("STORAGE_ERROR", "runtime_capabilities.details_json safe_summary must be a string")
-    if not isinstance(details["probed_values"], dict):
-        raise AlabError("STORAGE_ERROR", "runtime_capabilities.details_json probed_values must be a JSON object")
-    if "error_code" in details and not isinstance(details["error_code"], str):
-        raise AlabError("STORAGE_ERROR", "runtime_capabilities.details_json error_code must be a string")
-    return details
-
-
-def catalog_metadata_json_obj(text: str) -> dict[str, Any]:
-    metadata = contract_json_obj(
-        text,
-        label="catalogs.metadata_json",
-        allowed_keys={"schema_version", "safe_summary", "task_refs", "evaluator_refs", "warnings"},
-        required_keys={"safe_summary", "task_refs", "evaluator_refs"},
-    )
-    if not isinstance(metadata["safe_summary"], str):
-        raise AlabError("STORAGE_ERROR", "catalogs.metadata_json safe_summary must be a string")
-    metadata["task_refs"] = _stored_string_array(metadata["task_refs"], label="catalogs.metadata_json task_refs")
-    metadata["evaluator_refs"] = _stored_string_array(metadata["evaluator_refs"], label="catalogs.metadata_json evaluator_refs")
-    if "warnings" in metadata:
-        metadata["warnings"] = _stored_string_array(metadata["warnings"], label="catalogs.metadata_json warnings")
-    return metadata
-
-
-def cache_metadata_json_obj(text: str) -> dict[str, Any]:
-    metadata = contract_json_obj(
-        text,
-        label="cache_entries.metadata_json",
-        allowed_keys={"schema_version", "safe_summary", "inputs_hash", "warnings"},
-        required_keys={"safe_summary", "inputs_hash"},
-    )
-    if not isinstance(metadata["safe_summary"], str):
-        raise AlabError("STORAGE_ERROR", "cache_entries.metadata_json safe_summary must be a string")
-    if not isinstance(metadata["inputs_hash"], str) or not metadata["inputs_hash"]:
-        raise AlabError("STORAGE_ERROR", "cache_entries.metadata_json inputs_hash must be a non-empty string")
-    if "warnings" in metadata:
-        metadata["warnings"] = _stored_string_array(metadata["warnings"], label="cache_entries.metadata_json warnings")
-    return metadata
 
 
 def _capability_from_row(row) -> dict[str, Any]:
@@ -1908,338 +1665,6 @@ def _source_origin_with_time(record: dict[str, Any], now: str, warnings: list[st
     stored["warnings"] = list(warnings if warnings is not None else stored.get("warnings", []))
     stored["created_at"] = now
     return stored
-
-
-def _source_origin_entry_obj(value: dict[str, Any], *, label: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a JSON object")
-    allowed_keys = {"origin_id", "origin_type", "safe_summary", "exact", "warnings", "created_at"}
-    required_keys = allowed_keys
-    unknown = sorted(set(value) - allowed_keys)
-    missing = sorted(required_keys - set(value))
-    if missing:
-        raise AlabError("STORAGE_ERROR", f"{label} missing JSON keys: {', '.join(missing)}")
-    if unknown:
-        raise AlabError("STORAGE_ERROR", f"{label} contains unknown JSON keys: {', '.join(unknown)}")
-    origin = dict(value)
-    if not isinstance(origin["origin_id"], str):
-        raise AlabError("STORAGE_ERROR", f"{label} origin_id must be a string")
-    try:
-        require_complete_id(origin["origin_id"], "origin")
-    except AlabError as exc:
-        raise AlabError("STORAGE_ERROR", f"{label} origin_id must be a complete origin id") from exc
-    if not isinstance(origin["origin_type"], str):
-        raise AlabError("STORAGE_ERROR", f"{label} origin_type must be a string")
-    if origin["origin_type"] not in SOURCE_ORIGIN_TYPES:
-        raise AlabError("STORAGE_ERROR", f"{label} origin_type is invalid")
-    if not isinstance(origin["safe_summary"], str):
-        raise AlabError("STORAGE_ERROR", f"{label} safe_summary must be a string")
-    if not isinstance(origin["exact"], dict):
-        raise AlabError("STORAGE_ERROR", f"{label} exact must be a JSON object")
-    if not isinstance(origin["warnings"], list) or not all(isinstance(warning, str) for warning in origin["warnings"]):
-        raise AlabError("STORAGE_ERROR", f"{label} warnings must be a string array")
-    if not isinstance(origin["created_at"], str):
-        raise AlabError("STORAGE_ERROR", f"{label} created_at must be a string")
-    try:
-        parse_rfc3339_utc(origin["created_at"])
-    except AlabError as exc:
-        raise AlabError("STORAGE_ERROR", f"{label} created_at must be RFC 3339") from exc
-    return origin
-
-
-def source_origin_metadata_obj(text: str) -> dict[str, Any]:
-    metadata = contract_json_obj(
-        text,
-        label="sources.origin_metadata_json",
-        allowed_keys={"schema_version", "tree_hash_algorithm", "primary_origin", "origins"},
-        required_keys={"tree_hash_algorithm", "primary_origin", "origins"},
-    )
-    if metadata["tree_hash_algorithm"] != "alab-tree-sha256-v1":
-        raise AlabError("STORAGE_ERROR", "sources.origin_metadata_json tree_hash_algorithm is invalid")
-    primary_origin = _source_origin_entry_obj(metadata["primary_origin"], label="sources.origin_metadata_json.primary_origin")
-    origins_value = metadata["origins"]
-    if not isinstance(origins_value, list) or not origins_value:
-        raise AlabError("STORAGE_ERROR", "sources.origin_metadata_json origins must be a non-empty array")
-    origins = [
-        _source_origin_entry_obj(origin, label=f"sources.origin_metadata_json.origins[{index}]")
-        for index, origin in enumerate(origins_value)
-    ]
-    if origins[0] != primary_origin:
-        raise AlabError("STORAGE_ERROR", "sources.origin_metadata_json primary_origin must match origins[0]")
-    return {**metadata, "primary_origin": primary_origin, "origins": origins}
-
-
-def _experiment_creation_origin_obj(value: dict[str, Any], *, label: str = "experiments.metadata_json.creation_origin") -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a JSON object")
-    kind = value.get("kind")
-    if kind == "source":
-        allowed_keys = {"kind", "source_id"}
-        required_keys = allowed_keys
-    elif kind == "inline_source":
-        allowed_keys = {"kind", "source_id", "source_ref"}
-        required_keys = allowed_keys
-    elif kind == "from_exp":
-        allowed_keys = {"kind", "source_exp_id", "from_commit", "resolved_commit", "source_id"}
-        required_keys = allowed_keys
-    else:
-        raise AlabError("STORAGE_ERROR", f"{label} kind is invalid")
-    unknown = sorted(set(value) - allowed_keys)
-    missing = sorted(required_keys - set(value))
-    if missing:
-        raise AlabError("STORAGE_ERROR", f"{label} missing JSON keys: {', '.join(missing)}")
-    if unknown:
-        raise AlabError("STORAGE_ERROR", f"{label} contains unknown JSON keys: {', '.join(unknown)}")
-    origin = dict(value)
-    try:
-        require_complete_id(origin["source_id"], "src")
-        if kind == "from_exp":
-            require_complete_id(origin["source_exp_id"], "exp")
-    except AlabError as exc:
-        raise AlabError("STORAGE_ERROR", f"{label} contains invalid object id") from exc
-    for key in ("source_ref", "from_commit", "resolved_commit"):
-        if key in origin and (not isinstance(origin[key], str) or not origin[key]):
-            raise AlabError("STORAGE_ERROR", f"{label} {key} must be a non-empty string")
-    return origin
-
-
-def experiment_metadata_obj(text: str) -> dict[str, Any]:
-    metadata = contract_json_obj(
-        text,
-        label="experiments.metadata_json",
-        allowed_keys={"schema_version", "name", "name_slug", "goal", "creation_origin", "requested_path", "source_selector", "display"},
-        required_keys={"name", "name_slug", "goal", "creation_origin", "requested_path", "source_selector", "display"},
-    )
-    for key in ("name", "name_slug", "requested_path", "source_selector"):
-        if not isinstance(metadata[key], str) or not metadata[key]:
-            raise AlabError("STORAGE_ERROR", f"experiments.metadata_json {key} must be a non-empty string")
-    if not isinstance(metadata["goal"], (str, type(None))):
-        raise AlabError("STORAGE_ERROR", "experiments.metadata_json goal must be a string or null")
-    creation_origin = _experiment_creation_origin_obj(metadata["creation_origin"])
-    display = metadata["display"]
-    if not isinstance(display, dict):
-        raise AlabError("STORAGE_ERROR", "experiments.metadata_json display must be a JSON object")
-    display_unknown = sorted(set(display) - {"safe_summary"})
-    if display_unknown:
-        raise AlabError("STORAGE_ERROR", f"experiments.metadata_json display contains unknown JSON keys: {', '.join(display_unknown)}")
-    if not isinstance(display.get("safe_summary"), str):
-        raise AlabError("STORAGE_ERROR", "experiments.metadata_json display.safe_summary must be a string")
-    return {**metadata, "creation_origin": creation_origin, "display": dict(display)}
-
-
-def _experiment_mutable_policy_obj(value: Any, *, label: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a JSON object")
-    allowed_keys = {"include", "exclude"}
-    unknown = sorted(set(value) - allowed_keys)
-    missing = sorted(allowed_keys - set(value))
-    if missing:
-        raise AlabError("STORAGE_ERROR", f"{label} missing JSON keys: {', '.join(missing)}")
-    if unknown:
-        raise AlabError("STORAGE_ERROR", f"{label} contains unknown JSON keys: {', '.join(unknown)}")
-    result: dict[str, Any] = {}
-    for key in ("include", "exclude"):
-        items = value[key]
-        if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
-            raise AlabError("STORAGE_ERROR", f"{label}.{key} must be a string array")
-        if key == "include" and not items:
-            raise AlabError("STORAGE_ERROR", f"{label}.include must contain at least one pattern")
-        if any(not item or "\n" in item or "\0" in item for item in items):
-            raise AlabError("STORAGE_ERROR", f"{label}.{key} patterns must be non-empty single-line values")
-        result[key] = list(items)
-    return result
-
-
-def _experiment_visibility_policy_obj(value: Any, *, label: str = "experiments.policy_json.visibility_upper_bound") -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a JSON object")
-    allowed_keys = {"schema_version", "scope", "experiment_ids"}
-    unknown = sorted(set(value) - allowed_keys)
-    missing = sorted({"scope", "experiment_ids"} - set(value))
-    if missing:
-        raise AlabError("STORAGE_ERROR", f"{label} missing JSON keys: {', '.join(missing)}")
-    if unknown:
-        raise AlabError("STORAGE_ERROR", f"{label} contains unknown JSON keys: {', '.join(unknown)}")
-    if "schema_version" in value and (isinstance(value["schema_version"], bool) or value["schema_version"] != 1):
-        raise AlabError("STORAGE_ERROR", f"{label} schema_version must be 1")
-    scope = value["scope"]
-    if scope not in VISIBILITY_SCOPES:
-        raise AlabError("STORAGE_ERROR", f"{label}.scope is invalid")
-    experiment_ids = value["experiment_ids"]
-    if not isinstance(experiment_ids, list) or not all(isinstance(exp_id, str) for exp_id in experiment_ids):
-        raise AlabError("STORAGE_ERROR", f"{label}.experiment_ids must be a string array")
-    if scope == "explicit" and not experiment_ids:
-        raise AlabError("STORAGE_ERROR", f"{label}.experiment_ids is required for explicit scope")
-    if scope != "explicit" and experiment_ids:
-        raise AlabError("STORAGE_ERROR", f"{label}.experiment_ids is only valid for explicit scope")
-    for exp_id in experiment_ids:
-        try:
-            require_complete_id(exp_id, "exp")
-        except AlabError as exc:
-            raise AlabError("STORAGE_ERROR", f"{label}.experiment_ids entries must be complete experiment ids") from exc
-    result = dict(value)
-    result["experiment_ids"] = sorted(set(experiment_ids))
-    return result
-
-
-def experiment_policy_json_obj(text: str) -> dict[str, Any]:
-    policy = contract_json_obj(
-        text,
-        label="experiments.policy_json",
-        allowed_keys={"schema_version", "mutable", "mutable_override", "visibility_upper_bound"},
-        required_keys={"mutable", "visibility_upper_bound"},
-    )
-    result = {
-        **policy,
-        "mutable": _experiment_mutable_policy_obj(policy["mutable"], label="experiments.policy_json.mutable"),
-        "visibility_upper_bound": _experiment_visibility_policy_obj(policy["visibility_upper_bound"]),
-    }
-    if "mutable_override" in policy:
-        result["mutable_override"] = _experiment_mutable_policy_obj(
-            policy["mutable_override"],
-            label="experiments.policy_json.mutable_override",
-        )
-    return result
-
-
-def _execution_record_nested_obj(value: Any, *, label: str, allowed_keys: set[str], required_keys: set[str]) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a JSON object")
-    unknown = sorted(set(value) - allowed_keys)
-    missing = sorted(required_keys - set(value))
-    if missing:
-        raise AlabError("STORAGE_ERROR", f"{label} missing JSON keys: {', '.join(missing)}")
-    if unknown:
-        raise AlabError("STORAGE_ERROR", f"{label} contains unknown JSON keys: {', '.join(unknown)}")
-    return dict(value)
-
-
-def _execution_record_metric_map(value: Any, *, label: str) -> dict[str, int | float]:
-    if not isinstance(value, dict):
-        raise AlabError("STORAGE_ERROR", f"{label} must be a JSON object")
-    metrics: dict[str, int | float] = {}
-    for key, metric in value.items():
-        if not isinstance(key, str) or not isinstance(metric, (int, float)) or isinstance(metric, bool) or not math.isfinite(float(metric)):
-            raise AlabError("STORAGE_ERROR", f"{label} must be a string-to-finite-number map")
-        metrics[key] = metric
-    return metrics
-
-
-def execution_record_json_obj(text: str) -> dict[str, Any]:
-    record = contract_json_obj(
-        text,
-        label="execution.record_json",
-        allowed_keys={
-            "schema_version",
-            "config_hash",
-            "runner",
-            "reward",
-            "metrics",
-            "warnings",
-            "failure",
-            "artifacts",
-            "logs",
-            "timeout",
-            "adapter_feedback",
-            "interrupted",
-            "mutable_scope",
-        },
-        required_keys={
-            "config_hash",
-            "runner",
-            "reward",
-            "metrics",
-            "warnings",
-            "failure",
-            "artifacts",
-            "logs",
-            "timeout",
-            "adapter_feedback",
-        },
-    )
-    if not isinstance(record["config_hash"], str) or not record["config_hash"]:
-        raise AlabError("STORAGE_ERROR", "execution.record_json config_hash must be a non-empty string")
-    runner = _execution_record_nested_obj(
-        record["runner"],
-        label="execution.record_json.runner",
-        allowed_keys={"type", "safe_summary"},
-        required_keys={"type"},
-    )
-    if not isinstance(runner["type"], str) or not runner["type"]:
-        raise AlabError("STORAGE_ERROR", "execution.record_json.runner.type must be a non-empty string")
-    if "safe_summary" in runner and not isinstance(runner["safe_summary"], str):
-        raise AlabError("STORAGE_ERROR", "execution.record_json.runner.safe_summary must be a string")
-    reward = _execution_record_nested_obj(
-        record["reward"],
-        label="execution.record_json.reward",
-        allowed_keys={"type", "value"},
-        required_keys={"type", "value"},
-    )
-    if not isinstance(reward["type"], str) or not reward["type"]:
-        raise AlabError("STORAGE_ERROR", "execution.record_json.reward.type must be a non-empty string")
-    reward_value = reward["value"]
-    if reward_value is not None and (not isinstance(reward_value, (int, float)) or isinstance(reward_value, bool) or not math.isfinite(float(reward_value))):
-        raise AlabError("STORAGE_ERROR", "execution.record_json.reward.value must be a finite number or null")
-    metrics = _execution_record_metric_map(record["metrics"], label="execution.record_json.metrics")
-    warnings = record["warnings"]
-    if not isinstance(warnings, list) or not all(isinstance(warning, str) for warning in warnings):
-        raise AlabError("STORAGE_ERROR", "execution.record_json warnings must be a string array")
-    if not isinstance(record["failure"], (str, type(None))):
-        raise AlabError("STORAGE_ERROR", "execution.record_json failure must be a string or null")
-    for key in ("artifacts", "logs", "adapter_feedback"):
-        if not isinstance(record[key], dict):
-            raise AlabError("STORAGE_ERROR", f"execution.record_json {key} must be a JSON object")
-    if not isinstance(record["timeout"], bool):
-        raise AlabError("STORAGE_ERROR", "execution.record_json timeout must be a boolean")
-    interrupted = record.get("interrupted")
-    if interrupted is not None and not isinstance(interrupted, bool):
-        raise AlabError("STORAGE_ERROR", "execution.record_json interrupted must be a boolean")
-    mutable_scope = record.get("mutable_scope")
-    if mutable_scope is not None:
-        mutable_scope = _execution_record_nested_obj(
-            mutable_scope,
-            label="execution.record_json.mutable_scope",
-            allowed_keys={"schema_version", "error_code", "violation_paths", "rolled_back_commit"},
-            required_keys={"error_code", "violation_paths", "rolled_back_commit"},
-        )
-        if isinstance(mutable_scope.get("schema_version", 1), bool) or mutable_scope.get("schema_version", 1) != 1:
-            raise AlabError("STORAGE_ERROR", "execution.record_json.mutable_scope schema_version must be 1")
-        if mutable_scope["error_code"] != "SCOPE_VIOLATION":
-            raise AlabError("STORAGE_ERROR", "execution.record_json.mutable_scope error_code is invalid")
-        if not isinstance(mutable_scope["violation_paths"], list) or not all(isinstance(path, str) for path in mutable_scope["violation_paths"]):
-            raise AlabError("STORAGE_ERROR", "execution.record_json.mutable_scope violation_paths must be a string array")
-        if not isinstance(mutable_scope["rolled_back_commit"], (str, type(None))):
-            raise AlabError("STORAGE_ERROR", "execution.record_json.mutable_scope rolled_back_commit must be a string or null")
-    result = {**record, "runner": runner, "reward": reward, "metrics": metrics}
-    if mutable_scope is not None:
-        result["mutable_scope"] = mutable_scope
-    return result
-
-
-def submission_refs_json_obj(text: str) -> dict[str, Any]:
-    refs_json = contract_json_obj(
-        text,
-        label="experiment_submissions.refs_json",
-        allowed_keys={"schema_version", "refs"},
-        required_keys={"refs"},
-    )
-    refs = refs_json["refs"]
-    if not isinstance(refs, list) or not refs or not all(isinstance(ref, str) and ref for ref in refs):
-        raise AlabError("STORAGE_ERROR", "experiment_submissions.refs_json refs must be a non-empty string array")
-    if "none" in refs:
-        if refs != ["none"]:
-            raise AlabError("STORAGE_ERROR", "experiment_submissions.refs_json ref none must be the only ref")
-    else:
-        seen: set[str] = set()
-        for ref in refs:
-            if ref in seen:
-                raise AlabError("STORAGE_ERROR", "experiment_submissions.refs_json refs must be deduplicated")
-            seen.add(ref)
-            try:
-                require_complete_id(ref, "exp")
-            except AlabError as exc:
-                raise AlabError("STORAGE_ERROR", "experiment_submissions.refs_json refs must be complete experiment ids or none") from exc
-    return {**refs_json, "refs": list(refs)}
 
 
 def _source_warning_codes(prepared_source: PreparedSource) -> list[str]:
@@ -3715,50 +3140,6 @@ def _complete_id_option(args: list[str], option: str, prefix: str) -> str | None
     require_options_at_most_once(args, (option,))
     value = command_arg(args, option)
     return require_complete_id(value, prefix) if value else None
-
-
-AUDIT_OBJECT_ID_PREFIXES = {
-    "annotation": "ann",
-    "artifact": "art",
-    "credential": "cred",
-    "experiment": "exp",
-    "inspection_checkout": "cred",
-    "log": "log",
-    "project": "proj",
-    "run": "run",
-    "source": "src",
-    "validation": "val",
-    "worktree": "exp",
-}
-
-AUDIT_OBJECT_ID_LITERALS = {
-    "backup": {"backups"},
-    "cache": {"cache"},
-    "catalog": {"skydiscover"},
-}
-
-AUDIT_ACTIONS = {
-    "add",
-    "archive",
-    "clear",
-    "gc",
-    "prune",
-    "regenerate",
-    "remove",
-    "repair",
-    "restore",
-    "revoke",
-    "unarchive",
-    "update",
-}
-
-
-ANNOTATION_TARGET_ID_PREFIXES = {
-    "artifact": "art",
-    "experiment": "exp",
-    "run": "run",
-}
-ANNOTATION_TARGET_TYPES = {"artifact", "experiment", "run", "path", "lines"}
 
 
 def _annotation_target_id_filter(target_type: str | None, target_id: str | None) -> str | None:
@@ -7091,241 +6472,6 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
         _release_experiment_run_submit_lock(req.globals.home, operation_lock)
 
 
-def _parse_limit_offset(args: list[str]) -> tuple[int, int]:
-    require_options_at_most_once(args, ("--limit", "--offset"))
-    try:
-        limit = int(command_arg(args, "--limit", default="50") or "50")
-        offset = int(command_arg(args, "--offset", default="0") or "0")
-    except ValueError as exc:
-        raise AlabError("CONFIG_INVALID", "--limit and --offset must be integers") from exc
-    if limit < 1 or limit > 500:
-        raise AlabError("CONFIG_INVALID", "--limit must be between 1 and 500")
-    if offset < 0:
-        raise AlabError("CONFIG_INVALID", "--offset must be zero or greater")
-    return limit, offset
-
-
-def _parse_audit_limit_offset(args: list[str]) -> tuple[int, int]:
-    require_options_at_most_once(args, ("--limit", "--offset"))
-    try:
-        limit = int(command_arg(args, "--limit", default="50") or "50")
-        offset = int(command_arg(args, "--offset", default="0") or "0")
-    except ValueError as exc:
-        raise AlabError("CONFIG_INVALID", "--limit and --offset must be integers") from exc
-    if limit < 1 or limit > 1000:
-        raise AlabError("CONFIG_INVALID", "invalid audit pagination")
-    if offset < 0:
-        raise AlabError("CONFIG_INVALID", "invalid audit pagination")
-    return limit, offset
-
-
-def _parse_float_option(args: list[str], name: str) -> float | None:
-    require_options_at_most_once(args, (name,))
-    value = command_arg(args, name)
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except ValueError as exc:
-        raise AlabError("CONFIG_INVALID", f"{name} must be numeric") from exc
-
-
-def _parse_int_option(args: list[str], name: str) -> int | None:
-    require_options_at_most_once(args, (name,))
-    value = command_arg(args, name)
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise AlabError("CONFIG_INVALID", f"{name} must be an integer") from exc
-
-
-def _parse_non_negative_int_option(args: list[str], name: str) -> int | None:
-    value = _parse_int_option(args, name)
-    if value is not None and value < 0:
-        raise AlabError("CONFIG_INVALID", f"{name} must be zero or greater")
-    return value
-
-
-def _parse_positive_int_option(args: list[str], name: str) -> int | None:
-    value = _parse_int_option(args, name)
-    if value is not None and value < 1:
-        raise AlabError("CONFIG_INVALID", f"{name} must be a positive integer")
-    return value
-
-
-def _require_ordered_range(
-    min_value: int | float | None,
-    max_value: int | float | None,
-    min_name: str,
-    max_name: str,
-) -> None:
-    if min_value is not None and max_value is not None and min_value > max_value:
-        raise AlabError("CONFIG_INVALID", f"{min_name} must be less than or equal to {max_name}")
-
-
-def _require_option_choice(value: str | None, name: str, choices: set[str]) -> str | None:
-    if value is None:
-        return None
-    if value not in choices:
-        raise AlabError("CONFIG_INVALID", f"{name} must be one of {', '.join(sorted(choices))}")
-    return value
-
-
-def _commit_sha_filter(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if not _is_commit_sha_selector(value):
-        raise AlabError("CONFIG_INVALID", "--commit must be a commit SHA")
-    return value.lower()
-
-
-def _exp_commit_selector_filter(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if value in {"latest", "final", "best"}:
-        return value
-    if not _is_commit_sha_selector(value):
-        raise AlabError("CONFIG_INVALID", "commit selector must be latest, final, best, or a commit SHA")
-    return value.lower()
-
-
-def _full_commit_sha_filter(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if len(value) != 40 or any(char not in "0123456789abcdefABCDEF" for char in value):
-        raise AlabError("CONFIG_INVALID", "--commit requires a full commit SHA")
-    return value.lower()
-
-
-def _content_hash_filter(value: str | None) -> str | None:
-    if value is None:
-        return None
-    prefix = "sha256:"
-    digest = value.removeprefix(prefix)
-    if not value.startswith(prefix) or len(digest) != 64 or any(char not in "0123456789abcdefABCDEF" for char in digest):
-        raise AlabError("CONFIG_INVALID", "--content-hash must be sha256:<64-hex>")
-    return prefix + digest.lower()
-
-
-def _parse_bool_option(args: list[str], name: str) -> bool | None:
-    require_options_at_most_once(args, (name,))
-    value = command_arg(args, name)
-    if value is None:
-        return None
-    if value.lower() in {"true", "1", "yes"}:
-        return True
-    if value.lower() in {"false", "0", "no"}:
-        return False
-    raise AlabError("CONFIG_INVALID", f"{name} must be true or false")
-
-
-def _append_time_filter(args: list[str], clauses: list[str], params: list[Any], option: str, column: str, op: str) -> None:
-    require_options_at_most_once(args, (option,))
-    value = command_arg(args, option)
-    if value:
-        clauses.append(f"{column} {op} ?")
-        params.append(parse_rfc3339_utc(value))
-
-
-def _require_ordered_time_range(args: list[str], after_option: str, before_option: str) -> None:
-    require_options_at_most_once(args, (after_option, before_option))
-    after_value = command_arg(args, after_option)
-    before_value = command_arg(args, before_option)
-    if after_value and before_value and parse_rfc3339_utc(after_value) > parse_rfc3339_utc(before_value):
-        raise AlabError("CONFIG_INVALID", f"{after_option} must be less than or equal to {before_option}")
-
-
-def _paginate_rows(args: list[str], rows: list[Any]) -> list[Any]:
-    limit, offset = _parse_limit_offset(args)
-    return rows[offset : offset + limit]
-
-
-def _sort_rows(
-    args: list[str],
-    rows: list[Any],
-    *,
-    default: str,
-    allowed: dict[str, Any],
-    subject: str,
-) -> list[Any]:
-    require_options_at_most_once(args, ("--sort",))
-    sort_text = command_arg(args, "--sort", default=default) or default
-    field, sep, direction = sort_text.partition(":")
-    if not field:
-        raise AlabError("CONFIG_INVALID", "--sort field is required")
-    if not sep:
-        direction = "desc"
-    if direction not in {"asc", "desc"}:
-        raise AlabError("CONFIG_INVALID", "--sort direction must be asc or desc")
-    if field not in allowed:
-        raise AlabError("CONFIG_INVALID", f"--sort field is not supported for {subject}")
-    nulls: list[Any] = []
-    values: list[tuple[Any, Any]] = []
-    for row in rows:
-        value = allowed[field](row)
-        if value is None:
-            nulls.append(row)
-            continue
-        if isinstance(value, str):
-            value = value.casefold()
-        elif isinstance(value, bool):
-            value = int(value)
-        values.append((value, row))
-    values.sort(key=lambda item: item[0], reverse=direction == "desc")
-    return [row for _value, row in values] + nulls
-
-
-def _sql_casefold_contains(value: Any, query: Any) -> int:
-    return int(str(query).casefold() in str(value or "").casefold())
-
-
-def _sql_casefold(value: Any) -> str:
-    return str(value or "").casefold()
-
-
-def _sql_record_json_field_casefold_contains(record_json: Any, field: Any, query: Any) -> int:
-    try:
-        record = json.loads(str(record_json))
-    except (TypeError, json.JSONDecodeError):
-        return 0
-    if not isinstance(record, dict):
-        return 0
-    return _sql_casefold_contains(record.get(str(field)), query)
-
-
-def _register_observe_text_predicates(conn: sqlite3.Connection) -> None:
-    conn.create_function("alab_casefold", 1, _sql_casefold)
-    conn.create_function("alab_casefold_contains", 2, _sql_casefold_contains)
-    conn.create_function("alab_record_json_field_casefold_contains", 3, _sql_record_json_field_casefold_contains)
-
-
-def _sql_order_limit_clause(
-    args: list[str],
-    *,
-    default: str,
-    allowed: dict[str, str],
-    subject: str,
-    tie_breakers: tuple[str, ...] = (),
-) -> tuple[str, tuple[Any, ...]]:
-    require_options_at_most_once(args, ("--sort",))
-    sort_text = command_arg(args, "--sort", default=default) or default
-    field, sep, direction = sort_text.partition(":")
-    if not field:
-        raise AlabError("CONFIG_INVALID", "--sort field is required")
-    if not sep:
-        direction = "desc"
-    if direction not in {"asc", "desc"}:
-        raise AlabError("CONFIG_INVALID", "--sort direction must be asc or desc")
-    if field not in allowed:
-        raise AlabError("CONFIG_INVALID", f"--sort field is not supported for {subject}")
-    limit, offset = _parse_limit_offset(args)
-    expression = allowed[field]
-    terms = [f"{expression} IS NULL ASC", f"{expression} {direction.upper()}", *tie_breakers]
-    return f"ORDER BY {', '.join(terms)} LIMIT ? OFFSET ?", (limit, offset)
-
-
 def _reward_identity_from_config_json(config_json: dict[str, Any]) -> str:
     reward = config_json.get("reward") or {}
     comparable = {
@@ -8771,10 +7917,6 @@ def _resolve_exp_commit(
     if not commit:
         raise AlabError("CONFIG_INVALID", "commit selector did not resolve")
     return commit
-
-
-def _is_commit_sha_selector(selector: str) -> bool:
-    return 4 <= len(selector) <= 40 and all(char in "0123456789abcdefABCDEF" for char in selector)
 
 
 def _resolve_commit_sha_selector(repo_git: Path, selector: str) -> str:

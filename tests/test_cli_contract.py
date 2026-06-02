@@ -159,6 +159,9 @@ _LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE = {
         "tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations",
         "tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec",
     ),
+    ("feedback", "archive"): (
+        "tests/test_cli_contract.py::test_feedback_root_lifecycle_is_file_backed_and_idempotent",
+    ),
 }
 
 _LIFECYCLE_REMOVE_EVIDENCE = {
@@ -2801,6 +2804,8 @@ def _missing_single_selector_error_for_spec(spec: registry.CommandSpec) -> tuple
         return "CREDENTIAL_NOT_FOUND", "key id is required"
     if spec.path == ("audit", "show"):
         return "AUDIT_NOT_FOUND", "audit id is required"
+    if spec.path[:1] == ("feedback",):
+        return "FEEDBACK_NOT_FOUND", "feedback id is required"
     if spec.path[:2] == ("project", "validation"):
         return "VALIDATION_NOT_FOUND", "validation id is required"
     if spec.path and spec.path[0] == "source":
@@ -4350,6 +4355,7 @@ def test_object_specific_not_found_errors_stay_precise_for_root_admin_selectors(
         "AUDIT_NOT_FOUND",
         "CATALOG_NOT_FOUND",
         "CACHE_NOT_FOUND",
+        "FEEDBACK_NOT_FOUND",
     }
     runtime_cases = [
         (
@@ -4417,6 +4423,12 @@ def test_object_specific_not_found_errors_stay_precise_for_root_admin_selectors(
             ["--home", str(home), "--key", root_key, "catalog", "skydiscover", "show"],
             "CATALOG_NOT_FOUND",
             "active SkyDiscover catalog not found",
+        ),
+        (
+            "feedback",
+            ["--home", str(home), "--key", root_key, "feedback", "show", missing_id("fb")],
+            "FEEDBACK_NOT_FOUND",
+            "feedback not found",
         ),
     ]
     runtime_not_found_codes = {expected_code for _name, _args, expected_code, _expected_reason in runtime_cases}
@@ -5503,6 +5515,10 @@ def test_feedback_submission_writes_file_record_with_session_and_git_metadata(
         "kind": "bug",
         "title": "Bug report",
         "created_at": fields["created at"],
+        "status": "active",
+        "archived_at": None,
+        "archived_by": None,
+        "archive_reason": None,
         "role": "none",
         "actor_type": None,
         "actor_credential_id": None,
@@ -5724,6 +5740,111 @@ def test_feedback_is_executable_from_all_context_roles(tmp_path: Path, monkeypat
             )
 
     assert failures == []
+
+
+def test_feedback_root_lifecycle_is_file_backed_and_idempotent(tmp_path: Path, monkeypatch, capsys) -> None:
+    home = tmp_path / "home"
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    monkeypatch.chdir(scratch)
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    root_key = _output_field_map(capsys.readouterr().out)["root key"]
+
+    assert cli.run(["--home", str(home), "feedback", "--kind", "bug", "--title", "Alpha issue", "--body", "Alpha body"]) == 0
+    alpha_fields, alpha_record, alpha_metadata = _feedback_record(capsys.readouterr().out)
+    alpha_id = alpha_fields["feedback id"]
+    assert cli.run(["--home", str(home), "feedback", "--kind", "question", "--title", "Beta topic", "--body", "Beta body"]) == 0
+    beta_fields, _beta_record, _beta_metadata = _feedback_record(capsys.readouterr().out)
+    beta_id = beta_fields["feedback id"]
+    temp_id = f"fb-temp-{'B' * 22}"
+    temp_record = home / "feedback" / f".99999999T999999Z_{temp_id}.tmp"
+    temp_record.mkdir()
+    (temp_record / "metadata.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "feedback_id": temp_id,
+                "kind": "bug",
+                "title": "Temporary",
+                "created_at": "9999-12-31T23:59:59Z",
+                "status": "active",
+                "body_path": str(temp_record / "body.md"),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (temp_record / "body.md").write_text("temporary body", encoding="utf-8")
+
+    for key in ("status", "archived_at", "archived_by", "archive_reason"):
+        alpha_metadata.pop(key, None)
+    (alpha_record / "metadata.json").write_text(json.dumps(alpha_metadata, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+    db_before = _database_snapshot(home)
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "list", "--kind", "bug", "--query", "alpha", "--limit", "1"]) == 0
+    listed = capsys.readouterr()
+    assert listed.err == ""
+    assert f"feedback id: {alpha_id}" in listed.out
+    assert f"feedback id: {beta_id}" not in listed.out
+    assert "status: active" in listed.out
+
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "show", alpha_id]) == 0
+    shown = capsys.readouterr()
+    assert shown.err == ""
+    assert f"feedback id: {alpha_id}" in shown.out
+    assert "status: active" in shown.out
+    assert "body:\n  Alpha body" in shown.out
+    assert _database_snapshot(home) == db_before
+
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "archive", alpha_id, "--reason", "triaged"]) == 0
+    archived = capsys.readouterr()
+    archive_fields = _output_field_map(archived.out)
+    assert archived.err == ""
+    assert archive_fields["feedback id"] == alpha_id
+    assert archive_fields["previous status"] == "active"
+    assert archive_fields["status"] == "archived"
+    assert archive_fields["archive reason"] == "triaged"
+    assert _database_snapshot(home) == db_before
+    archived_metadata = json.loads((alpha_record / "metadata.json").read_text(encoding="utf-8"))
+    assert archived_metadata["status"] == "archived"
+    assert archived_metadata["archive_reason"] == "triaged"
+    assert archived_metadata["archived_at"] == archive_fields["archived at"]
+    assert archived_metadata["archived_by"] is not None
+
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "list"]) == 0
+    active_list = capsys.readouterr()
+    assert f"feedback id: {alpha_id}" not in active_list.out
+    assert f"feedback id: {beta_id}" in active_list.out
+    assert f"feedback id: {temp_id}" not in active_list.out
+
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "list", "--include-archived"]) == 0
+    all_list = capsys.readouterr()
+    assert f"feedback id: {alpha_id}" in all_list.out
+    assert f"feedback id: {beta_id}" in all_list.out
+    assert f"feedback id: {temp_id}" not in all_list.out
+
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "archive", alpha_id, "--reason", "changed"]) == 0
+    repeat = capsys.readouterr()
+    repeat_fields = _output_field_map(repeat.out)
+    repeat_metadata = json.loads((alpha_record / "metadata.json").read_text(encoding="utf-8"))
+    assert repeat_fields["previous status"] == "archived"
+    assert repeat_fields["archived at"] == archive_fields["archived at"]
+    assert repeat_fields["archive reason"] == "triaged"
+    assert repeat_metadata == archived_metadata
+
+    missing_id = f"fb-missing-{'A' * 22}"
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "show", missing_id]) == 2
+    missing = capsys.readouterr()
+    assert "error code: FEEDBACK_NOT_FOUND" in missing.err
+    assert "reason: feedback not found" in missing.err
+    assert cli.run(["--home", str(home), "--key", root_key, "feedback", "archive"]) == 2
+    missing_selector = capsys.readouterr()
+    assert "error code: FEEDBACK_NOT_FOUND" in missing_selector.err
+    assert "reason: feedback id is required" in missing_selector.err
+    assert _database_snapshot(home) == db_before
 
 
 def test_feedback_invalid_inputs_are_side_effect_free(tmp_path: Path, monkeypatch, capsys) -> None:

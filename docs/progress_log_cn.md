@@ -7913,3 +7913,23 @@
 
 - Focused docs sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized`
 - `git diff --check`
+
+## 2026-06-02 Feedback File-Backed Lifecycle
+
+已实现：
+
+- 新增 root-only `alab feedback list`、`alab feedback show` 和幂等 `alab feedback archive`，同时保留既有 public initialized-HOME `alab feedback --body|--body-file` submit command。
+- 为新 feedback records 增加 metadata status fields，并在读取旧 file records 时将缺失 archive keys 的记录默认视为 active。
+- Root lifecycle reads 会跳过 hidden feedback temp write directories，避免 interrupted 或 in-progress atomic writes 出现在 list 中。
+- 保持 feedback lifecycle 只基于 file-backed records：archive 更新 `metadata.json`，不创建 SQLite rows 或 audit events。
+- 将 `FEEDBACK_NOT_FOUND` 加入 stable error-code catalog，并同步 CLI specs、storage spec、README、changelog、global-admin skill references、completion audit、pipeline 和 dashboard docs。
+
+验证：
+
+- Focused feedback tests：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_feedback_submission_writes_file_record_with_session_and_git_metadata tests/test_cli_contract.py::test_feedback_body_file_non_git_and_missing_session_are_recorded_as_null tests/test_cli_contract.py::test_feedback_only_requires_initialized_home_not_valid_global_config tests/test_cli_contract.py::test_feedback_experiment_context_does_not_require_token_file tests/test_cli_contract.py::test_feedback_is_executable_from_all_context_roles tests/test_cli_contract.py::test_feedback_root_lifecycle_is_file_backed_and_idempotent tests/test_cli_contract.py::test_feedback_invalid_inputs_are_side_effect_free`
+- CLI/error/spec/position/capability contract checks：focused `tests/test_errors.py` 加 selected `tests/test_cli_contract.py` registry、success-field、parser、selector、not-found 和 capability tests。
+- Documentation checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing tests/test_cli_contract.py::test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests tests/test_cli_contract.py::test_local_agent_notes_and_env_files_are_gitignored tests/test_cli_contract.py::test_env_example_documents_setup_environment_variables`
+- Full default suite 首次在 managed sandbox 内失败，因为 dashboard tests 无法绑定 loopback ports（`PermissionError`）；同时发现的 lifecycle evidence-map failure 已通过加入 feedback archive evidence 修复。
+- Elevated dashboard regression：`/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`
+- Elevated full default suite with loopback socket access：`/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m pytest -q`
+- Final temp-directory cleanup 后，再次运行 focused feedback/lifecycle checks、`git diff --check` 和 elevated full default suite。

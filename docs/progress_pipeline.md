@@ -12,12 +12,12 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 - Keep only the current queue and update policy here. Do not append stale backlog; rewrite or remove queue rows as evidence closes.
 - English docs are canonical. Update the synchronized `*_cn.md` file in the same change.
 
-## Current Active Batch - 2026-05-31
+## Current Active Batch - 2026-06-02
 
-- Focus: observe list SQL pushdown, dashboard feedback pagination/search, and runtime diagnostic UX are closed for the current worktree. Run/artifact/log/annotation list filters, whitelisted sorting, null-last ordering, and pagination now execute in SQL for high-volume paths; dashboard feedback now uses a paginated/searchable API; `config validate` capability rows now include actionable remediation in `next`.
-- Explicit non-goals for this batch: do not add JSON CLI output, local batch execution, hosted/remote dashboard behavior, or new runner families.
+- Focus: the root-only file-backed lifecycle surface for HOME-level feedback records is closed for the current worktree. Feedback now has `list`, `show`, and idempotent `archive` without changing public submit availability or introducing SQLite/audit persistence.
+- Explicit non-goals for this batch: do not add feedback deletion, SQLite feedback rows, audit rows for feedback archive, project-admin scoped feedback reads, JSON CLI output, hosted/remote dashboard behavior, or new runner families.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
-- Next evidence to add: none for this batch. Reopen only if a later requirement changes observe filtering/sorting semantics, dashboard route semantics, runtime capability diagnostics, or release-target validation expectations.
+- Evidence added: focused feedback lifecycle CLI tests, CLI registry/spec sync checks, error-code sync checks, capability/help checks, docs checks, elevated dashboard regression, elevated full default suite, and `git diff --check`.
 
 ## Active Queue
 

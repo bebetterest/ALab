@@ -189,6 +189,7 @@ ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab submit \
 ```sh
 alab help
 alab feedback --kind suggestion --body "Describe a suggestion, question, or bug for the project owner."
+alab --key <root-key> feedback list
 alab --key <root-key> dashboard --no-open
 alab --key <admin-or-root-key> report --project <project-id> --out ./alab-project-report.md
 alab observe experiments list
@@ -204,7 +205,7 @@ alab observe experiments best
 - **Experiment**：绑定到一个 source 和一个 config version 的隔离 Git branch/worktree。
 - **Run**：针对某个 experiment commit 的一次 evaluator execution，包含 status、reward、logs、artifacts 和 warning codes。
 - **Submit**：用 final summary、feedback、final run、final commit 和 explicit refs 关闭 experiment。
-- **Feedback**：HOME-level plaintext notes，用于 suggestions、questions、bugs 或其他 agent observations，每条记录在 `feedback/` 下独立存放。
+- **Feedback**：HOME-level plaintext notes，用于 suggestions、questions、bugs 或其他 agent observations，每条记录在 `feedback/` 下独立存放。任何 initialized-home role 都可提交 feedback；root 可以 list、show 和 archive records，且不创建 SQLite 或 audit rows。
 - **Dashboard**：root-only local browser panel，用于 read-only inspection。它只绑定 `127.0.0.1`，使用随机 browser session token，为 large homes 提供 bounded paginated read models，且不写 ALab records。
 - **Reports**：Markdown evidence exports，用于 project-level owner handoffs 或 visible experiment contexts，不包含 raw secrets、hidden log contents 或 artifact bytes。
 - **Inspection checkout**：只读 checkout，用于 observe/export scoped experiment evidence，不会变成 submit-capable。

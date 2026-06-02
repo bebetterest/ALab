@@ -197,6 +197,7 @@ Stable error codes：
 - `AUDIT_NOT_FOUND`
 - `CATALOG_NOT_FOUND`
 - `CACHE_NOT_FOUND`
+- `FEEDBACK_NOT_FOUND`
 - `COMMAND_UNAVAILABLE`
 - `NAME_CONFLICT`
 - `SCOPE_VIOLATION`
@@ -251,6 +252,7 @@ Stable error-code exit mapping：
 | `AUDIT_NOT_FOUND` | 2 |
 | `CATALOG_NOT_FOUND` | 2 |
 | `CACHE_NOT_FOUND` | 2 |
+| `FEEDBACK_NOT_FOUND` | 2 |
 | `COMMAND_UNAVAILABLE` | 4 |
 | `NAME_CONFLICT` | 2 |
 | `SCOPE_VIOLATION` | 4 |
@@ -277,7 +279,7 @@ Stable error-code exit mapping：
 
 Input normalization 和 lookup rules：
 
-- 所有 ALab object id 参数都要求完整 id，包括 home、project、source、experiment、run、validation、artifact、log、annotation、credential、token、audit、catalog 和 cache id。
+- 所有 ALab object id 参数都要求完整 id，包括 home、project、source、experiment、run、validation、artifact、log、annotation、credential、token、audit、catalog、cache 和 feedback id。
 - Git commit selector 可以使用完整 SHA；命令明确接受 commit selector 时，也可以使用无歧义的 abbreviated SHA。
 - `--created-after`、`--created-before`、`--started-after`、`--ended-before` 等时间过滤参数只接受带 `Z` 或显式 numeric offset 的 RFC3339 timestamp。ALab 接受后统一 normalizes to UTC `Z` 再查询和输出。同一字段 family 同时提供 matching `after` 与 `before` 时，`after` 值必须小于或等于 `before` 值。
 - 已存在且是目录的 export output path 会以 `OUTPUT_EXISTS` 失败，即使提供 `--overwrite`；`--overwrite` 只可替换文件，不可替换目录。
@@ -301,6 +303,7 @@ Command error matrix：
 | `auth root regenerate` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`STORAGE_ERROR` exit `5` |
 | `config show|set|reset|validate` | `CONFIG_INVALID` exit `2`；`STORAGE_ERROR` exit `5` |
 | `feedback` | ALab home 未初始化时 `CONTEXT_NOT_FOUND` exit `2`；invalid inputs `CONFIG_INVALID` exit `2`；storage failures `STORAGE_ERROR` exit `5` |
+| `feedback list|show|archive` | `AUTH_REQUIRED` 或 `AUTH_DENIED` exit `3`；invalid filters 或 arguments `CONFIG_INVALID` exit `2`；missing feedback selectors `FEEDBACK_NOT_FOUND` exit `2`；storage failures `STORAGE_ERROR` exit `5`；feedback 已 archived 时重复 archive exit `0` |
 | `dashboard` | invalid port 或 refresh values `CONFIG_INVALID` exit `2`；`AUTH_REQUIRED` 或 `AUTH_DENIED` exit `3`；port unavailable 时 `RESOURCE_BUSY` exit `4`；storage failures `STORAGE_ERROR` exit `5` |
 | `report` | invalid selector 或 output path `CONFIG_INVALID` exit `2`；output 已存在时 `OUTPUT_EXISTS` exit `2`；root/admin 下 `PROJECT_NOT_FOUND` 或 `EXPERIMENT_NOT_FOUND` exit `2`；token not-visible-or-not-found selector `SCOPE_VIOLATION` exit `4`；auth failures exit `3` |
 | `key create|list|revoke` | `AUTH_REQUIRED`、`AUTH_DENIED` exit `3`；`PROJECT_NOT_FOUND`、`CREDENTIAL_NOT_FOUND` 或 `CONFIG_INVALID` exit `2` |
@@ -434,7 +437,7 @@ Primary object types：
 | help output 的 repeated command rows | `help_command` |
 | `auth init`, `auth root regenerate` | `auth` |
 | `config show|set|reset|validate` | `config` |
-| `feedback` | `feedback` |
+| `feedback`, `feedback list|show|archive` | `feedback` |
 | `dashboard` | `dashboard` |
 | `report` | `report` |
 | `config validate` 的 repeated capability rows | `capability` |
@@ -505,11 +508,46 @@ Lifecycle command rules：
 - Conflicts：`--body` 与 `--body-file` 冲突。
 - Body rule：feedback body 必须是非空 UTF-8 text，编码后不超过 65536 bytes。
 - Title rule：提供 title 时，必须是非空 UTF-8 text，编码后不超过 120 bytes。
-- Storage rule：每条 feedback 在 `ALAB_HOME/feedback/` 下创建一个目录，包含 `metadata.json` 和 `body.md`；ALab 不会为了 feedback 创建未初始化 home。
+- Storage rule：每条 feedback 在 `ALAB_HOME/feedback/` 下创建一个目录，包含 `metadata.json` 和 `body.md`；ALab 不会为了 feedback 创建未初始化 home。新记录包含 `status: active`、`archived_at: null`、`archived_by: null` 和 `archive_reason: null`。旧 file record 缺少这些 keys 时按 active 读取。
 - Global config rule：home database 已初始化后，invalid 或 missing global config 不会阻止 feedback。
 - Metadata rule：缺失的 role、session、context、actor 或 Git information 存为 JSON `null`。
 - Success fields：`feedback id`、`kind`、`title`、`created at`、`role`、`session id`、`commit`、`path`、`metadata path`、`body path`。
 - Exit：成功 `0`；missing home 或 invalid input `2`；storage failure `5`。
+
+`alab feedback list [--kind suggestion|question|bug|other] [--query <text>] [--limit <n>] [--offset <n>] [--include-archived]`
+
+- Context：任意已初始化 ALab home。
+- Credential：Root。
+- Required args：无。
+- Options：`--kind`、`--query`、`--limit`、`--offset`、`--include-archived`。
+- Defaults：`--limit 100`、`--offset 0`。
+- Credential rule：需要 explicit root key，因为 feedback bodies 可能包含 local paths、session ids，以及 project visibility 边界外的 operational notes。
+- List rule：`feedback list` 默认按 newest-first 返回 active records；`--include-archived` 包含 archived records。`--limit` 默认 `100`，`--offset` 默认 `0`，`--limit` 必须为 `1..500`。
+- Query rule：`--query` 对 metadata JSON 和 body text 做 case-insensitive match。`--kind` 限定 feedback kind。
+- Success fields：`feedback id`、`kind`、`title`、`status`、`created at`、`archived at`、`role`、`session id`、`commit`、`path`。
+- Exit：成功 `0`；invalid filters `2`；auth failure `3`；storage failure `5`。
+
+`alab feedback show <feedback_id>`
+
+- Context：任意已初始化 ALab home。
+- Credential：Root。
+- Required args：`<feedback_id>`。
+- Options：无。
+- Credential rule：需要 explicit root key，因为 feedback bodies 可能包含 local paths、session ids，以及 project visibility 边界外的 operational notes。
+- Show rule：`feedback show <feedback_id>` 使用完整 exact feedback id 读取 active 或 archived record，并渲染 body。
+- Success fields：`feedback id`、`kind`、`title`、`status`、`created at`、`archived at`、`archive reason`、`role`、`session id`、`commit`、`path`、`metadata path`、`body path`、`body`。
+- Exit：成功 `0`；missing feedback 或 invalid selector `2`；auth failure `3`；storage failure `5`。
+
+`alab feedback archive <feedback_id> [--reason <text>]`
+
+- Context：任意已初始化 ALab home。
+- Credential：Root。
+- Required args：`<feedback_id>`。
+- Options：`--reason`。
+- Credential rule：需要 explicit root key，因为 feedback bodies 可能包含 local paths、session ids，以及 project visibility 边界外的 operational notes。
+- Archive rule：`feedback archive <feedback_id>` 只更新 file-backed `metadata.json`，设置 status 为 `archived`，保存 `archived_at`、`archived_by` 和 optional `archive_reason`，不写 SQLite rows 或 audit events。重复 archive 是幂等的，并保留最初的 archive timestamp 和 reason。
+- Success fields：`feedback id`、`previous status`、`status`、`archived at`、`archive reason`、`path`、`metadata path`。
+- Exit：成功 `0`；missing feedback 或 invalid selector `2`；auth failure `3`；storage failure `5`。
 
 ### Dashboard
 
