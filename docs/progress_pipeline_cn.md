@@ -14,10 +14,10 @@
 
 ## 当前 Active Batch - 2026-06-02
 
-- Focus：当前 worktree 已关闭 HOME-level feedback file records 的 root-only file-backed lifecycle surface。Feedback 现在有 `list`、`show` 和幂等 `archive`，同时不改变 public submit availability，也不引入 SQLite/audit persistence。
-- 本 batch 明确 non-goals：不新增 feedback deletion、SQLite feedback rows、feedback archive audit rows、project-admin scoped feedback reads、JSON CLI output、hosted/remote dashboard behavior 或新的 runner families。
+- Focus：当前 worktree 已关闭第一轮 object-family `services.py` extraction。Feedback submit/list/show/archive handlers 现在位于 `src/alab/feedback.py`，shared request auth gates 位于 `src/alab/service_auth.py`，shared text/reason validation 位于 `src/alab/service_text.py`；registered feedback CLI behavior 保持不变。
+- 本 batch 明确 non-goals：不继续做大范围 object-family extraction，不改变 feedback deletion、SQLite feedback rows、feedback archive audit rows、project-admin scoped feedback reads、JSON CLI output、hosted/remote dashboard behavior 或新的 runner families。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
-- 已新增 evidence：focused feedback lifecycle CLI tests、CLI registry/spec sync checks、error-code sync checks、capability/help checks、docs checks、elevated dashboard regression、elevated full default suite 和 `git diff --check`。
+- 已新增 evidence：focused feedback lifecycle CLI tests、auth re-export regression、已更新为从 registry 推导 scanned handler modules 的 CLI registry/spec/option/static contract checks、import-order fix、`compileall`、仅由 dashboard loopback bind `PermissionError` 造成的 sandbox full default suite failure，以及 elevated full default suite pass。
 
 ## Active Queue
 

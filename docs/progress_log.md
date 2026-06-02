@@ -7939,3 +7939,25 @@ Validation:
 - Elevated dashboard regression: `/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`
 - Elevated full default suite with loopback socket access: `/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m pytest -q`
 - After final temp-directory cleanup, reran focused feedback/lifecycle checks, `git diff --check`, and the elevated full default suite again.
+
+## 2026-06-02 Feedback Service Object-Family Extraction
+
+Implemented:
+
+- Moved feedback submit/list/show/archive handlers and feedback file-record helpers from `src/alab/services.py` into `src/alab/feedback.py` without changing registered CLI behavior.
+- Moved shared request auth gates into `src/alab/service_auth.py` and shared text input/reason validation helpers into `src/alab/service_text.py`.
+- Updated `src/alab/registry.py` to register feedback commands from the extracted object-family module.
+- Updated CLI contract static scan helpers to derive command-handler modules from `src/alab/registry.py`, so registered command option/guard/typed-value checks cover both the legacy `services.py` module and extracted service modules.
+- Updated progress/audit/pipeline documentation and synchronized Chinese documents.
+
+Validation:
+
+- Focused feedback/auth regression: `.venv/bin/python -m pytest -q tests/test_auth.py::test_empty_ambient_alab_key_is_treated_as_absent tests/test_cli_contract.py::test_feedback_submission_writes_file_record_with_session_and_git_metadata tests/test_cli_contract.py::test_feedback_root_lifecycle_is_file_backed_and_idempotent`
+- Focused feedback lifecycle inputs: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_feedback_submission_writes_file_record_with_session_and_git_metadata tests/test_cli_contract.py::test_feedback_body_file_non_git_and_missing_session_are_recorded_as_null tests/test_cli_contract.py::test_feedback_root_lifecycle_is_file_backed_and_idempotent tests/test_cli_contract.py::test_feedback_invalid_inputs_are_side_effect_free`
+- Focused CLI contract scan: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_dry_run_force_confirm_remove_handlers_use_mixed_mode_guard`
+- Import order fix: `.venv/bin/ruff check --select I --fix src/alab/services.py src/alab/feedback.py src/alab/service_auth.py src/alab/service_text.py src/alab/registry.py tests/test_cli_contract.py`
+- Compile check: `python -m compileall -q src/alab`
+- Focused docs/audit sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
+- Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`

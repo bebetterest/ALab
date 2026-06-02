@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .feedback import cmd_feedback, cmd_feedback_archive, cmd_feedback_list, cmd_feedback_show
 from .rendering import ResultBlock
 from .services import (
     LongRunningResult,
@@ -47,10 +48,6 @@ from .services import (
     cmd_exp_unarchive,
     cmd_exp_worktree_remove,
     cmd_exp_worktree_restore,
-    cmd_feedback,
-    cmd_feedback_archive,
-    cmd_feedback_list,
-    cmd_feedback_show,
     cmd_help,
     cmd_key_create,
     cmd_key_list,

@@ -14,10 +14,10 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 
 ## Current Active Batch - 2026-06-02
 
-- Focus: the root-only file-backed lifecycle surface for HOME-level feedback records is closed for the current worktree. Feedback now has `list`, `show`, and idempotent `archive` without changing public submit availability or introducing SQLite/audit persistence.
-- Explicit non-goals for this batch: do not add feedback deletion, SQLite feedback rows, audit rows for feedback archive, project-admin scoped feedback reads, JSON CLI output, hosted/remote dashboard behavior, or new runner families.
+- Focus: the first object-family `services.py` extraction is closed for the current worktree. Feedback submit/list/show/archive handlers now live in `src/alab/feedback.py`, shared request auth gates live in `src/alab/service_auth.py`, and shared text/reason validation lives in `src/alab/service_text.py`; the registered feedback CLI behavior remains unchanged.
+- Explicit non-goals for this batch: do not continue into broad object-family extraction, do not change feedback deletion, SQLite feedback rows, audit rows for feedback archive, project-admin scoped feedback reads, JSON CLI output, hosted/remote dashboard behavior, or new runner families.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
-- Evidence added: focused feedback lifecycle CLI tests, CLI registry/spec sync checks, error-code sync checks, capability/help checks, docs checks, elevated dashboard regression, elevated full default suite, and `git diff --check`.
+- Evidence added: focused feedback lifecycle CLI tests, auth re-export regression, CLI registry/spec/option/static contract checks updated to derive scanned handler modules from the registry, import-order fix, `compileall`, sandbox full default suite failure limited to dashboard loopback bind `PermissionError`, and elevated full default suite pass.
 
 ## Active Queue
 

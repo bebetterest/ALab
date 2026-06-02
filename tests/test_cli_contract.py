@@ -20,6 +20,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from alab import cli, registry, services
+from alab import feedback as feedback_services
 from alab.errors import ERROR_EXIT_CODES, AlabError, error_exit_code
 from alab.home import Home, resolve_home
 from alab.rendering import ResultBlock, multiline_text, render_text
@@ -73,6 +74,18 @@ _KNOWN_CREDENTIAL_SURFACES = {
     "token",
     "token_or_admin",
 }
+
+
+def _registered_service_command_modules() -> tuple[object, ...]:
+    modules: list[object] = [services]
+    for spec in registry.COMMANDS:
+        module = sys.modules.get(spec.handler.__module__)
+        if module is not None and module not in modules:
+            modules.append(module)
+    return tuple(modules)
+
+
+_SERVICE_COMMAND_MODULES = _registered_service_command_modules()
 
 _CAPABILITY_PATH_SETS = (
     cli.GLOBAL_PUBLIC,
@@ -932,6 +945,14 @@ def _called_names(obj: object) -> set[str]:
     return calls
 
 
+def _service_function(name: str) -> object:
+    for module in _SERVICE_COMMAND_MODULES:
+        candidate = getattr(module, name, None)
+        if inspect.isfunction(candidate):
+            return candidate
+    raise AssertionError(f"service helper {name} not found")
+
+
 def _field_map(block: ResultBlock) -> dict[str, object]:
     return dict(block.fields)
 
@@ -1038,9 +1059,10 @@ def _literal_option_values(node: ast.AST) -> list[str]:
 
 def _literal_string_values(node: ast.AST) -> list[str]:
     if isinstance(node, ast.Name):
-        value = getattr(services, node.id, None)
-        if isinstance(value, tuple | list | set) and all(isinstance(item, str) for item in value):
-            return list(value)
+        for module in _SERVICE_COMMAND_MODULES:
+            value = getattr(module, node.id, None)
+            if isinstance(value, tuple | list | set) and all(isinstance(item, str) for item in value):
+                return list(value)
     if not isinstance(node, ast.Tuple | ast.List | ast.Set):
         return []
     values: list[str] = []
@@ -1575,7 +1597,6 @@ def _documented_command_surface_paths(spec_path: Path) -> set[tuple[str, ...]]:
 
 
 def _known_options_by_function() -> dict[str, set[str]]:
-    tree = ast.parse(inspect.getsource(services))
     options_by_function: dict[str, set[str]] = defaultdict(set)
 
     class Visitor(ast.NodeVisitor):
@@ -1596,7 +1617,8 @@ def _known_options_by_function() -> dict[str, set[str]]:
                 options_by_function[self.current_function].update(_literal_option_values(node.args[1]))
             self.generic_visit(node)
 
-    Visitor().visit(tree)
+    for module in _SERVICE_COMMAND_MODULES:
+        Visitor().visit(ast.parse(inspect.getsource(module)))
     return options_by_function
 
 
@@ -1782,7 +1804,6 @@ def _output_object_type(output: str) -> str | None:
 
 
 def _known_option_calls() -> tuple[list[tuple[str, int, list[str]]], list[str]]:
-    tree = ast.parse(inspect.getsource(services))
     calls: list[tuple[str, int, list[str]]] = []
     non_literal: list[str] = []
 
@@ -1808,54 +1829,55 @@ def _known_option_calls() -> tuple[list[tuple[str, int, list[str]]], list[str]]:
                     non_literal.append(f"{self.current_function}:{node.lineno}")
             self.generic_visit(node)
 
-    Visitor().visit(tree)
+    for module in _SERVICE_COMMAND_MODULES:
+        Visitor().visit(ast.parse(inspect.getsource(module)))
     return calls, non_literal
 
 
 def _known_option_declarations_and_usage() -> list[tuple[str, list[str], list[str]]]:
-    tree = ast.parse(inspect.getsource(services))
     rows: list[tuple[str, list[str], list[str]]] = []
 
-    for node in tree.body:
-        if not isinstance(node, ast.FunctionDef):
-            continue
-        declared: set[str] = set()
-        used: set[str] = set()
-        for child in ast.walk(node):
-            if not isinstance(child, ast.Call):
+    for module in _SERVICE_COMMAND_MODULES:
+        tree = ast.parse(inspect.getsource(module))
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef):
                 continue
-            function_name = child.func.id if isinstance(child.func, ast.Name) else ""
-            if function_name == "require_known_options" and len(child.args) >= 2:
-                declared.update(_literal_option_values(child.args[1]))
-            if (
-                function_name in {"command_arg", "command_args", "flag", "option_count"}
-                and len(child.args) >= 2
-                and isinstance(child.args[1], ast.Constant)
-                and isinstance(child.args[1].value, str)
-                and child.args[1].value.startswith("--")
-            ):
-                used.add(child.args[1].value)
-            if function_name in _VALUE_OPTION_READ_HELPER_ARG_INDEXES:
-                option_arg_index = _VALUE_OPTION_READ_HELPER_ARG_INDEXES[function_name]
-                if len(child.args) > option_arg_index:
-                    option = _constant_option_arg(child.args[option_arg_index])
-                    if option:
-                        used.add(option)
-            if function_name == "require_options_at_most_once" and len(child.args) >= 2:
-                used.update(_literal_option_values(child.args[1]))
-            if function_name in _HELPER_OPTION_USAGE:
-                used.update(_HELPER_OPTION_USAGE[function_name])
-            for keyword in child.keywords:
-                if keyword.arg == "options_with_values":
-                    used.update(_literal_option_values(keyword.value))
-        if declared:
-            rows.append((node.name, sorted(declared), sorted(used)))
+            declared: set[str] = set()
+            used: set[str] = set()
+            for child in ast.walk(node):
+                if not isinstance(child, ast.Call):
+                    continue
+                function_name = child.func.id if isinstance(child.func, ast.Name) else ""
+                if function_name == "require_known_options" and len(child.args) >= 2:
+                    declared.update(_literal_option_values(child.args[1]))
+                if (
+                    function_name in {"command_arg", "command_args", "flag", "option_count"}
+                    and len(child.args) >= 2
+                    and isinstance(child.args[1], ast.Constant)
+                    and isinstance(child.args[1].value, str)
+                    and child.args[1].value.startswith("--")
+                ):
+                    used.add(child.args[1].value)
+                if function_name in _VALUE_OPTION_READ_HELPER_ARG_INDEXES:
+                    option_arg_index = _VALUE_OPTION_READ_HELPER_ARG_INDEXES[function_name]
+                    if len(child.args) > option_arg_index:
+                        option = _constant_option_arg(child.args[option_arg_index])
+                        if option:
+                            used.add(option)
+                if function_name == "require_options_at_most_once" and len(child.args) >= 2:
+                    used.update(_literal_option_values(child.args[1]))
+                if function_name in _HELPER_OPTION_USAGE:
+                    used.update(_HELPER_OPTION_USAGE[function_name])
+                for keyword in child.keywords:
+                    if keyword.arg == "options_with_values":
+                        used.update(_literal_option_values(keyword.value))
+            if declared:
+                rows.append((node.name, sorted(declared), sorted(used)))
 
     return rows
 
 
 def _literal_value_option_reads() -> list[tuple[str, int, str, str]]:
-    tree = ast.parse(inspect.getsource(services))
     rows: list[tuple[str, int, str, str]] = []
 
     class Visitor(ast.NodeVisitor):
@@ -1881,7 +1903,8 @@ def _literal_value_option_reads() -> list[tuple[str, int, str, str]]:
                         rows.append((self.current_function, node.lineno, function_name, option))
             self.generic_visit(node)
 
-    Visitor().visit(tree)
+    for module in _SERVICE_COMMAND_MODULES:
+        Visitor().visit(ast.parse(inspect.getsource(module)))
     return rows
 
 
@@ -1892,35 +1915,36 @@ def _constant_option_arg(node: ast.AST) -> str | None:
 
 
 def _singleton_option_declarations_and_guards() -> list[tuple[str, list[str], list[str], list[str]]]:
-    tree = ast.parse(inspect.getsource(services))
     rows: list[tuple[str, list[str], list[str], list[str]]] = []
 
-    for node in tree.body:
-        if not isinstance(node, ast.FunctionDef):
-            continue
-        declared: set[str] = set()
-        guarded: set[str] = set()
-        for child in ast.walk(node):
-            if not isinstance(child, ast.Call):
+    for module in _SERVICE_COMMAND_MODULES:
+        tree = ast.parse(inspect.getsource(module))
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef):
                 continue
-            function_name = child.func.id if isinstance(child.func, ast.Name) else ""
-            if function_name == "require_known_options" and len(child.args) >= 2:
-                declared.update(_literal_option_values(child.args[1]))
-            if function_name == "require_options_at_most_once" and len(child.args) >= 2:
-                guarded.update(_literal_option_values(child.args[1]))
-            if function_name == "require_exactly_one_option_pair" and len(child.args) >= 3:
-                first = _constant_option_arg(child.args[1])
-                second = _constant_option_arg(child.args[2])
-                if first and second:
-                    guarded.update((first, second))
-            if function_name in _HELPER_AT_MOST_ONCE_OPTIONS:
-                guarded.update(_HELPER_AT_MOST_ONCE_OPTIONS[function_name])
-            if function_name in _DYNAMIC_SINGLETON_OPTION_HELPERS and len(child.args) >= 2:
-                option = _constant_option_arg(child.args[1])
-                if option:
-                    guarded.add(option)
-        if declared:
-            rows.append((node.name, sorted(declared), sorted(guarded), sorted(declared & _REPEATABLE_COMMAND_OPTIONS)))
+            declared: set[str] = set()
+            guarded: set[str] = set()
+            for child in ast.walk(node):
+                if not isinstance(child, ast.Call):
+                    continue
+                function_name = child.func.id if isinstance(child.func, ast.Name) else ""
+                if function_name == "require_known_options" and len(child.args) >= 2:
+                    declared.update(_literal_option_values(child.args[1]))
+                if function_name == "require_options_at_most_once" and len(child.args) >= 2:
+                    guarded.update(_literal_option_values(child.args[1]))
+                if function_name == "require_exactly_one_option_pair" and len(child.args) >= 3:
+                    first = _constant_option_arg(child.args[1])
+                    second = _constant_option_arg(child.args[2])
+                    if first and second:
+                        guarded.update((first, second))
+                if function_name in _HELPER_AT_MOST_ONCE_OPTIONS:
+                    guarded.update(_HELPER_AT_MOST_ONCE_OPTIONS[function_name])
+                if function_name in _DYNAMIC_SINGLETON_OPTION_HELPERS and len(child.args) >= 2:
+                    option = _constant_option_arg(child.args[1])
+                    if option:
+                        guarded.add(option)
+            if declared:
+                rows.append((node.name, sorted(declared), sorted(guarded), sorted(declared & _REPEATABLE_COMMAND_OPTIONS)))
 
     return rows
 
@@ -3402,7 +3426,7 @@ def test_registered_command_handlers_gate_unknown_options() -> None:
     helper_guard_gaps = [
         helper_name
         for helper_name in _GUARDED_HELPERS
-        if "require_known_options" not in _called_names(getattr(services, helper_name))
+        if "require_known_options" not in _called_names(_service_function(helper_name))
     ]
     assert helper_guard_gaps == []
 
@@ -3423,7 +3447,7 @@ def test_registered_command_handlers_validate_positional_arguments() -> None:
     helper_gaps = [
         helper_name
         for helper_name in _POSITIONAL_VALIDATION_HELPERS
-        if not (_called_names(getattr(services, helper_name)) & _POSITIONAL_VALIDATORS)
+        if not (_called_names(_service_function(helper_name)) & _POSITIONAL_VALIDATORS)
     ]
     assert helper_gaps == []
 
@@ -5550,7 +5574,7 @@ def test_feedback_body_file_non_git_and_missing_session_are_recorded_as_null(
     non_git.mkdir()
     body_path = non_git / "feedback.md"
     body_path.write_text("file body\n", encoding="utf-8")
-    for key in services.FEEDBACK_SESSION_ENV_KEYS:
+    for key in feedback_services.FEEDBACK_SESSION_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
 
     assert cli.run(["--home", str(home), "auth", "init"]) == 0
@@ -21564,7 +21588,8 @@ def test_v1_security_boundary_excludes_encryption_grants_and_rewrap_artifacts() 
 def test_dry_run_force_confirm_remove_handlers_use_mixed_mode_guard() -> None:
     gaps = [
         function_name
-        for function_name, function in inspect.getmembers(services, inspect.isfunction)
+        for module in _SERVICE_COMMAND_MODULES
+        for function_name, function in inspect.getmembers(module, inspect.isfunction)
         if "require_force_confirm" in _called_names(function)
         and '"--dry-run"' in inspect.getsource(function)
         and "require_dry_run_unforced" not in _called_names(function)

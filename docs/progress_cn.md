@@ -16,14 +16,14 @@ Blueprint 和 subsystem specs 仍是规范性产品契约。
 
 ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、HOME-level agent feedback capture、root-only local read-only dashboard、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
-当前 active focus 的短摘要：2026-06-02 feedback lifecycle batch 已经落地。当前 worktree 最新 changed edge 为 file-backed HOME feedback records 新增 root-only `feedback list`、`feedback show` 和幂等 `feedback archive`，同时保留 public submit availability，并避免为 feedback archive 引入 SQLite/audit persistence。Feedback deletion、project-admin feedback reads、JSON CLI output、hosted/remote dashboard behavior 和新的 runner families 仍不属于本范围。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
+当前 active focus 的短摘要：2026-06-02 feedback lifecycle batch 已经落地，并且第一轮 object-family `services.py` extraction 现在已关闭。Feedback submit/list/show/archive handlers 已移至 `src/alab/feedback.py`，shared request auth gates 已移至 `src/alab/service_auth.py`，shared text/reason validation 已移至 `src/alab/service_text.py`；registered feedback CLI behavior 保持不变。Feedback deletion、project-admin feedback reads、JSON CLI output、hosted/remote dashboard behavior、大范围 service-module extraction 和新的 runner families 仍不属于本范围。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
 
 当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在最新 2026-06-02 implementation/test changes 后重跑。当前 evidence ledger 没有已知缺失实现：
 
 - `docs/completion_audit.md` 已为 feedback file-backed lifecycle edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- Latest full default-suite closeout gate 已在 2026-06-02 implementation/test changes 后通过。该 suite 在 sandbox 外重跑，因为 dashboard tests 需要绑定 loopback ports，而 managed sandbox 会以 `PermissionError` 拒绝。
+- Latest full default-suite closeout gate 已在 2026-06-02 feedback service extraction changes 后通过。Sandbox full suite 仅因为 dashboard tests 需要绑定 loopback ports 且 managed sandbox 以 `PermissionError` 拒绝而失败；elevated full default suite 已通过。
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
-- 2026-06-02 batch 的 focused feedback lifecycle、CLI registry/spec/error-code/capability、documentation、dashboard 和 full default-suite checks 已通过。
+- Feedback lifecycle batch 的 focused feedback lifecycle、CLI registry/spec/error-code/capability、documentation、dashboard 和 full default-suite checks 已通过；follow-up service extraction 的 focused feedback/auth/contract checks、`compileall`、docs checks 和 elevated full default suite 已通过。
 
 ## Gate 快照
 
