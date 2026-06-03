@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from alab import annotations as annotation_services
 from alab import context as context_module
 from alab import db as db_module
 from alab import services
@@ -844,17 +845,17 @@ def test_annotation_target_and_visibility_json_contracts() -> None:
         "constraints": {},
     }
 
-    assert services.annotation_target_json_obj(canonical_json(target)) == target
-    assert services.annotation_target_json_obj(
+    assert annotation_services.annotation_target_json_obj(canonical_json(target)) == target
+    assert annotation_services.annotation_target_json_obj(
         canonical_json({"schema_version": 1, "target_type": "experiment", "target_id": exp_id, "exp_id": exp_id, "commit": "abc123"})
     ) == {"schema_version": 1, "target_type": "experiment", "target_id": exp_id, "exp_id": exp_id, "commit": "abc123"}
-    assert services.annotation_target_json_obj(
+    assert annotation_services.annotation_target_json_obj(
         canonical_json({"schema_version": 1, "target_type": "run", "target_id": run_id, "exp_id": exp_id, "commit": "abc123"})
     ) == {"schema_version": 1, "target_type": "run", "target_id": run_id, "exp_id": exp_id, "commit": "abc123"}
-    assert services.annotation_target_json_obj(
+    assert annotation_services.annotation_target_json_obj(
         canonical_json({"schema_version": 1, "target_type": "artifact", "target_id": artifact_id, "exp_id": exp_id, "commit": None})
     ) == {"schema_version": 1, "target_type": "artifact", "target_id": artifact_id, "exp_id": exp_id, "commit": None}
-    assert services.annotation_visibility_json_obj(canonical_json(visibility)) == visibility
+    assert annotation_services.annotation_visibility_json_obj(canonical_json(visibility)) == visibility
     private_peer_row = {
         "target_json": canonical_json(
             {
@@ -869,11 +870,11 @@ def test_annotation_target_and_visibility_json_contracts() -> None:
         "created_by_type": "token",
         "created_by_id": exp_id,
     }
-    creator_actor = services.Actor(actor_type="token", credential_id="cred-alpha", project_id="proj-alpha", exp_id=exp_id, token_mode="worktree")
-    assert services._annotation_visible(private_peer_row, creator_actor, {exp_id, peer_exp_id})
-    assert not services._annotation_visible(private_peer_row, creator_actor, {exp_id})
-    assert services._annotation_editable(private_peer_row, creator_actor, {exp_id, peer_exp_id})
-    assert not services._annotation_editable(private_peer_row, creator_actor, {exp_id})
+    creator_actor = annotation_services.Actor(actor_type="token", credential_id="cred-alpha", project_id="proj-alpha", exp_id=exp_id, token_mode="worktree")
+    assert annotation_services._annotation_visible(private_peer_row, creator_actor, {exp_id, peer_exp_id})
+    assert not annotation_services._annotation_visible(private_peer_row, creator_actor, {exp_id})
+    assert annotation_services._annotation_editable(private_peer_row, creator_actor, {exp_id, peer_exp_id})
+    assert not annotation_services._annotation_editable(private_peer_row, creator_actor, {exp_id})
 
     invalid_targets = [
         ({**target, "raw_path": "/tmp/main.py"}, "contains unknown JSON keys: raw_path"),
@@ -896,7 +897,7 @@ def test_annotation_target_and_visibility_json_contracts() -> None:
     ]
     for value, message in invalid_targets:
         with pytest.raises(AlabError) as excinfo:
-            services.annotation_target_json_obj(canonical_json(value))
+            annotation_services.annotation_target_json_obj(canonical_json(value))
         assert excinfo.value.code == "STORAGE_ERROR"
         assert message in excinfo.value.reason
 
@@ -908,7 +909,7 @@ def test_annotation_target_and_visibility_json_contracts() -> None:
     ]
     for value, message in invalid_visibilities:
         with pytest.raises(AlabError) as excinfo:
-            services.annotation_visibility_json_obj(canonical_json(value))
+            annotation_services.annotation_visibility_json_obj(canonical_json(value))
         assert excinfo.value.code == "STORAGE_ERROR"
         assert message in excinfo.value.reason
 

@@ -3,6 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .annotations import (
+    cmd_annotate_add,
+    cmd_annotate_archive,
+    cmd_annotate_edit,
+    cmd_annotate_remove,
+    cmd_annotate_unarchive,
+    cmd_observe_annotations_list,
+    cmd_observe_annotations_show,
+)
 from .audit import cmd_audit_list, cmd_audit_show
 from .catalog import (
     cmd_catalog_skydiscover_add,
@@ -12,14 +21,29 @@ from .catalog import (
 )
 from .dashboard import cmd_dashboard
 from .feedback import cmd_feedback, cmd_feedback_archive, cmd_feedback_list, cmd_feedback_show
+from .observe import (
+    cmd_observe_artifacts_archive,
+    cmd_observe_artifacts_export,
+    cmd_observe_artifacts_list,
+    cmd_observe_artifacts_remove,
+    cmd_observe_artifacts_show,
+    cmd_observe_artifacts_unarchive,
+    cmd_observe_logs_archive,
+    cmd_observe_logs_export,
+    cmd_observe_logs_list,
+    cmd_observe_logs_remove,
+    cmd_observe_logs_show,
+    cmd_observe_logs_unarchive,
+    cmd_observe_runs_archive,
+    cmd_observe_runs_list,
+    cmd_observe_runs_remove,
+    cmd_observe_runs_show,
+    cmd_observe_runs_unarchive,
+)
 from .rendering import ResultBlock
+from .report import cmd_report
 from .service_models import LongRunningResult, Request
 from .services import (
-    cmd_annotate_add,
-    cmd_annotate_archive,
-    cmd_annotate_edit,
-    cmd_annotate_remove,
-    cmd_annotate_unarchive,
     cmd_auth_init,
     cmd_auth_root_regenerate,
     cmd_backup_prune,
@@ -52,25 +76,6 @@ from .services import (
     cmd_key_create,
     cmd_key_list,
     cmd_key_revoke,
-    cmd_observe_annotations_list,
-    cmd_observe_annotations_show,
-    cmd_observe_artifacts_archive,
-    cmd_observe_artifacts_export,
-    cmd_observe_artifacts_list,
-    cmd_observe_artifacts_remove,
-    cmd_observe_artifacts_show,
-    cmd_observe_artifacts_unarchive,
-    cmd_observe_logs_archive,
-    cmd_observe_logs_export,
-    cmd_observe_logs_list,
-    cmd_observe_logs_remove,
-    cmd_observe_logs_show,
-    cmd_observe_logs_unarchive,
-    cmd_observe_runs_archive,
-    cmd_observe_runs_list,
-    cmd_observe_runs_remove,
-    cmd_observe_runs_show,
-    cmd_observe_runs_unarchive,
     cmd_project_archive,
     cmd_project_config_export,
     cmd_project_config_import,
@@ -93,16 +98,17 @@ from .services import (
     cmd_project_validation_archive,
     cmd_project_validation_remove,
     cmd_project_validation_unarchive,
-    cmd_report,
     cmd_run,
+    cmd_status,
+    cmd_submit,
+)
+from .sources import (
     cmd_source_archive,
     cmd_source_import,
     cmd_source_list,
     cmd_source_remove,
     cmd_source_show,
     cmd_source_unarchive,
-    cmd_status,
-    cmd_submit,
 )
 
 Handler = Callable[[list[str], Request], list[ResultBlock] | LongRunningResult]

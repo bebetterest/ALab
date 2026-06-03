@@ -8021,3 +8021,24 @@ Validation:
 - Migration catalog/cache metadata contract check: `.venv/bin/python -m pytest -q tests/test_migrations.py::test_runtime_catalog_and_cache_metadata_contracts_enforce_documented_shape`
 - Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
 - Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Annotation, Observe, Report, and Source Service Extraction
+
+Implemented:
+
+- Moved annotation add/edit/archive/unarchive/remove handlers plus observe annotation list/show handlers from `src/alab/services.py` into `src/alab/annotations.py`.
+- Moved observe run/artifact/log list/show/export/archive/unarchive/remove handlers and their shared observe lifecycle helpers into `src/alab/observe.py`.
+- Moved Markdown report export handling into `src/alab/report.py`.
+- Moved source import/list/show/archive/unarchive/remove handlers into `src/alab/sources.py` while leaving source-origin helpers shared with `exp create` in `src/alab/services.py`.
+- Updated `src/alab/registry.py` to register the extracted handlers from their object-family modules while keeping registry-derived CLI contract scans as the handler source of truth.
+- Kept `alab.services` compatibility exports for annotation target/visibility JSON contract helpers while moving annotation tests to the extracted annotation module.
+- Kept project/experiment/run-submit core lifecycle handlers in `src/alab/services.py`; those families remain too coupled to shared helper boundaries for a low-risk line-count-only extraction.
+- Updated progress/audit/pipeline/closed-gap documentation and synchronized Chinese documents.
+
+Validation:
+
+- Compile check: `.venv/bin/python -m compileall -q src/alab tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
+- Relevant full ruff check: `.venv/bin/ruff check src/alab/sources.py src/alab/services.py src/alab/registry.py src/alab/report.py src/alab/observe.py src/alab/annotations.py tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
+- Focused registry/source/annotation/observe contract and smoke checks: `.venv/bin/python -m pytest -q tests/test_migrations.py::test_annotation_target_and_visibility_json_contracts tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_source_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_origin_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_warning_success_fields_follow_cli_spec tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_observe_success_fields_follow_cli_spec tests/test_smoke.py::test_config_source_observe_and_tags tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
+- Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`

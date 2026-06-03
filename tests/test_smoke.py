@@ -14,7 +14,9 @@ from pathlib import Path
 import pytest
 
 import alab.cli as cli
+import alab.observe as observe_services
 import alab.services as services
+import alab.sources as source_services
 from alab.cli import run
 from alab.home import Home
 from alab.ids import new_id, slugify
@@ -1621,7 +1623,7 @@ def test_worktree_remove_restores_staged_trash_after_transaction_failure(tmp_pat
     assert run(["--home", str(home), "--key", admin_key, "exp", "create", "--project", project_id, "--name", "Trash Restore", "--path", str(worktree)]) == 0
     exp_id = _field(capsys.readouterr().out, "exp id")
 
-    original_audit = services.audit
+    original_audit = source_services.audit
 
     def fail_worktree_remove_audit(conn, **kwargs):
         if kwargs.get("action") == "remove" and kwargs.get("object_type") == "worktree":
@@ -1690,7 +1692,7 @@ def test_source_remove_restores_deleted_ref_after_transaction_failure(tmp_path, 
             raise sqlite3.OperationalError("injected source audit failure")
         return original_audit(conn, **kwargs)
 
-    monkeypatch.setattr(services, "audit", fail_source_remove_audit)
+    monkeypatch.setattr(source_services, "audit", fail_source_remove_audit)
 
     assert run(["--home", str(home), "--key", admin_key, "source", "remove", source_id, "--project", project_id, "--force", "--confirm", source_id]) == 5
     err = capsys.readouterr().err
@@ -1717,7 +1719,7 @@ def test_experiment_remove_restores_branch_and_trash_after_transaction_failure(t
     repo_git = home / "projects" / project_id / "repo.git"
     branch_ref = f"refs/heads/alab/exp/{exp_id}"
     branch_commit = _git(["--git-dir", str(repo_git), "rev-parse", "--verify", branch_ref], home)
-    original_audit = services.audit
+    original_audit = observe_services.audit
 
     def fail_experiment_remove_audit(conn, **kwargs):
         if kwargs.get("action") == "remove" and kwargs.get("object_type") == "experiment":
@@ -1969,7 +1971,7 @@ def test_observe_remove_restores_staged_trash_after_transaction_failure(tmp_path
             raise sqlite3.OperationalError("injected observe audit failure")
         return original_audit(conn, **kwargs)
 
-    monkeypatch.setattr(services, "audit", fail_observe_remove_audit)
+    monkeypatch.setattr(observe_services, "audit", fail_observe_remove_audit)
     assert artifact_path.exists()
     assert stdout_log_path.exists()
 

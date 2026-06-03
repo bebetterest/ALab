@@ -8015,3 +8015,24 @@
 - Migration catalog/cache metadata contract check：`.venv/bin/python -m pytest -q tests/test_migrations.py::test_runtime_catalog_and_cache_metadata_contracts_enforce_documented_shape`
 - Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
 - Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Annotation、Observe、Report 和 Source Service Extraction
+
+已实现：
+
+- 将 annotation add/edit/archive/unarchive/remove handlers 以及 observe annotation list/show handlers 从 `src/alab/services.py` 移入 `src/alab/annotations.py`。
+- 将 observe run/artifact/log list/show/export/archive/unarchive/remove handlers 及其 shared observe lifecycle helpers 移入 `src/alab/observe.py`。
+- 将 Markdown report export handling 移入 `src/alab/report.py`。
+- 将 source import/list/show/archive/unarchive/remove handlers 移入 `src/alab/sources.py`，同时把与 `exp create` 共享的 source-origin helpers 继续留在 `src/alab/services.py`。
+- 更新 `src/alab/registry.py`，使抽出的 handlers 从对应 object-family modules 注册，同时保持 registry-derived CLI contract scans 以 handler source of truth 为准。
+- 保留 `alab.services` 中 annotation target/visibility JSON contract helpers 的 compatibility exports，同时将 annotation tests 移至抽出的 annotation module。
+- 将 project/experiment/run-submit core lifecycle handlers 继续保留在 `src/alab/services.py`；这些 families 与 shared helper boundaries 仍然耦合较强，不适合为了降低行数做低收益 extraction。
+- 更新 progress/audit/pipeline/closed-gap documentation，并同步中文文档。
+
+验证：
+
+- Compile check：`.venv/bin/python -m compileall -q src/alab tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
+- Relevant full ruff check：`.venv/bin/ruff check src/alab/sources.py src/alab/services.py src/alab/registry.py src/alab/report.py src/alab/observe.py src/alab/annotations.py tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
+- Focused registry/source/annotation/observe contract and smoke checks：`.venv/bin/python -m pytest -q tests/test_migrations.py::test_annotation_target_and_visibility_json_contracts tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_source_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_origin_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_warning_success_fields_follow_cli_spec tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_observe_success_fields_follow_cli_spec tests/test_smoke.py::test_config_source_observe_and_tags tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
+- Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
