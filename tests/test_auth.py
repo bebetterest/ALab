@@ -16,7 +16,8 @@ from alab.auth import (
 from alab.db import Database
 from alab.errors import AlabError
 from alab.home import Home
-from alab.services import GlobalOptions, Request, require_actor
+from alab.service_auth import require_actor
+from alab.service_models import GlobalOptions, Request
 
 
 def test_credentials_store_verifiers_not_raw_secrets(tmp_path) -> None:

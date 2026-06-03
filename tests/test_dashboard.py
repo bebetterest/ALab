@@ -12,10 +12,16 @@ from pathlib import Path
 from alab import cli
 from alab.auth import create_credential, write_token
 from alab.context import path_hash, write_marker
-from alab.dashboard import DASHBOARD_TOKEN_HEADER, read_project_detail, read_summary, read_system
+from alab.dashboard import (
+    DASHBOARD_TOKEN_HEADER,
+    cmd_dashboard,
+    read_project_detail,
+    read_summary,
+    read_system,
+)
 from alab.home import Home
 from alab.ids import new_id
-from alab.services import GlobalOptions, Request, cmd_dashboard
+from alab.service_models import GlobalOptions, Request
 
 _URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 

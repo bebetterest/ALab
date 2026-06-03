@@ -12,24 +12,24 @@
 
 Blueprint 和 subsystem specs 仍是规范性产品契约。
 
-## 当前位置 - 2026-06-02
+## 当前位置 - 2026-06-03
 
 ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、HOME-level agent feedback capture、root-only local read-only dashboard、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
-当前 active focus 的短摘要：2026-06-02 feedback lifecycle batch 已经落地，并且第一轮 object-family `services.py` extraction 现在已关闭。Feedback submit/list/show/archive handlers 已移至 `src/alab/feedback.py`，shared request auth gates 已移至 `src/alab/service_auth.py`，shared text/reason validation 已移至 `src/alab/service_text.py`；registered feedback CLI behavior 保持不变。Feedback deletion、project-admin feedback reads、JSON CLI output、hosted/remote dashboard behavior、大范围 service-module extraction 和新的 runner families 仍不属于本范围。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
+当前 active focus 的短摘要：2026-06-02 feedback lifecycle batch 已经落地，并且前四轮 object-family `services.py` extraction 现在已关闭。Feedback submit/list/show/archive handlers 位于 `src/alab/feedback.py`；audit list/show handlers 和 audit object-id filtering 位于 `src/alab/audit.py`；dashboard command handler 与 dashboard server/read models 一起位于 `src/alab/dashboard.py`；SkyDiscover catalog add/update/show/remove handlers 以及 catalog/adapter-ref resolution helpers 位于 `src/alab/catalog.py`；shared audit-event writing 位于 `src/alab/service_audit.py`；shared request auth gates 位于 `src/alab/service_auth.py`；shared text/reason validation 位于 `src/alab/service_text.py`。Registered feedback、audit、dashboard 和 catalog CLI behavior 保持不变。Feedback deletion、project-admin feedback reads、JSON CLI output、hosted/remote dashboard behavior、SkyDiscover catalog behavior changes、大范围一次性 service-module extraction 和新的 runner families 仍不属于本范围。recently closed proof families 由 `docs/progress_closed_gaps.md` 跟踪；除非 `docs/completion_audit.md` 点名新的 concrete edge，或 release target 不同于当前已证明的 host/platform/upstream gates，否则不要重启这些已关闭工作。详细队列状态只放在 `docs/progress_pipeline.md`。
 
-当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在最新 2026-06-02 implementation/test changes 后重跑。当前 evidence ledger 没有已知缺失实现：
+当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在最新 2026-06-03 implementation/test changes 后重跑。当前 evidence ledger 没有已知缺失实现：
 
 - `docs/completion_audit.md` 已为 feedback file-backed lifecycle edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- Latest full default-suite closeout gate 已在 2026-06-02 feedback service extraction changes 后通过。Sandbox full suite 仅因为 dashboard tests 需要绑定 loopback ports 且 managed sandbox 以 `PermissionError` 拒绝而失败；elevated full default suite 已通过。
+- Latest full default-suite closeout gate 已在 2026-06-03 catalog service extraction changes 后通过。Sandbox full suite 仅因为 dashboard tests 需要绑定 loopback ports 且 managed sandbox 以 `PermissionError` 拒绝而失败；elevated full default suite 已通过。
 - Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
-- Feedback lifecycle batch 的 focused feedback lifecycle、CLI registry/spec/error-code/capability、documentation、dashboard 和 full default-suite checks 已通过；follow-up service extraction 的 focused feedback/auth/contract checks、`compileall`、docs checks 和 elevated full default suite 已通过。
+- Feedback lifecycle batch 的 focused feedback lifecycle、CLI registry/spec/error-code/capability、documentation、dashboard 和 full default-suite checks 已通过；feedback extraction 的 focused feedback/auth/contract checks、`compileall`、docs checks 和 elevated full default suite 已通过；audit extraction 的 focused audit/registry contract checks、import-order checks、`compileall`、docs checks 和 elevated full default suite 已通过；dashboard extraction 的 focused dashboard socket/static/registry contract checks、import-order checks、docs checks 和 elevated full default suite 已通过；catalog extraction 的 focused catalog lifecycle/ref/blocker checks、migration catalog/cache contract checks、full relevant ruff checks、registry-derived CLI contract checks、`compileall` 和 elevated full default suite 已通过。
 
 ## Gate 快照
 
 | Gate | State | Completion blocker |
 | --- | --- | --- |
-| Requirement evidence | 2026-06-02 feedback lifecycle edge 为 `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
+| Requirement evidence | 当前 feedback、audit、dashboard 和 catalog service extraction edges 为 `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
 | Full default suite | `PASSED` | 如果 release claim 前还有额外 implementation/test changes，需要重跑。 |
 | CLI contract completeness | focused docs/typed-value checks `PASSED` | 当前 registered CLI surfaces 已由 generated parser/capability/output matrices、docs-derived success schemas、saved result-failure/system-error checks 和 completion-audit consistency guard 证明；commands 或 output variants 变化时重跑/更新。 |
 | Non-CLI hardening | Feedback lifecycle no-SQLite/audit checks 和 dashboard focused tests `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |

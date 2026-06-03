@@ -3,33 +3,33 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .audit import cmd_audit_list, cmd_audit_show
+from .catalog import (
+    cmd_catalog_skydiscover_add,
+    cmd_catalog_skydiscover_remove,
+    cmd_catalog_skydiscover_show,
+    cmd_catalog_skydiscover_update,
+)
+from .dashboard import cmd_dashboard
 from .feedback import cmd_feedback, cmd_feedback_archive, cmd_feedback_list, cmd_feedback_show
 from .rendering import ResultBlock
+from .service_models import LongRunningResult, Request
 from .services import (
-    LongRunningResult,
-    Request,
     cmd_annotate_add,
     cmd_annotate_archive,
     cmd_annotate_edit,
     cmd_annotate_remove,
     cmd_annotate_unarchive,
-    cmd_audit_list,
-    cmd_audit_show,
     cmd_auth_init,
     cmd_auth_root_regenerate,
     cmd_backup_prune,
     cmd_cache_prune,
-    cmd_catalog_skydiscover_add,
-    cmd_catalog_skydiscover_remove,
-    cmd_catalog_skydiscover_show,
-    cmd_catalog_skydiscover_update,
     cmd_config_reset,
     cmd_config_set,
     cmd_config_show,
     cmd_config_validate,
     cmd_context_repair,
     cmd_context_show,
-    cmd_dashboard,
     cmd_exp_archive,
     cmd_exp_best,
     cmd_exp_checkout,

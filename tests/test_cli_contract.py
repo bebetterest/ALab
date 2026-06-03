@@ -24,6 +24,7 @@ from alab import feedback as feedback_services
 from alab.errors import ERROR_EXIT_CODES, AlabError, error_exit_code
 from alab.home import Home, resolve_home
 from alab.rendering import ResultBlock, multiline_text, render_text
+from alab.service_models import GlobalOptions, Request
 
 _GUARDED_HELPERS = (
     "_archive_observe_record",
@@ -14261,7 +14262,7 @@ def test_nested_help_runtime_covers_every_registered_command(tmp_path: Path, cap
 
 
 def test_all_commands_help_covers_registry_with_stable_schema(tmp_path: Path) -> None:
-    req = services.Request(services.GlobalOptions(Home(tmp_path / "home")), context=None)
+    req = Request(GlobalOptions(Home(tmp_path / "home")), context=None)
     blocks = cli.help_blocks(req, all_commands=True, explain=True)
     expected_help_labels = _documented_success_labels("help")
     expected_help_command_labels = _documented_success_labels_for_object("help", "help_command")

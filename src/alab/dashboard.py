@@ -18,6 +18,15 @@ from .db import all_rows, connect_initialized, one
 from .errors import AlabError
 from .home import Home
 from .rendering import ResultBlock
+from .service_args import (
+    _parse_int_option,
+    flag,
+    require_known_options,
+    require_options_at_most_once,
+    require_positional_count,
+)
+from .service_auth import require_actor
+from .service_models import LongRunningResult, Request
 
 DASHBOARD_HOST = "127.0.0.1"
 DASHBOARD_TOKEN_HEADER = "X-ALab-Dashboard-Token"
@@ -35,6 +44,35 @@ STATIC_TYPES = {
     ".svg": "image/svg+xml",
     ".md": "text/markdown; charset=utf-8",
 }
+
+
+def cmd_dashboard(args: list[str], req: Request) -> LongRunningResult:
+    require_known_options(args, ("--port", "--no-open", "--refresh-seconds"))
+    require_options_at_most_once(args, ("--port", "--no-open", "--refresh-seconds"))
+    require_actor(req, "root")
+    require_positional_count(
+        args,
+        0,
+        "dashboard accepts no positional arguments",
+        options_with_values=("--port", "--refresh-seconds"),
+    )
+    port = _parse_int_option(args, "--port")
+    if port is None:
+        port = 0
+    if port < 0 or port > 65535:
+        raise AlabError("CONFIG_INVALID", "--port must be between 0 and 65535")
+    refresh_seconds = _parse_int_option(args, "--refresh-seconds")
+    if refresh_seconds is None:
+        refresh_seconds = DEFAULT_REFRESH_SECONDS
+    if refresh_seconds < 0 or refresh_seconds > 3600:
+        raise AlabError("CONFIG_INVALID", "--refresh-seconds must be between 0 and 3600")
+    server = create_dashboard_server(
+        home=req.globals.home,
+        port=port,
+        refresh_seconds=refresh_seconds,
+        open_browser=not flag(args, "--no-open"),
+    )
+    return LongRunningResult(blocks=server.result_blocks(), run=server.serve, close=server.close)
 
 
 @dataclass

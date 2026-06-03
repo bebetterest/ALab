@@ -12,12 +12,12 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-06-02
+## 当前 Active Batch - 2026-06-03
 
-- Focus：当前 worktree 已关闭第一轮 object-family `services.py` extraction。Feedback submit/list/show/archive handlers 现在位于 `src/alab/feedback.py`，shared request auth gates 位于 `src/alab/service_auth.py`，shared text/reason validation 位于 `src/alab/service_text.py`；registered feedback CLI behavior 保持不变。
-- 本 batch 明确 non-goals：不继续做大范围 object-family extraction，不改变 feedback deletion、SQLite feedback rows、feedback archive audit rows、project-admin scoped feedback reads、JSON CLI output、hosted/remote dashboard behavior 或新的 runner families。
+- Focus：当前 worktree 已关闭第四轮 object-family `services.py` extraction。SkyDiscover catalog add/update/show/remove handlers 以及 catalog/adapter-ref resolution helpers 现在位于 `src/alab/catalog.py`；shared audit-event writing 位于 `src/alab/service_audit.py`；dashboard command handler 继续位于 `src/alab/dashboard.py`；audit list/show handlers 和 audit object-id filtering 继续位于 `src/alab/audit.py`；feedback handlers 继续位于 `src/alab/feedback.py`；shared request auth gates 继续位于 `src/alab/service_auth.py`；shared text/reason validation 继续位于 `src/alab/service_text.py`。Registered catalog、dashboard、audit 和 feedback CLI behavior 保持不变。
+- 本 batch 明确 non-goals：不继续做大范围一次性 object-family extraction，不改变 SkyDiscover catalog add/update/show/remove behavior、catalog checkout/ref resolution semantics、adapter-derived source behavior、runner config validation、dashboard server routes、read models、loopback/token behavior、static assets、audit command authorization、filters、output fields、JSON sanitization、audit persistence、feedback deletion、SQLite feedback rows、feedback archive audit rows、project-admin scoped feedback reads、JSON CLI output、hosted/remote dashboard behavior 或新的 runner families。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
-- 已新增 evidence：focused feedback lifecycle CLI tests、auth re-export regression、已更新为从 registry 推导 scanned handler modules 的 CLI registry/spec/option/static contract checks、import-order fix、`compileall`、仅由 dashboard loopback bind `PermissionError` 造成的 sandbox full default suite failure，以及 elevated full default suite pass。
+- 已新增 evidence：focused SkyDiscover catalog lifecycle/ref/blocker checks、migration catalog/cache metadata contract checks、registry-derived CLI registry/spec/option/static contract checks、full relevant ruff checks、`compileall`、仅由 dashboard loopback bind `PermissionError` 造成的 sandbox full default suite failure，以及 elevated full default suite pass。
 
 ## Active Queue
 

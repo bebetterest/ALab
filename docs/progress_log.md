@@ -7961,3 +7961,63 @@ Validation:
 - `git diff --check`
 - Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
 - Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Audit Service Object-Family Extraction
+
+Implemented:
+
+- Moved audit list/show command handlers and audit object-id filter validation from `src/alab/services.py` into `src/alab/audit.py` without changing registered CLI behavior.
+- Updated `src/alab/registry.py` to register audit commands from the extracted object-family module.
+- Kept shared request auth, parser helpers, audit JSON sanitization contracts, and SQLite read behavior unchanged.
+- Updated progress/audit/pipeline documentation and synchronized Chinese documents.
+
+Validation:
+
+- Compile check: `python -m compileall -q src/alab`
+- Import-order check: `.venv/bin/ruff check --select I src/alab/audit.py src/alab/services.py src/alab/registry.py`
+- Focused audit and registry-derived CLI contract checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_audit_success_fields_follow_cli_spec tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Focused docs/audit sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
+- Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Dashboard Command Service Extraction
+
+Implemented:
+
+- Moved `cmd_dashboard` from `src/alab/services.py` into `src/alab/dashboard.py`, colocating the dashboard command handler with the dashboard server and read models.
+- Updated `src/alab/registry.py` to register the dashboard command from the extracted dashboard module.
+- Updated CLI, registry, and focused dashboard/auth tests to import request/result models directly from `src/alab/service_models.py` instead of relying on `services.py` as a model re-export boundary.
+- Updated progress/audit/pipeline documentation and synchronized Chinese documents.
+
+Validation:
+
+- Compile check: `python -m compileall -q src/alab tests/test_dashboard.py tests/test_auth.py`
+- Import-order check: `.venv/bin/ruff check --select I src/alab/dashboard.py src/alab/services.py src/alab/registry.py src/alab/cli.py tests/test_dashboard.py tests/test_auth.py`
+- Focused dashboard socket tests with loopback socket access: `.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`
+- Focused dashboard static check: `.venv/bin/python -m pytest -q tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- Focused registry-derived CLI contract checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Focused docs/audit sync checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
+- Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Catalog Service Object-Family Extraction
+
+Implemented:
+
+- Moved SkyDiscover catalog add/update/show/remove command handlers and catalog/adapter-ref resolution helpers from `src/alab/services.py` into `src/alab/catalog.py` without changing registered CLI behavior.
+- Moved shared audit-event insertion into `src/alab/service_audit.py` so extracted handler modules do not need to import back into `services.py`.
+- Updated `src/alab/registry.py` to register catalog commands from the extracted catalog module while keeping registry-derived CLI contract scans as the handler source of truth.
+- Kept `alab.services` compatibility exports for CLI option constants and migration JSON contract helpers that existing tests read directly.
+- Updated progress/audit/pipeline/closed-gap documentation and synchronized Chinese documents.
+
+Validation:
+
+- Compile check: `.venv/bin/python -m compileall -q src/alab`
+- Relevant full ruff check: `.venv/bin/ruff check src/alab/catalog.py src/alab/service_audit.py src/alab/services.py src/alab/registry.py`
+- Focused registry-derived CLI contract checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Focused SkyDiscover catalog lifecycle/ref/blocker checks: `.venv/bin/python -m pytest -q tests/test_smoke.py::test_skydiscover_catalog_lifecycle tests/test_smoke.py::test_skydiscover_catalog_ref_validation tests/test_smoke.py::test_skydiscover_catalog_remove_blockers_unexpected_remote_and_history`
+- Migration catalog/cache metadata contract check: `.venv/bin/python -m pytest -q tests/test_migrations.py::test_runtime_catalog_and_cache_metadata_contracts_enforce_documented_shape`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
+- Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`

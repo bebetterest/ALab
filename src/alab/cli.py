@@ -16,7 +16,7 @@ from .errors import AlabError, error_exit_code
 from .home import resolve_home
 from .registry import COMMANDS, CommandSpec, match_command
 from .rendering import ResultBlock, error_block, render_text
-from .services import GlobalOptions, LongRunningResult, Request
+from .service_models import GlobalOptions, LongRunningResult, Request
 
 
 @dataclass

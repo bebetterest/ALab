@@ -12,12 +12,12 @@ This file is the active work queue for ALab V1. Keep `docs/progress.md` as the s
 - Keep only the current queue and update policy here. Do not append stale backlog; rewrite or remove queue rows as evidence closes.
 - English docs are canonical. Update the synchronized `*_cn.md` file in the same change.
 
-## Current Active Batch - 2026-06-02
+## Current Active Batch - 2026-06-03
 
-- Focus: the first object-family `services.py` extraction is closed for the current worktree. Feedback submit/list/show/archive handlers now live in `src/alab/feedback.py`, shared request auth gates live in `src/alab/service_auth.py`, and shared text/reason validation lives in `src/alab/service_text.py`; the registered feedback CLI behavior remains unchanged.
-- Explicit non-goals for this batch: do not continue into broad object-family extraction, do not change feedback deletion, SQLite feedback rows, audit rows for feedback archive, project-admin scoped feedback reads, JSON CLI output, hosted/remote dashboard behavior, or new runner families.
+- Focus: the fourth object-family `services.py` extraction is closed for the current worktree. SkyDiscover catalog add/update/show/remove handlers and catalog/adapter-ref resolution helpers now live in `src/alab/catalog.py`; shared audit-event writing lives in `src/alab/service_audit.py`; the dashboard command handler remains in `src/alab/dashboard.py`; audit list/show handlers and audit object-id filtering remain in `src/alab/audit.py`; feedback handlers remain in `src/alab/feedback.py`; shared request auth gates remain in `src/alab/service_auth.py`; and shared text/reason validation remains in `src/alab/service_text.py`. Registered catalog, dashboard, audit, and feedback CLI behavior remains unchanged.
+- Explicit non-goals for this batch: do not continue into broad all-at-once object-family extraction, do not change SkyDiscover catalog add/update/show/remove behavior, catalog checkout/ref resolution semantics, adapter-derived source behavior, runner config validation, dashboard server routes, read models, loopback/token behavior, static assets, audit command authorization, filters, output fields, JSON sanitization, audit persistence, feedback deletion, SQLite feedback rows, feedback archive audit rows, project-admin scoped feedback reads, JSON CLI output, hosted/remote dashboard behavior, or new runner families.
 - Duplicate guardrail: `docs/progress_closed_gaps.md` owns the do-not-reopen list. Open it only if a future batch looks similar to a closed family.
-- Evidence added: focused feedback lifecycle CLI tests, auth re-export regression, CLI registry/spec/option/static contract checks updated to derive scanned handler modules from the registry, import-order fix, `compileall`, sandbox full default suite failure limited to dashboard loopback bind `PermissionError`, and elevated full default suite pass.
+- Evidence added: focused SkyDiscover catalog lifecycle/ref/blocker checks, migration catalog/cache metadata contract checks, registry-derived CLI registry/spec/option/static contract checks, full relevant ruff checks, `compileall`, sandbox full default suite failure limited to dashboard loopback bind `PermissionError`, and elevated full default suite pass.
 
 ## Active Queue
 
