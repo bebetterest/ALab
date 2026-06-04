@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import base64
+import importlib
 import inspect
 import io
 import json
@@ -97,6 +98,38 @@ _CAPABILITY_PATH_SETS = (
     cli.OBSERVE_TOKEN_LIFECYCLE,
     cli.INSPECTION_TOKEN,
 )
+
+
+def test_services_lazy_compat_exports_resolve_registered_extracted_handlers() -> None:
+    failures = []
+    for name, (module_name, attr_name) in services._COMPAT_EXPORTS.items():
+        expected = getattr(importlib.import_module(module_name, services.__package__), attr_name)
+        actual = getattr(services, name, None)
+        if actual is not expected or name not in dir(services):
+            failures.append(
+                {
+                    "name": name,
+                    "target": f"{module_name}.{attr_name}",
+                    "same object": actual is expected,
+                    "in dir": name in dir(services),
+                }
+            )
+
+    for spec in registry.COMMANDS:
+        if spec.handler.__module__ == services.__name__:
+            continue
+        actual = getattr(services, spec.handler.__name__, None)
+        if actual is not spec.handler:
+            failures.append(
+                {
+                    "command": " ".join(spec.path),
+                    "name": spec.handler.__name__,
+                    "target": spec.handler.__module__,
+                    "same object": actual is spec.handler,
+                }
+            )
+
+    assert failures == []
 
 _LIFECYCLE_ARCHIVE_UNARCHIVE_EVIDENCE = {
     ("project", "archive"): (
