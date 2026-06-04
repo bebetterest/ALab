@@ -8129,6 +8129,26 @@ Validation:
 - Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
 - Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`
 
+## 2026-06-04 Project Lifecycle Service Extraction and Lazy Compatibility Exports
+
+Implemented:
+
+- Moved project list/show/archive/unarchive/remove and project lock clear-stale handlers from `src/alab/services.py` into `src/alab/project_lifecycle.py`.
+- Updated `src/alab/registry.py` to register project lifecycle handlers directly from `src/alab/project_lifecycle.py`.
+- Replaced explicit extracted-family compatibility wrappers in `src/alab/services.py` with a centralized lazy compatibility export table, keeping historical `alab.services.<name>` imports working for extracted project config, project validation, project lifecycle, experiment query, experiment lifecycle, and experiment access names.
+- Kept project init, source bootstrap shared with experiment creation, global config, context, run/submit, experiment create/tags, and tightly coupled shared helpers in `src/alab/services.py`.
+- Preserved legacy `services.audit` monkeypatch behavior for project-remove rollback tests by routing project lifecycle audit calls through the core service export.
+- Updated progress/audit/pipeline/closed-gap documentation and synchronized Chinese documents.
+
+Validation:
+
+- Registry and compatibility binding check: confirmed `project list/show/archive/unarchive/remove/locks` commands bind to `alab.project_lifecycle` while historical `alab.services.cmd_project_show`, `alab.services.cmd_project_config_show`, `alab.services.cmd_exp_list`, and `alab.services._experiment_branch_ref` resolve to their extracted modules.
+- Relevant ruff check: `.venv/bin/ruff check src/alab/services.py src/alab/project_lifecycle.py src/alab/registry.py src/alab/project_config.py src/alab/project_validation.py src/alab/experiment_query.py src/alab/experiment_lifecycle.py src/alab/experiment_access.py`
+- Forced compile check: `.venv/bin/python -m compileall -f src/alab/services.py src/alab/project_lifecycle.py src/alab/registry.py src/alab/project_config.py src/alab/project_validation.py src/alab/experiment_query.py src/alab/experiment_lifecycle.py src/alab/experiment_access.py`
+- Focused project lifecycle and registry-derived regression checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_project_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_hard_remove_dry_runs_preserve_database_and_filesystem tests/test_smoke.py::test_project_remove_cascades_whole_tree_through_trash tests/test_smoke.py::test_project_remove_restores_whole_tree_trash_after_transaction_failure`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
+- Elevated full default suite with loopback socket access: `.venv/bin/python -m pytest -q`
+
 ## 2026-06-04 Stable-Boundary Project and Experiment Service Extraction
 
 Implemented:

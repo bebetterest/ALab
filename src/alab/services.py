@@ -11,6 +11,7 @@ import socket
 import sqlite3
 import tomllib
 from datetime import UTC, datetime, timedelta
+from importlib import import_module
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -57,17 +58,17 @@ from .proc import run_cmd
 from .removal import (
     _delete_trash_path,  # noqa: F401 - compatibility export for legacy alab.services callers
     _finalize_staged_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
-    _finalize_staged_trashes,
+    _finalize_staged_trashes,  # noqa: F401 - compatibility export for legacy alab.services callers
     _path_present,  # noqa: F401 - compatibility export for legacy alab.services callers
-    _raise_after_staged_trash_transaction_failure,
+    _raise_after_staged_trash_transaction_failure,  # noqa: F401 - compatibility export for legacy alab.services callers
     _record_pending_trash_cleanup,  # noqa: F401 - compatibility export for legacy alab.services callers
     _remove_path_if_safe,  # noqa: F401 - compatibility export for legacy alab.services callers
     _remove_trash_cache_path,  # noqa: F401 - compatibility export for legacy alab.services callers
     _restore_staged_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
     _restore_staged_trashes,  # noqa: F401 - compatibility export for legacy alab.services callers
     _stage_path_to_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
-    _stage_targets_to_trash,
-    _trash_plan,
+    _stage_targets_to_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _trash_plan,  # noqa: F401 - compatibility export for legacy alab.services callers
     _worktree_dirty_state,  # noqa: F401 - compatibility export for legacy alab.services callers
 )
 from .rendering import ResultBlock, multiline_text
@@ -89,9 +90,7 @@ from .service_args import (
     flag,
     option_count,
     optional_positional_selector,
-    require_dry_run_unforced,
     require_exactly_one_option_pair,
-    require_force_confirm,
     require_known_options,
     require_options_at_most_once,
     require_positional_count,
@@ -112,7 +111,6 @@ from .service_models import (
     VISIBILITY_SCOPES,
     AdapterDerivedSource,
     ExperimentOperationLock,
-    FilesystemRemovalTarget,
     GitRefDeletion,
     PreparedSource,
     Request,
@@ -121,14 +119,10 @@ from .service_models import (
     SourceImportResult,
     TrashStage,  # noqa: F401 - compatibility export for legacy alab.services callers
 )
-from .service_models import (
-    ResolvedRemovalTarget as _ResolvedRemovalTarget,
-)
 from .service_text import (
     _assert_display_name,
     _assert_non_empty_text,
     _assert_utf8_max_bytes,
-    _lifecycle_reason,
     _read_text_input_file,
 )
 from .source_import import (
@@ -2191,27 +2185,6 @@ def _selected_config_row(conn, project: Any, selector: str | None) -> tuple[int,
     return int(version), selector, row
 
 
-def _runner_sandbox_summary(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _runner_sandbox_summary as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _exportable_config_json(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _exportable_config_json as _impl
-
-    return _impl(*args, **kwargs)
-
-
-RUNTIME_CONFIG_KEYS = {"source", "runner", "reward", "artifacts", "logs", "env", "secret_env"}
-
-
-def _runtime_signature(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _runtime_signature as _impl
-
-    return _impl(*args, **kwargs)
-
-
 def _source_for_ref(conn, project_id: str, source_ref: str | None) -> Any:
     if not source_ref:
         raise AlabError("SOURCE_NOT_FOUND", "source.default_source_ref is not set")
@@ -2225,493 +2198,119 @@ def _source_for_ref(conn, project_id: str, source_ref: str | None) -> Any:
     return row
 
 
-def _secret_marker_summary(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _secret_marker_summary as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _validate_env_name(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _validate_env_name as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _apply_project_config(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _apply_project_config as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_project_list(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--include-archived",))
-    require_options_at_most_once(args, ("--include-archived",))
-    require_actor(req, "root")
-    require_positional_count(args, 0, "project list accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        if flag(args, "--include-archived"):
-            rows = all_rows(conn, "SELECT * FROM projects ORDER BY created_at")
-        else:
-            rows = all_rows(conn, "SELECT * FROM projects WHERE status != 'archived' ORDER BY created_at")
-        return [
-            ResultBlock(
-                "project",
-                [
-                    ("project id", row["project_id"]),
-                    ("project name", project_config_json_obj(one(conn, "SELECT canonical_config_json FROM project_config_versions WHERE project_id = ? AND version = ?", (row["project_id"], row["latest_attempted_config_version"]))["canonical_config_json"])["project"]["name"]),
-                    ("project status", row["status"]),
-                    ("created at", row["created_at"]),
-                    ("updated at", row["updated_at"]),
-                    ("archived at", row["archived_at"]),
-                ],
-            )
-            for row in rows
-        ]
-    finally:
-        conn.close()
-
-
-def cmd_project_show(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project_id = _project_id_from_request(args, req)
-    require_actor(req, ("root", "admin"), project_id=project_id)
-    require_positional_count(args, 0, "project show accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        cfg, _, cfg_json = _load_config_and_secrets(conn, project["project_id"], project["latest_attempted_config_version"])
-        return [
-            ResultBlock(
-                "project",
-                [
-                    ("project id", project["project_id"]),
-                    ("home id", one(conn, "SELECT home_id FROM homes LIMIT 1")["home_id"]),
-                    ("project name", cfg.project.name),
-                    ("status", project["status"]),
-                    ("task", multiline_text(cfg.project.task)),
-                    ("goal", multiline_text(cfg.project.goal)),
-                    ("active config version", project["active_valid_config_version"]),
-                    ("latest attempted config version", project["latest_attempted_config_version"]),
-                    ("default source", cfg.source.default_source_ref),
-                    ("runner type", cfg.runner.type),
-                    ("sandbox", _runner_sandbox_summary(cfg)),
-                    ("reward type", cfg.reward.type),
-                    ("visibility scope", cfg.visibility.scope),
-                    ("mutable summary", f"include={len(cfg.mutable.include)} exclude={len(cfg.mutable.exclude)}"),
-                    ("public exp create", cfg.project.allow_public_exp_create),
-                ],
-            )
-        ]
-    finally:
-        conn.close()
-
-
-def cmd_project_archive(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    require_positional_count(args, 0, "project archive accepts no positional arguments")
-    with Database(req.globals.home).tx() as conn:
-        project = dict(_project_row(conn, project["project_id"]))
-        previous = project["status"]
-        archived_at = project["archived_at"] or utc_now()
-        if previous != "archived":
-            active_lock = one(conn, "SELECT lock_name FROM locks WHERE project_id = ? LIMIT 1", (project["project_id"],))
-            if active_lock:
-                raise AlabError("RESOURCE_BUSY", "project has active locks")
-            conn.execute(
-                "UPDATE projects SET status = 'archived', pre_archive_status = ?, archived_at = ?, updated_at = ? WHERE project_id = ?",
-                (previous, archived_at, archived_at, project["project_id"]),
-            )
-            audit(
-                conn,
-                action="archive",
-                object_type="project",
-                object_id=project["project_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                metadata={
-                    "schema_version": 1,
-                    "previous_status": previous,
-                    "project_status": "archived",
-                    "archived_at": archived_at,
-                },
-            )
-        return [
-            ResultBlock(
-                "project",
-                [
-                    ("project id", project["project_id"]),
-                    ("previous status", previous),
-                    ("project status", "archived"),
-                    ("archived at", archived_at),
-                ],
-            )
-        ]
-
-
-def cmd_project_unarchive(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    require_positional_count(args, 0, "project unarchive accepts no positional arguments")
-    with Database(req.globals.home).tx() as conn:
-        project = dict(_project_row(conn, project["project_id"]))
-        previous = project["status"]
-        restored = project["pre_archive_status"] or "invalid"
-        now = utc_now() if previous == "archived" else None
-        if previous == "archived":
-            conn.execute(
-                "UPDATE projects SET status = ?, pre_archive_status = NULL, archived_at = NULL, updated_at = ? WHERE project_id = ?",
-                (restored, now, project["project_id"]),
-            )
-            audit(
-                conn,
-                action="unarchive",
-                object_type="project",
-                object_id=project["project_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                metadata={
-                    "schema_version": 1,
-                    "previous_status": previous,
-                    "project_status": restored,
-                    "unarchived_at": now,
-                },
-            )
-        return [
-            ResultBlock(
-                "project",
-                [
-                    ("project id", project["project_id"]),
-                    ("previous status", previous),
-                    ("project status", restored if previous == "archived" else previous),
-                    ("unarchived at", now),
-                ],
-            )
-        ]
-
-
-def _resolve_removal_path(path: Path) -> Path:
-    return path.expanduser().resolve(strict=False)
-
-
-def _dedupe_nested_removal_targets(targets: list[FilesystemRemovalTarget]) -> list[FilesystemRemovalTarget]:
-    resolved_targets = [_ResolvedRemovalTarget(target, _resolve_removal_path(target.path), order) for order, target in enumerate(targets)]
-    resolved_targets.sort(key=lambda item: (len(item.resolved.parts), str(item.resolved), item.order))
-    kept: list[_ResolvedRemovalTarget] = []
-    seen: set[str] = set()
-    for item in resolved_targets:
-        key = str(item.resolved)
-        if key in seen:
-            continue
-        if any(item.resolved == kept_item.resolved or kept_item.resolved in item.resolved.parents for kept_item in kept):
-            continue
-        seen.add(key)
-        kept.append(item)
-    return [item.target for item in kept]
-
-
-def _project_remove_filesystem_targets(conn, home: Home, project: dict[str, Any]) -> list[FilesystemRemovalTarget]:
-    project_id = project["project_id"]
-    project_root, repo_git, artifact_store = _project_paths(home, project_id)
-    targets: list[FilesystemRemovalTarget] = [
-        FilesystemRemovalTarget("project_root", project_id, project_root),
-        FilesystemRemovalTarget("project_repo", project_id, Path(project["canonical_repo_path"]) if project.get("canonical_repo_path") else repo_git),
-        FilesystemRemovalTarget("project_artifacts", project_id, artifact_store),
-    ]
-    if project.get("control_path"):
-        targets.append(FilesystemRemovalTarget("project_control", project_id, Path(project["control_path"])))
-    for row in all_rows(
-        conn,
-        """
-        SELECT path_registry_id, context_type, token_id, path
-        FROM path_registry
-        WHERE project_id = ? AND status = 'active'
-        ORDER BY context_type, path_registry_id
-        """,
-        (project_id,),
-    ):
-        object_id = row["token_id"] if row["context_type"] == "inspection" and row["token_id"] else row["path_registry_id"]
-        targets.append(FilesystemRemovalTarget(row["context_type"], object_id, Path(row["path"])))
-    return _dedupe_nested_removal_targets(targets)
-
-
-def cmd_project_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--cascade", "--force", "--confirm", "--reason"))
-    project_id = _project_id_from_request(args, req)
-    actor = require_actor(req, "root", project_id=project_id)
-    require_options_at_most_once(args, ("--dry-run", "--cascade", "--reason"))
-    require_dry_run_unforced(args)
-    require_positional_count(args, 0, "project remove accepts no positional arguments")
-    dry_run = flag(args, "--dry-run")
-    cascade = flag(args, "--cascade")
-    conn = require_home(req.globals.home)
-    try:
-        project = dict(_project_row(conn, project_id))
-        blockers = [] if project["status"] == "archived" else ["target_not_archived"]
-        if one(conn, "SELECT lock_name FROM locks WHERE project_id = ? LIMIT 1", (project["project_id"],)):
-            blockers.append("project_has_active_lock")
-        counts = {
-            "experiments": one(conn, "SELECT count(*) AS c FROM experiments WHERE project_id = ?", (project["project_id"],))["c"],
-            "runs": one(conn, "SELECT count(*) AS c FROM runs WHERE project_id = ?", (project["project_id"],))["c"],
-            "artifacts": one(conn, "SELECT count(*) AS c FROM artifacts WHERE project_id = ?", (project["project_id"],))["c"],
-            "logs": one(conn, "SELECT count(*) AS c FROM log_streams WHERE project_id = ?", (project["project_id"],))["c"],
-            "sources": one(conn, "SELECT count(*) AS c FROM sources WHERE project_id = ?", (project["project_id"],))["c"],
-        }
-        filesystem_targets = _project_remove_filesystem_targets(conn, req.globals.home, project)
-    finally:
-        conn.close()
-    reason = _lifecycle_reason(args)
-    if not cascade:
-        raise AlabError("CONFIG_INVALID", "project remove requires --cascade")
-    if dry_run:
-        return [
-            ResultBlock(
-                "project",
-                [
-                    ("project id", project["project_id"]),
-                    ("dry run", True),
-                    ("removed", False),
-                    ("cascade", cascade),
-                    ("audit id", None),
-                    ("blocker", blockers),
-                    ("deleted experiments", counts["experiments"]),
-                    ("deleted runs", counts["runs"]),
-                    ("deleted artifacts", counts["artifacts"]),
-                    ("deleted logs", counts["logs"]),
-                    ("deleted sources", counts["sources"]),
-                    ("deleted filesystem paths", len(filesystem_targets)),
-                    ("filesystem path", [str(target.path) for target in filesystem_targets]),
-                    ("planned trash move", [_trash_plan(req.globals.home, target.path) for target in filesystem_targets]),
-                ],
-            )
-        ]
-    require_force_confirm(args, project["project_id"], "project remove requires --force and matching --confirm")
-    if blockers:
-        raise AlabError("RESOURCE_BUSY", ", ".join(blockers))
-    audit_id = new_id("aud", "remove")
-    stages = _stage_targets_to_trash(req.globals.home, filesystem_targets, audit_id)
-    try:
-        with Database(req.globals.home).tx() as tx:
-            now = utc_now()
-            tx.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE project_id = ? AND status = 'active'", (now, project["project_id"]))
-            tx.execute(
-                "UPDATE path_registry SET status = 'removed', removed_at = ?, removed_by_credential_id = ?, updated_at = ? WHERE project_id = ? AND status = 'active'",
-                (now, actor.credential_id, now, project["project_id"]),
-            )
-            audit(
-                tx,
-                action="remove",
-                object_type="project",
-                object_id=project["project_id"],
-                actor=actor,
-                audit_id=audit_id,
-                project_id=project["project_id"],
-                cascade=True,
-                reason=reason,
-                metadata={
-                    "schema_version": 1,
-                    "filesystem_target_count": len(filesystem_targets),
-                    "filesystem_absent_count": sum(1 for stage in stages if stage.already_absent),
-                    "trash": [
-                        {
-                            "kind": target.kind,
-                            "object_id": target.object_id,
-                            "mode": stage.mode,
-                            "label": stage.audit_label,
-                            "original_path_hash": path_hash(stage.original_path) if stage.original_path else None,
-                            "already_absent": stage.already_absent,
-                        }
-                        for target, stage in zip(filesystem_targets, stages, strict=False)
-                    ],
-                },
-            )
-            tx.execute("DELETE FROM annotation_revisions WHERE annotation_id IN (SELECT annotation_id FROM annotations WHERE project_id = ?)", (project["project_id"],))
-            for table in [
-                "annotations",
-                "experiment_tags",
-                "experiment_submissions",
-                "runs",
-                "project_validations",
-                "artifacts",
-                "log_streams",
-                "experiments",
-                "sources",
-                "project_config_versions",
-                "secret_values",
-                "locks",
-                "projects",
-            ]:
-                tx.execute(f"DELETE FROM {table} WHERE project_id = ?", (project["project_id"],))
-    except Exception as exc:
-        _raise_after_staged_trash_transaction_failure(exc, stages)
-    trash_cleanup_pending = _finalize_staged_trashes(req.globals.home, stages, project["project_id"])
-    return [
-        ResultBlock(
-            "project",
-            [
-                ("project id", project["project_id"]),
-                ("dry run", False),
-                ("removed", True),
-                ("cascade", True),
-                ("audit id", audit_id),
-                ("deleted experiments", counts["experiments"]),
-                ("deleted runs", counts["runs"]),
-                ("deleted artifacts", counts["artifacts"]),
-                ("deleted logs", counts["logs"]),
-                ("deleted sources", counts["sources"]),
-                ("deleted filesystem paths", len(filesystem_targets)),
-                ("trash cleanup pending", trash_cleanup_pending),
-            ],
-        )
-    ]
-
-
-def cmd_project_config_show(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_config_show as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_config_export(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_config_export as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_config_import(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_config_import as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_config_set(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_config_set as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_env_list(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_env_list as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_env_set(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_env_set as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_env_unset(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_env_unset as _impl
-
-    return _impl(args, req)
-
-
-def _read_secret_input(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _read_secret_input as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_project_secret_list(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_secret_list as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_secret_set(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_secret_set as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_secret_unset(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_secret_unset as _impl
-
-    return _impl(args, req)
-
-
-def _referenced_secret_ids(*args: Any, **kwargs: Any) -> Any:
-    from .project_config import _referenced_secret_ids as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_project_secret_gc(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_config import cmd_project_secret_gc as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_validate(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_validation import cmd_project_validate as _impl
-
-    return _impl(args, req)
-
-
-def _validation_row(*args: Any, **kwargs: Any) -> Any:
-    from .project_validation import _validation_row as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _validation_blockers(*args: Any, **kwargs: Any) -> Any:
-    from .project_validation import _validation_blockers as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_project_validation_archive(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_validation import cmd_project_validation_archive as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_validation_unarchive(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_validation import cmd_project_validation_unarchive as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_validation_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    from .project_validation import cmd_project_validation_remove as _impl
-
-    return _impl(args, req)
-
-
-def cmd_project_locks_clear_stale(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    require_positional_count(args, 0, "project locks clear-stale accepts no positional arguments")
-    with Database(req.globals.home).tx() as conn:
-        now = utc_now()
-        rows = all_rows(conn, "SELECT * FROM locks WHERE project_id = ? AND expires_at < ? ORDER BY lock_name", (project["project_id"], now))
-        lock_names = [row["lock_name"] for row in rows]
-        audit_id = None
-        if lock_names:
-            conn.executemany("DELETE FROM locks WHERE lock_name = ?", [(name,) for name in lock_names])
-            audit_id = audit(
-                conn,
-                action="clear",
-                object_type="lock",
-                object_id=project["project_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                metadata={"schema_version": 1, "cleared_count": len(lock_names)},
-            )
-    return [
-        ResultBlock(
-            "lock_clear",
-            [
-                ("project id", project["project_id"]),
-                ("cleared count", len(lock_names)),
-                ("lock name", lock_names),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
+_COMPAT_EXPORTS: dict[str, tuple[str, str]] = {
+    "RUNTIME_CONFIG_KEYS": (".project_config", "RUNTIME_CONFIG_KEYS"),
+    "_active_worktree_token": (".experiment_access", "_active_worktree_token"),
+    "_append_experiment_search_clause": (".experiment_query", "_append_experiment_search_clause"),
+    "_append_visible_exp_clause": (".experiment_query", "_append_visible_exp_clause"),
+    "_apply_project_config": (".project_config", "_apply_project_config"),
+    "_artifact_log_filesystem_targets": (".experiment_lifecycle", "_artifact_log_filesystem_targets"),
+    "_authorize_checkout_remove": (".experiment_access", "_authorize_checkout_remove"),
+    "_best_context": (".experiment_query", "_best_context"),
+    "_best_run_for_experiment": (".experiment_query", "_best_run_for_experiment"),
+    "_best_run_from_joined_experiment_row": (".experiment_query", "_best_run_from_joined_experiment_row"),
+    "_best_run_sql_clauses": (".experiment_query", "_best_run_sql_clauses"),
+    "_best_run_window_order": (".experiment_query", "_best_run_window_order"),
+    "_config_json_for_version": (".experiment_query", "_config_json_for_version"),
+    "_credential_selector_sql": (".experiment_access", "_credential_selector_sql"),
+    "_current_visibility_policy": (".experiment_query", "_current_visibility_policy"),
+    "_dedupe_nested_removal_targets": (".project_lifecycle", "_dedupe_nested_removal_targets"),
+    "_delete_experiment_branch_ref": (".experiment_access", "_delete_experiment_branch_ref"),
+    "_experiment_best_rows_with_excluded_count": (".experiment_query", "_experiment_best_rows_with_excluded_count"),
+    "_experiment_branch_ref": (".experiment_access", "_experiment_branch_ref"),
+    "_experiment_candidate_sql": (".experiment_query", "_experiment_candidate_sql"),
+    "_experiment_list_search_rows_with_best": (".experiment_query", "_experiment_list_search_rows_with_best"),
+    "_experiment_order_limit_clause": (".experiment_query", "_experiment_order_limit_clause"),
+    "_experiment_page_rows": (".experiment_query", "_experiment_page_rows"),
+    "_experiment_query_clauses": (".experiment_query", "_experiment_query_clauses"),
+    "_experiment_remove_filesystem_targets": (".experiment_lifecycle", "_experiment_remove_filesystem_targets"),
+    "_experiment_requested_sort_field": (".experiment_query", "_experiment_requested_sort_field"),
+    "_experiment_result_block": (".experiment_query", "_experiment_result_block"),
+    "_experiment_rows_with_ranked_best": (".experiment_query", "_experiment_rows_with_ranked_best"),
+    "_exp_visible": (".experiment_query", "_exp_visible"),
+    "_exportable_config_json": (".project_config", "_exportable_config_json"),
+    "_git_ref_commit": (".experiment_access", "_git_ref_commit"),
+    "_incomparable_best_run_count": (".experiment_query", "_incomparable_best_run_count"),
+    "_intersect_visibility": (".experiment_query", "_intersect_visibility"),
+    "_optional_best_context": (".experiment_query", "_optional_best_context"),
+    "_path_registry_row_for_token": (".experiment_access", "_path_registry_row_for_token"),
+    "_project_remove_filesystem_targets": (".project_lifecycle", "_project_remove_filesystem_targets"),
+    "_prune_missing_git_worktrees": (".experiment_access", "_prune_missing_git_worktrees"),
+    "_public_from_exp_visible": (".experiment_query", "_public_from_exp_visible"),
+    "_read_secret_input": (".project_config", "_read_secret_input"),
+    "_referenced_secret_ids": (".project_config", "_referenced_secret_ids"),
+    "_require_experiment_query_options_at_most_once": (
+        ".experiment_query",
+        "_require_experiment_query_options_at_most_once",
+    ),
+    "_resolve_commit_sha_selector": (".experiment_access", "_resolve_commit_sha_selector"),
+    "_resolve_exp_commit": (".experiment_access", "_resolve_exp_commit"),
+    "_resolve_removal_path": (".project_lifecycle", "_resolve_removal_path"),
+    "_restore_experiment_branch_ref": (".experiment_access", "_restore_experiment_branch_ref"),
+    "_reward_bound_sql": (".experiment_query", "_reward_bound_sql"),
+    "_reward_direction_from_config_json": (".experiment_query", "_reward_direction_from_config_json"),
+    "_reward_identity_config_versions": (".experiment_query", "_reward_identity_config_versions"),
+    "_reward_identity_from_config_json": (".experiment_query", "_reward_identity_from_config_json"),
+    "_runner_sandbox_summary": (".project_config", "_runner_sandbox_summary"),
+    "_runtime_signature": (".project_config", "_runtime_signature"),
+    "_secret_marker_summary": (".project_config", "_secret_marker_summary"),
+    "_sql_in_clause": (".experiment_query", "_sql_in_clause"),
+    "_stored_relative_path": (".experiment_lifecycle", "_stored_relative_path"),
+    "_token_path_status": (".experiment_access", "_token_path_status"),
+    "_validate_env_name": (".project_config", "_validate_env_name"),
+    "_validation_blockers": (".project_validation", "_validation_blockers"),
+    "_validation_row": (".project_validation", "_validation_row"),
+    "_visible_exp_ids": (".experiment_query", "_visible_exp_ids"),
+    "cmd_exp_archive": (".experiment_lifecycle", "cmd_exp_archive"),
+    "cmd_exp_best": (".experiment_query", "cmd_exp_best"),
+    "cmd_exp_checkout": (".experiment_access", "cmd_exp_checkout"),
+    "cmd_exp_checkout_remove": (".experiment_access", "cmd_exp_checkout_remove"),
+    "cmd_exp_list": (".experiment_query", "cmd_exp_list"),
+    "cmd_exp_remove": (".experiment_lifecycle", "cmd_exp_remove"),
+    "cmd_exp_search": (".experiment_query", "cmd_exp_search"),
+    "cmd_exp_show": (".experiment_query", "cmd_exp_show"),
+    "cmd_exp_token_list": (".experiment_access", "cmd_exp_token_list"),
+    "cmd_exp_token_regenerate": (".experiment_access", "cmd_exp_token_regenerate"),
+    "cmd_exp_token_revoke": (".experiment_access", "cmd_exp_token_revoke"),
+    "cmd_exp_unarchive": (".experiment_lifecycle", "cmd_exp_unarchive"),
+    "cmd_exp_worktree_remove": (".experiment_access", "cmd_exp_worktree_remove"),
+    "cmd_exp_worktree_restore": (".experiment_access", "cmd_exp_worktree_restore"),
+    "cmd_project_archive": (".project_lifecycle", "cmd_project_archive"),
+    "cmd_project_config_export": (".project_config", "cmd_project_config_export"),
+    "cmd_project_config_import": (".project_config", "cmd_project_config_import"),
+    "cmd_project_config_set": (".project_config", "cmd_project_config_set"),
+    "cmd_project_config_show": (".project_config", "cmd_project_config_show"),
+    "cmd_project_env_list": (".project_config", "cmd_project_env_list"),
+    "cmd_project_env_set": (".project_config", "cmd_project_env_set"),
+    "cmd_project_env_unset": (".project_config", "cmd_project_env_unset"),
+    "cmd_project_locks_clear_stale": (".project_lifecycle", "cmd_project_locks_clear_stale"),
+    "cmd_project_list": (".project_lifecycle", "cmd_project_list"),
+    "cmd_project_remove": (".project_lifecycle", "cmd_project_remove"),
+    "cmd_project_secret_gc": (".project_config", "cmd_project_secret_gc"),
+    "cmd_project_secret_list": (".project_config", "cmd_project_secret_list"),
+    "cmd_project_secret_set": (".project_config", "cmd_project_secret_set"),
+    "cmd_project_secret_unset": (".project_config", "cmd_project_secret_unset"),
+    "cmd_project_show": (".project_lifecycle", "cmd_project_show"),
+    "cmd_project_unarchive": (".project_lifecycle", "cmd_project_unarchive"),
+    "cmd_project_validate": (".project_validation", "cmd_project_validate"),
+    "cmd_project_validation_archive": (".project_validation", "cmd_project_validation_archive"),
+    "cmd_project_validation_remove": (".project_validation", "cmd_project_validation_remove"),
+    "cmd_project_validation_unarchive": (".project_validation", "cmd_project_validation_unarchive"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    target = _COMPAT_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = target
+    value = getattr(import_module(module_name, __package__), attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_COMPAT_EXPORTS))
 
 
 def cmd_status(args: list[str], req: Request) -> list[ResultBlock]:
@@ -3090,6 +2689,9 @@ def _optional_request_actor(req: Request, project_id: str | None) -> Actor | Non
 
 
 def cmd_exp_create(args: list[str], req: Request) -> list[ResultBlock]:
+    from .experiment_access import _resolve_exp_commit
+    from .experiment_query import _exp_visible, _intersect_visibility, _public_from_exp_visible
+
     require_known_options(
         args,
         (
@@ -3732,6 +3334,8 @@ def cmd_run(args: list[str], req: Request) -> list[ResultBlock]:
 
 
 def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
+    from .experiment_query import _exp_visible
+
     require_known_options(
         args,
         (
@@ -3880,258 +3484,12 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
         _release_experiment_run_submit_lock(req.globals.home, operation_lock)
 
 
-def _reward_identity_from_config_json(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _reward_identity_from_config_json as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _reward_direction_from_config_json(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _reward_direction_from_config_json as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _config_json_for_version(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _config_json_for_version as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _current_visibility_policy(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _current_visibility_policy as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _intersect_visibility(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _intersect_visibility as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _public_from_exp_visible(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _public_from_exp_visible as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _visible_exp_ids(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _visible_exp_ids as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _append_visible_exp_clause(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _append_visible_exp_clause as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _exp_visible(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _exp_visible as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _best_context(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _best_context as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _optional_best_context(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _optional_best_context as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _best_run_for_experiment(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _best_run_for_experiment as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _sql_in_clause(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _sql_in_clause as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _reward_identity_config_versions(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _reward_identity_config_versions as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _best_run_window_order(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _best_run_window_order as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _best_run_sql_clauses(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _best_run_sql_clauses as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _append_experiment_search_clause(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _append_experiment_search_clause as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_query_clauses(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_query_clauses as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_candidate_sql(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_candidate_sql as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_requested_sort_field(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_requested_sort_field as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_order_limit_clause(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_order_limit_clause as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _best_run_from_joined_experiment_row(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _best_run_from_joined_experiment_row as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _reward_bound_sql(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _reward_bound_sql as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _best_runs_for_experiments(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _best_runs_for_experiments as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_page_rows(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_page_rows as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_rows_with_ranked_best(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_rows_with_ranked_best as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_list_search_rows_with_best(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_list_search_rows_with_best as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _incomparable_best_run_count(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _incomparable_best_run_count as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_best_rows_with_excluded_count(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_best_rows_with_excluded_count as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_result_block(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _experiment_result_block as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _require_experiment_query_options_at_most_once(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_query import _require_experiment_query_options_at_most_once as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_exp_list(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_query import cmd_exp_list as _impl
-
-    return _impl(args, req)
-
-
 def _exp_row(conn, project_id: str, exp_id: str | None) -> Any:
     exp_id = _complete_id_or_missing(exp_id, prefix="exp", code="EXPERIMENT_NOT_FOUND", label="experiment id")
     row = one(conn, "SELECT * FROM experiments WHERE project_id = ? AND exp_id = ?", (project_id, exp_id))
     if row is None:
         raise AlabError("EXPERIMENT_NOT_FOUND", "experiment not found")
     return row
-
-
-def cmd_exp_search(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_query import cmd_exp_search as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_show(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_query import cmd_exp_show as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_best(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_query import cmd_exp_best as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_archive(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_lifecycle import cmd_exp_archive as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_unarchive(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_lifecycle import cmd_exp_unarchive as _impl
-
-    return _impl(args, req)
-
-
-def _stored_relative_path(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_lifecycle import _stored_relative_path as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _artifact_log_filesystem_targets(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_lifecycle import _artifact_log_filesystem_targets as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _experiment_remove_filesystem_targets(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_lifecycle import _experiment_remove_filesystem_targets as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_exp_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_lifecycle import cmd_exp_remove as _impl
-
-    return _impl(args, req)
 
 
 def _authorize_tag(req: Request, project_id: str, exp_id: str) -> Actor:
@@ -4213,61 +3571,15 @@ def cmd_exp_tag_list(args: list[str], req: Request) -> list[ResultBlock]:
     return [ResultBlock("tag", [("exp id", exp_id), ("tag", None), ("action", "list"), ("tags", tags)])]
 
 
-def _resolve_exp_commit(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _resolve_exp_commit as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _resolve_commit_sha_selector(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _resolve_commit_sha_selector as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _path_registry_row_for_token(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _path_registry_row_for_token as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _token_path_status(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _token_path_status as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _active_worktree_token(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _active_worktree_token as _impl
-
-    return _impl(*args, **kwargs)
-
-
 def _source_branch_ref(source_ref: str) -> str:
     if not source_ref.startswith("alab/source/src-"):
         raise AlabError("GIT_ERROR", "refusing to delete unexpected source branch")
     return f"refs/heads/{source_ref}"
 
 
-def _experiment_branch_ref(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _experiment_branch_ref as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _git_ref_commit(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _git_ref_commit as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def _delete_experiment_branch_ref(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _delete_experiment_branch_ref as _impl
-
-    return _impl(*args, **kwargs)
-
-
 def _delete_source_ref(repo_git: Path, source_ref: str) -> GitRefDeletion:
+    from .experiment_access import _git_ref_commit
+
     branch_ref = _source_branch_ref(source_ref)
     commit = _git_ref_commit(repo_git, branch_ref)
     if commit is None:
@@ -4279,12 +3591,6 @@ def _delete_source_ref(repo_git: Path, source_ref: str) -> GitRefDeletion:
     return GitRefDeletion(branch_ref, commit, True, False)
 
 
-def _restore_experiment_branch_ref(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _restore_experiment_branch_ref as _impl
-
-    return _impl(*args, **kwargs)
-
-
 def _restore_source_ref(repo_git: Path, deletion: GitRefDeletion | None) -> None:
     if deletion is None or not deletion.deleted or deletion.commit is None:
         return
@@ -4292,66 +3598,6 @@ def _restore_source_ref(repo_git: Path, deletion: GitRefDeletion | None) -> None
     if result.returncode != 0:
         reason = result.stderr.decode("utf-8", errors="replace").strip() or "failed to restore source branch ref"
         raise AlabError("GIT_ERROR", reason)
-
-
-def _prune_missing_git_worktrees(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _prune_missing_git_worktrees as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_exp_worktree_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_worktree_remove as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_worktree_restore(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_worktree_restore as _impl
-
-    return _impl(args, req)
-
-
-def _credential_selector_sql(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _credential_selector_sql as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_exp_token_list(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_token_list as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_token_revoke(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_token_revoke as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_token_regenerate(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_token_regenerate as _impl
-
-    return _impl(args, req)
-
-
-def cmd_exp_checkout(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_checkout as _impl
-
-    return _impl(args, req)
-
-
-def _authorize_checkout_remove(*args: Any, **kwargs: Any) -> Any:
-    from .experiment_access import _authorize_checkout_remove as _impl
-
-    return _impl(*args, **kwargs)
-
-
-def cmd_exp_checkout_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    from .experiment_access import cmd_exp_checkout_remove as _impl
-
-    return _impl(args, req)
 
 
 def _authorize_observe(req: Request, project_id: str | None, *, admin_required: bool = False) -> Actor:

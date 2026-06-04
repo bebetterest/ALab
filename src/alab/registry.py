@@ -72,6 +72,14 @@ from .project_config import (
     cmd_project_secret_set,
     cmd_project_secret_unset,
 )
+from .project_lifecycle import (
+    cmd_project_archive,
+    cmd_project_list,
+    cmd_project_locks_clear_stale,
+    cmd_project_remove,
+    cmd_project_show,
+    cmd_project_unarchive,
+)
 from .project_validation import (
     cmd_project_validate,
     cmd_project_validation_archive,
@@ -93,13 +101,7 @@ from .services import (
     cmd_exp_tag_list,
     cmd_exp_tag_remove,
     cmd_help,
-    cmd_project_archive,
     cmd_project_init,
-    cmd_project_list,
-    cmd_project_locks_clear_stale,
-    cmd_project_remove,
-    cmd_project_show,
-    cmd_project_unarchive,
     cmd_run,
     cmd_status,
     cmd_submit,

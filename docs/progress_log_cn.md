@@ -8123,6 +8123,26 @@
 - Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
 - Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
 
+## 2026-06-04 Project Lifecycle Service Extraction and Lazy Compatibility Exports
+
+Implemented:
+
+- 将 project list/show/archive/unarchive/remove 和 project lock clear-stale handlers 从 `src/alab/services.py` 移入 `src/alab/project_lifecycle.py`。
+- 更新 `src/alab/registry.py`，从 `src/alab/project_lifecycle.py` 直接注册 project lifecycle handlers。
+- 用 centralized lazy compatibility export table 替代 `src/alab/services.py` 中 extracted-family 的显式 compatibility wrappers，继续支持 historical `alab.services.<name>` imports 访问已抽出的 project config、project validation、project lifecycle、experiment query、experiment lifecycle 和 experiment access names。
+- 将 project init、与 experiment creation 共享的 source bootstrap、global config、context、run/submit、experiment create/tags 和 tightly coupled shared helpers 保留在 `src/alab/services.py`。
+- 通过 core service export 路由 project lifecycle audit calls，保留 project-remove rollback tests 依赖的 legacy `services.audit` monkeypatch behavior。
+- 更新 progress/audit/pipeline/closed-gap documentation，并同步中文文档。
+
+Validation:
+
+- Registry and compatibility binding check：确认 `project list/show/archive/unarchive/remove/locks` commands 绑定到 `alab.project_lifecycle`，同时 historical `alab.services.cmd_project_show`、`alab.services.cmd_project_config_show`、`alab.services.cmd_exp_list` 和 `alab.services._experiment_branch_ref` 解析到已抽出的模块。
+- Relevant ruff check：`.venv/bin/ruff check src/alab/services.py src/alab/project_lifecycle.py src/alab/registry.py src/alab/project_config.py src/alab/project_validation.py src/alab/experiment_query.py src/alab/experiment_lifecycle.py src/alab/experiment_access.py`
+- Forced compile check：`.venv/bin/python -m compileall -f src/alab/services.py src/alab/project_lifecycle.py src/alab/registry.py src/alab/project_config.py src/alab/project_validation.py src/alab/experiment_query.py src/alab/experiment_lifecycle.py src/alab/experiment_access.py`
+- Focused project lifecycle and registry-derived regression checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_project_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_hard_remove_dry_runs_preserve_database_and_filesystem tests/test_smoke.py::test_project_remove_cascades_whole_tree_through_trash tests/test_smoke.py::test_project_remove_restores_whole_tree_trash_after_transaction_failure`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 仅因 dashboard loopback bind `PermissionError` 失败，失败用例为 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`。
+- Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
 ## 2026-06-04 Stable-Boundary Project and Experiment Service Extraction
 
 已实现：
