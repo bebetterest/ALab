@@ -9,7 +9,6 @@ import secrets
 import shutil
 import socket
 import sqlite3
-import sys
 import tomllib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -27,7 +26,6 @@ from .auth import (
 )
 from .catalog import _resolve_harbor_task_ref, _resolve_runner_adapter_ref
 from .configs import (
-    ENV_NAME_RE,
     ProjectConfig,
     config_hash,
     dumps_toml,
@@ -58,19 +56,19 @@ from .ids import new_id, require_complete_id, slugify
 from .proc import run_cmd
 from .removal import (
     _delete_trash_path,  # noqa: F401 - compatibility export for legacy alab.services callers
-    _finalize_staged_trash,
+    _finalize_staged_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
     _finalize_staged_trashes,
-    _path_present,
+    _path_present,  # noqa: F401 - compatibility export for legacy alab.services callers
     _raise_after_staged_trash_transaction_failure,
     _record_pending_trash_cleanup,  # noqa: F401 - compatibility export for legacy alab.services callers
     _remove_path_if_safe,  # noqa: F401 - compatibility export for legacy alab.services callers
     _remove_trash_cache_path,  # noqa: F401 - compatibility export for legacy alab.services callers
     _restore_staged_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
-    _restore_staged_trashes,
-    _stage_path_to_trash,
+    _restore_staged_trashes,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _stage_path_to_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
     _stage_targets_to_trash,
     _trash_plan,
-    _worktree_dirty_state,
+    _worktree_dirty_state,  # noqa: F401 - compatibility export for legacy alab.services callers
 )
 from .rendering import ResultBlock, multiline_text
 from .runner import (
@@ -85,21 +83,12 @@ from .runner import (
 )
 from .service_args import (
     _exp_commit_selector_filter,
-    _is_commit_sha_selector,
-    _parse_float_option,
-    _parse_limit_offset,
-    _parse_positive_int_option,
-    _register_observe_text_predicates,
     _require_option_choice,
-    _require_ordered_range,
-    _require_ordered_time_range,
-    _sql_order_limit_clause,
     command_arg,
     command_args,
     flag,
     option_count,
     optional_positional_selector,
-    require_dry_run_skip_baseline_compatible,
     require_dry_run_unforced,
     require_exactly_one_option_pair,
     require_force_confirm,
@@ -120,8 +109,6 @@ from .service_contracts import (
 )
 from .service_models import (
     DEFAULT_SOURCE_IMPORT_LIMITS,
-    EXPERIMENT_STATUSES,
-    TOKEN_MODES,
     VISIBILITY_SCOPES,
     AdapterDerivedSource,
     ExperimentOperationLock,
@@ -150,7 +137,7 @@ from .source_import import (
     init_snapshot_repo,
     reject_gitlinks,
 )
-from .timeutil import parse_rfc3339_utc, utc_now
+from .timeutil import utc_now
 
 EMPTY_COMMAND_VALUE_ALLOWED = _service_args.EMPTY_COMMAND_VALUE_ALLOWED
 OPTIONS_WITH_VALUES = _service_args.OPTIONS_WITH_VALUES
@@ -2204,28 +2191,25 @@ def _selected_config_row(conn, project: Any, selector: str | None) -> tuple[int,
     return int(version), selector, row
 
 
-def _runner_sandbox_summary(config: ProjectConfig) -> str:
-    if config.runner.type == "skydiscover_python":
-        return "not-os-sandbox"
-    return "not-declared"
+def _runner_sandbox_summary(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _runner_sandbox_summary as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _exportable_config_json(config_json: dict[str, Any]) -> dict[str, Any]:
-    exported = json.loads(canonical_json(config_json))
-    secret_env = exported.get("secret_env", {})
-    exported["secret_env"] = {
-        name: {"retain": True, "fingerprint": marker.get("fingerprint")}
-        for name, marker in sorted(secret_env.items())
-        if isinstance(marker, dict)
-    }
-    return exported
+def _exportable_config_json(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _exportable_config_json as _impl
+
+    return _impl(*args, **kwargs)
 
 
 RUNTIME_CONFIG_KEYS = {"source", "runner", "reward", "artifacts", "logs", "env", "secret_env"}
 
 
-def _runtime_signature(config_json: dict[str, Any]) -> str:
-    return canonical_json({key: config_json.get(key) for key in sorted(RUNTIME_CONFIG_KEYS)})
+def _runtime_signature(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _runtime_signature as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def _source_for_ref(conn, project_id: str, source_ref: str | None) -> Any:
@@ -2241,240 +2225,22 @@ def _source_for_ref(conn, project_id: str, source_ref: str | None) -> Any:
     return row
 
 
-def _secret_marker_summary(config_json: dict[str, Any]) -> tuple[list[str], list[str]]:
-    secret_env = config_json.get("secret_env", {})
-    names: list[str] = []
-    fingerprints: list[str] = []
-    for name in sorted(secret_env):
-        marker = secret_env[name]
-        names.append(name)
-        fingerprints.append(marker.get("fingerprint") if isinstance(marker, dict) else "none")
-    return names, fingerprints
+def _secret_marker_summary(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _secret_marker_summary as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _validate_env_name(name: str) -> None:
-    if not ENV_NAME_RE.match(name):
-        raise AlabError("CONFIG_INVALID", f"invalid environment variable name: {name}")
+def _validate_env_name(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _validate_env_name as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _apply_project_config(
-    args: list[str],
-    req: Request,
-    *,
-    project: Any,
-    actor: Actor,
-    next_config: ProjectConfig,
-    dry_run: bool = False,
-    skip_baseline: bool = False,
-) -> list[ResultBlock]:
-    _validate_project_config_text_fields(next_config)
-    if dry_run and skip_baseline:
-        raise AlabError("CONFIG_INVALID", "--dry-run conflicts with --skip-baseline-test")
-    warning_codes: list[str] = []
-    db = Database(req.globals.home)
-    conn = require_home(req.globals.home)
-    try:
-        current_version = project["latest_attempted_config_version"]
-        current_row = one(
-            conn,
-            "SELECT * FROM project_config_versions WHERE project_id = ? AND version = ?",
-            (project["project_id"], current_version),
-        )
-        if current_row is None:
-            raise AlabError("PROJECT_INVALID", "project has no config version")
-        current_json = project_config_json_obj(current_row["canonical_config_json"])
-        base_secret_markers = current_json.get("secret_env", {})
-        fingerprint_key = bytes(project["secret_fingerprint_key"])
-        if dry_run:
-            # Validate secret retain markers and raw secret shape without writing new rows.
-            for name, value in next_config.secret_env.items():
-                if isinstance(value, dict) and value.get("retain"):
-                    marker = base_secret_markers.get(name)
-                    if marker is None:
-                        raise AlabError("CONFIG_INVALID", f"secret_env.{name} retain marker has no previous secret value")
-                    if value.get("fingerprint") and marker.get("fingerprint") and value["fingerprint"] != marker["fingerprint"]:
-                        raise AlabError("CONFIG_INVALID", f"secret_env.{name} retain marker fingerprint does not match")
-                if isinstance(value, str) and ("\n" in value or "\0" in value or len(value.encode("utf-8")) < 4):
-                    raise AlabError("CONFIG_INVALID", "secret_env values must be single-line UTF-8 strings at least 4 bytes")
-            _validate_docker_config_capabilities(conn, next_config, allow_probe=False)
-            _validate_adapter_config_refs(conn, next_config, allow_probe=False)
-            next_json = next_config.canonical_dict()
-            for name, marker in list(next_json.get("secret_env", {}).items()):
-                if isinstance(marker, dict) and marker.get("retain"):
-                    next_json["secret_env"][name] = base_secret_markers[name]
-                elif isinstance(marker, str):
-                    next_json["secret_env"][name] = {"fingerprint": _secret_fingerprint(fingerprint_key, name, marker)}
-            new_hash = config_hash(next_json)
-            runtime_affecting = _runtime_signature(current_json) != _runtime_signature(next_json)
-            return [
-                ResultBlock(
-                    "project_config",
-                    [
-                        ("project id", project["project_id"]),
-                        ("previous active config version", project["active_valid_config_version"]),
-                        ("latest attempted config version", current_version),
-                        ("runtime affecting", runtime_affecting),
-                        ("validation status", "dry-run"),
-                        ("project status", project["status"]),
-                        ("next", "rerun without --dry-run"),
-                    ],
-                )
-            ]
-    finally:
-        conn.close()
+def _apply_project_config(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _apply_project_config as _impl
 
-    with db.tx() as tx:
-        project = dict(_project_row(tx, project["project_id"]))
-        current_version = project["latest_attempted_config_version"]
-        current_row = one(
-            tx,
-            "SELECT * FROM project_config_versions WHERE project_id = ? AND version = ?",
-            (project["project_id"], current_version),
-        )
-        if current_row is None:
-            raise AlabError("PROJECT_INVALID", "project has no config version")
-        current_json = project_config_json_obj(current_row["canonical_config_json"])
-        _validate_docker_config_capabilities(tx, next_config)
-        _validate_adapter_config_refs(tx, next_config)
-        config_json, raw_secrets = _store_secret_values(
-            tx,
-            project["project_id"],
-            bytes(project["secret_fingerprint_key"]),
-            next_config,
-            actor,
-            current_json.get("secret_env", {}),
-        )
-        new_hash = config_hash(config_json)
-        runtime_affecting = _runtime_signature(current_json) != _runtime_signature(config_json)
-        if new_hash == current_row["config_hash"]:
-            return [
-                ResultBlock(
-                    "project_config",
-                    [
-                        ("project id", project["project_id"]),
-                        ("previous active config version", project["active_valid_config_version"]),
-                        ("latest attempted config version", current_version),
-                        ("runtime affecting", False),
-                        ("validation status", current_row["validation_status"]),
-                        ("project status", project["status"]),
-                        ("next", "none"),
-                    ],
-                )
-            ]
-        new_version = int(current_version) + 1
-        now = utc_now()
-        validation_id = new_id("val", "config")
-        inherited_validation_id = project["active_validation_id"] if not runtime_affecting else None
-        validation_status = "running" if runtime_affecting and not skip_baseline else "skipped" if runtime_affecting else "inherited"
-        tx.execute(
-            """
-            INSERT INTO project_config_versions(project_id, version, canonical_config_json, config_hash,
-              baseline_required, validation_status, inherited_from_validation_id, created_at, created_by_credential_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                project["project_id"],
-                new_version,
-                canonical_json(project_config_json_obj(canonical_json(config_json))),
-                new_hash,
-                1 if runtime_affecting else 0,
-                validation_status,
-                inherited_validation_id,
-                now,
-                actor.credential_id,
-            ),
-        )
-        source = _source_for_ref(tx, project["project_id"], config_json.get("source", {}).get("default_source_ref"))
-        if runtime_affecting:
-            tx.execute(
-                """
-                INSERT INTO project_validations(validation_id, project_id, config_version, source_ref, source_commit,
-                  status, exit_code, reward_value, reward_parse_status, archive_status, started_at, ended_at, record_json)
-                VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'not_attempted', 'active', ?, ?, ?)
-                """,
-                (
-                    validation_id,
-                    project["project_id"],
-                    new_version,
-                    source["source_ref"],
-                    source["source_commit"],
-                    "skipped" if skip_baseline else "running",
-                    now,
-                    now if skip_baseline else None,
-                    _execution_record_object_json(
-                        config_hash_value=new_hash,
-                        runner_type=next_config.runner.type,
-                        reward_type=next_config.reward.type,
-                    ),
-                ),
-            )
-        next_active = (
-            new_version
-            if not runtime_affecting and project["active_valid_config_version"]
-            else project["active_valid_config_version"]
-        )
-        next_active_validation = project["active_validation_id"]
-        next_status = project["status"]
-        if runtime_affecting and skip_baseline:
-            next_status = "invalid"
-        tx.execute(
-            """
-            UPDATE projects
-            SET latest_attempted_config_version = ?, active_valid_config_version = ?, active_validation_id = ?, updated_at = ?, status = ?
-            WHERE project_id = ?
-            """,
-            (new_version, next_active, next_active_validation, now, next_status, project["project_id"]),
-        )
-    if runtime_affecting and not skip_baseline:
-        with db.tx() as tx:
-            validation_status, exit_code, reward, reward_parse_status, warning_codes = _run_validation(
-                tx,
-                req.globals.home,
-                project["project_id"],
-                validation_id,
-                source["source_ref"],
-                source["source_commit"],
-                new_version,
-                next_config,
-                raw_secrets,
-            )
-            project_status = "valid" if validation_status == "passed" else "invalid"
-            active_version = (
-                new_version
-                if validation_status == "passed"
-                else project["active_valid_config_version"]
-            )
-            active_validation = (
-                validation_id
-                if validation_status == "passed"
-                else project["active_validation_id"]
-            )
-            tx.execute(
-                "UPDATE projects SET status = ?, active_valid_config_version = ?, active_validation_id = ?, updated_at = ? WHERE project_id = ?",
-                (project_status, active_version, active_validation, utc_now(), project["project_id"]),
-            )
-            tx.execute(
-                "UPDATE project_config_versions SET validation_status = ? WHERE project_id = ? AND version = ?",
-                (validation_status, project["project_id"], new_version),
-            )
-    else:
-        project_status = "invalid" if runtime_affecting and skip_baseline else project["status"]
-    next_action = "alab exp create --name <name>" if project_status == "valid" else "alab project validate"
-    fields: list[tuple[str, Any]] = [
-        ("project id", project["project_id"]),
-        ("previous active config version", project["active_valid_config_version"]),
-        ("latest attempted config version", new_version),
-        ("runtime affecting", runtime_affecting),
-        ("validation status", validation_status),
-        ("project status", project_status),
-        ("warning code", warning_codes),
-    ]
-    failure_fields = _baseline_failure_fields(validation_status, next_action)
-    if failure_fields:
-        fields.extend(failure_fields)
-    else:
-        fields.append(("next", next_action))
-    return [ResultBlock("project_config", fields)]
+    return _impl(*args, **kwargs)
 
 
 def cmd_project_list(args: list[str], req: Request) -> list[ResultBlock]:
@@ -2802,727 +2568,117 @@ def cmd_project_remove(args: list[str], req: Request) -> list[ResultBlock]:
 
 
 def cmd_project_config_show(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--version"))
-    require_options_at_most_once(args, ("--version",))
-    project_id = _project_id_from_request(args, req)
-    require_actor(req, ("root", "admin"), project_id=project_id)
-    require_positional_count(args, 0, "project config show accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        version, selector, cfg_row = _selected_config_row(conn, project, command_arg(args, "--version", default="latest-attempted"))
-        config_json = project_config_json_obj(cfg_row["canonical_config_json"])
-        cfg = ProjectConfig.model_validate(config_json)
-        secret_names, secret_fingerprints = _secret_marker_summary(config_json)
-        return [
-            ResultBlock(
-                "project_config",
-                [
-                    ("project id", project["project_id"]),
-                    ("config version", version),
-                    ("version selector", selector),
-                    ("config hash", cfg_row["config_hash"]),
-                    ("project name", cfg.project.name),
-                    ("task", multiline_text(cfg.project.task)),
-                    ("goal", multiline_text(cfg.project.goal)),
-                    ("default source", cfg.source.default_source_ref),
-                    ("runner type", cfg.runner.type),
-                    ("sandbox", _runner_sandbox_summary(cfg)),
-                    ("runner working directory", cfg.runner.working_directory),
-                    ("timeout seconds", cfg.runner.timeout_seconds),
-                    ("env mode", cfg.runner.env_mode),
-                    ("reward type", cfg.reward.type),
-                    ("reward direction", cfg.reward.direction),
-                    ("primary metric", cfg.reward.primary_metric),
-                    ("artifact glob count", len(cfg.artifacts.globs)),
-                    ("stdout limit bytes", cfg.logs.stdout_limit_bytes),
-                    ("stderr limit bytes", cfg.logs.stderr_limit_bytes),
-                    ("mutable summary", f"include={len(cfg.mutable.include)} exclude={len(cfg.mutable.exclude)}"),
-                    ("visibility scope", cfg.visibility.scope),
-                    ("public exp create", cfg.project.allow_public_exp_create),
-                    ("env name", sorted(config_json.get("env", {}).keys())),
-                    ("secret name", secret_names),
-                    ("secret fingerprint", secret_fingerprints),
-                ],
-            )
-        ]
-    finally:
-        conn.close()
+    from .project_config import cmd_project_config_show as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_config_export(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--out", "--version", "--overwrite"))
-    require_options_at_most_once(args, ("--out", "--version", "--overwrite"))
-    project_id = _project_id_from_request(args, req)
-    require_actor(req, ("root", "admin"), project_id=project_id)
-    out = command_arg(args, "--out", required=True)
-    require_positional_count(args, 0, "project config export accepts no positional arguments")
-    out_path = Path(out).expanduser()
-    _assert_export_output_path(out_path, overwrite=flag(args, "--overwrite"), require_existing_parent=False)
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        version, _selector, cfg_row = _selected_config_row(conn, project, command_arg(args, "--version", default="latest-attempted"))
-        export_json = _exportable_config_json(project_config_json_obj(cfg_row["canonical_config_json"]))
-    finally:
-        conn.close()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(dumps_toml(export_json), encoding="utf-8")
-    return [
-        ResultBlock(
-            "project_config",
-            [
-                ("project id", project["project_id"]),
-                ("config version", version),
-                ("out", str(out_path)),
-                ("wrote", True),
-                ("secret mode", "retain"),
-            ],
-        )
-    ]
+    from .project_config import cmd_project_config_export as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_config_import(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--config", "--dry-run", "--skip-baseline-test"))
-    require_options_at_most_once(args, ("--config", "--dry-run", "--skip-baseline-test"))
-    require_dry_run_skip_baseline_compatible(args)
-    project, actor = _require_project_admin(args, req)
-    config_path = Path(command_arg(args, "--config", required=True))
-    require_positional_count(args, 0, "project config import accepts no positional arguments")
-    next_config = load_project_config(config_path)
-    return _apply_project_config(
-        args,
-        req,
-        project=project,
-        actor=actor,
-        next_config=next_config,
-        dry_run=flag(args, "--dry-run"),
-        skip_baseline=flag(args, "--skip-baseline-test"),
-    )
+    from .project_config import cmd_project_config_import as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_config_set(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--skip-baseline-test"))
-    require_options_at_most_once(args, ("--dry-run", "--skip-baseline-test"))
-    require_dry_run_skip_baseline_compatible(args)
-    project, actor = _require_project_admin(args, req)
-    pos = require_positional_count(args, 2, "project config set requires field and TOML literal")
-    field, value = pos[0], pos[1]
-    if field == "secret_env" or field.startswith("secret_env."):
-        raise AlabError("CONFIG_INVALID", "secret_env changes must use project secret or config import retain markers")
-    conn = require_home(req.globals.home)
-    try:
-        _version, _selector, cfg_row = _selected_config_row(conn, project, "latest-attempted")
-        data = project_config_json_obj(cfg_row["canonical_config_json"])
-    finally:
-        conn.close()
-    data = set_nested_toml_value(data, field, value)
-    try:
-        next_config = ProjectConfig.model_validate(data)
-    except Exception as exc:
-        raise AlabError("CONFIG_INVALID", str(exc)) from exc
-    return _apply_project_config(
-        args,
-        req,
-        project=project,
-        actor=actor,
-        next_config=next_config,
-        dry_run=flag(args, "--dry-run"),
-        skip_baseline=flag(args, "--skip-baseline-test"),
-    )
+    from .project_config import cmd_project_config_set as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_env_list(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project_id = _project_id_from_request(args, req)
-    require_actor(req, ("root", "admin"), project_id=project_id)
-    require_positional_count(args, 0, "project env list accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        version, _selector, cfg_row = _selected_config_row(conn, project, "latest-attempted")
-        env = project_config_json_obj(cfg_row["canonical_config_json"]).get("env", {})
-        return [
-            ResultBlock("project_env", [("project id", project_id), ("config version", version), ("env name", name), ("value", value)])
-            for name, value in sorted(env.items())
-        ]
-    finally:
-        conn.close()
+    from .project_config import cmd_project_env_list as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_env_set(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--skip-baseline-test"))
-    require_options_at_most_once(args, ("--dry-run", "--skip-baseline-test"))
-    require_dry_run_skip_baseline_compatible(args)
-    project, actor = _require_project_admin(args, req)
-    pos = require_positional_count(args, 2, "project env set requires name and value")
-    name, value = pos[0], pos[1]
-    _validate_env_name(name)
-    conn = require_home(req.globals.home)
-    try:
-        _version, _selector, cfg_row = _selected_config_row(conn, project, "latest-attempted")
-        data = project_config_json_obj(cfg_row["canonical_config_json"])
-    finally:
-        conn.close()
-    data.setdefault("env", {})[name] = value
-    next_config = ProjectConfig.model_validate(data)
-    blocks = _apply_project_config(
-        args,
-        req,
-        project=project,
-        actor=actor,
-        next_config=next_config,
-        dry_run=flag(args, "--dry-run"),
-        skip_baseline=flag(args, "--skip-baseline-test"),
-    )
-    fields = dict(blocks[0].fields)
-    result_fields: list[tuple[str, Any]] = [
-        ("project id", project["project_id"]),
-        ("config version", fields.get("latest attempted config version")),
-        ("env name", name),
-        ("action", "set"),
-        ("runtime affecting", fields.get("runtime affecting")),
-        ("validation status", fields.get("validation status")),
-    ]
-    result_fields.extend(_result_failure_tail(blocks[0].fields))
-    return [
-        ResultBlock(
-            "project_env",
-            result_fields,
-        )
-    ]
+    from .project_config import cmd_project_env_set as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_env_unset(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--skip-baseline-test"))
-    require_options_at_most_once(args, ("--dry-run", "--skip-baseline-test"))
-    require_dry_run_skip_baseline_compatible(args)
-    project, actor = _require_project_admin(args, req)
-    pos = require_positional_count(args, 1, "project env unset requires name")
-    name = pos[0]
-    _validate_env_name(name)
-    conn = require_home(req.globals.home)
-    try:
-        _version, _selector, cfg_row = _selected_config_row(conn, project, "latest-attempted")
-        data = project_config_json_obj(cfg_row["canonical_config_json"])
-    finally:
-        conn.close()
-    data.setdefault("env", {}).pop(name, None)
-    next_config = ProjectConfig.model_validate(data)
-    blocks = _apply_project_config(
-        args,
-        req,
-        project=project,
-        actor=actor,
-        next_config=next_config,
-        dry_run=flag(args, "--dry-run"),
-        skip_baseline=flag(args, "--skip-baseline-test"),
-    )
-    fields = dict(blocks[0].fields)
-    result_fields: list[tuple[str, Any]] = [
-        ("project id", project["project_id"]),
-        ("config version", fields.get("latest attempted config version")),
-        ("env name", name),
-        ("action", "unset"),
-        ("runtime affecting", fields.get("runtime affecting")),
-        ("validation status", fields.get("validation status")),
-    ]
-    result_fields.extend(_result_failure_tail(blocks[0].fields))
-    return [
-        ResultBlock(
-            "project_env",
-            result_fields,
-        )
-    ]
+    from .project_config import cmd_project_env_unset as _impl
+
+    return _impl(args, req)
 
 
-def _read_secret_input(args: list[str]) -> str:
-    require_exactly_one_option_pair(args, "--value-stdin", "--value-file", "project secret set requires exactly one of --value-stdin or --value-file")
-    value_file = command_arg(args, "--value-file")
-    value = _read_text_input_file(value_file, "secret value") if value_file else sys.stdin.read()
-    if value.endswith("\n"):
-        value = value[:-1]
-    if not value or "\n" in value or "\0" in value or len(value.encode("utf-8")) < 4:
-        raise AlabError("CONFIG_INVALID", "secret value must be a single-line UTF-8 string at least 4 bytes")
-    return value
+def _read_secret_input(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _read_secret_input as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_project_secret_list(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project_id = _project_id_from_request(args, req)
-    require_actor(req, ("root", "admin"), project_id=project_id)
-    require_positional_count(args, 0, "project secret list accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        _project_row(conn, project_id)
-        rows = all_rows(conn, "SELECT * FROM secret_values WHERE project_id = ? ORDER BY name, created_at", (project_id,))
-        referenced_ids: set[str] = set()
-        for cfg in all_rows(conn, "SELECT canonical_config_json FROM project_config_versions WHERE project_id = ?", (project_id,)):
-            for marker in project_config_json_obj(cfg["canonical_config_json"]).get("secret_env", {}).values():
-                if isinstance(marker, dict) and marker.get("secret_value_id"):
-                    referenced_ids.add(marker["secret_value_id"])
-        return [
-            ResultBlock(
-                "project_secret",
-                [
-                    ("project id", project_id),
-                    ("secret name", row["name"]),
-                    ("secret fingerprint", row["fingerprint"]),
-                    ("referenced", row["secret_value_id"] in referenced_ids),
-                    ("created at", row["created_at"]),
-                    ("replaced at", row["replaced_at"]),
-                ],
-            )
-            for row in rows
-        ]
-    finally:
-        conn.close()
+    from .project_config import cmd_project_secret_list as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_secret_set(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--value-stdin", "--value-file", "--dry-run", "--skip-baseline-test"))
-    require_options_at_most_once(args, ("--value-stdin", "--value-file", "--dry-run", "--skip-baseline-test"))
-    require_dry_run_skip_baseline_compatible(args)
-    project, actor = _require_project_admin(args, req)
-    pos = require_positional_count(args, 1, "project secret set requires name")
-    name = pos[0]
-    _validate_env_name(name)
-    value = _read_secret_input(args)
-    conn = require_home(req.globals.home)
-    try:
-        _version, _selector, cfg_row = _selected_config_row(conn, project, "latest-attempted")
-        data = project_config_json_obj(cfg_row["canonical_config_json"])
-    finally:
-        conn.close()
-    data.setdefault("secret_env", {})[name] = value
-    next_config = ProjectConfig.model_validate(data)
-    blocks = _apply_project_config(
-        args,
-        req,
-        project=project,
-        actor=actor,
-        next_config=next_config,
-        dry_run=flag(args, "--dry-run"),
-        skip_baseline=flag(args, "--skip-baseline-test"),
-    )
-    fields = dict(blocks[0].fields)
-    conn = require_home(req.globals.home)
-    try:
-        _version, _selector, cfg_row = _selected_config_row(conn, _project_row(conn, project["project_id"]), "latest-attempted")
-        marker = project_config_json_obj(cfg_row["canonical_config_json"]).get("secret_env", {}).get(name, {})
-    finally:
-        conn.close()
-    result_fields: list[tuple[str, Any]] = [
-        ("project id", project["project_id"]),
-        ("config version", fields.get("latest attempted config version")),
-        ("secret name", name),
-        ("action", "set"),
-        ("secret fingerprint", marker.get("fingerprint") if isinstance(marker, dict) else None),
-        ("runtime affecting", fields.get("runtime affecting")),
-        ("validation status", fields.get("validation status")),
-    ]
-    result_fields.extend(_result_failure_tail(blocks[0].fields))
-    return [
-        ResultBlock(
-            "project_secret",
-            result_fields,
-        )
-    ]
+    from .project_config import cmd_project_secret_set as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_secret_unset(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--skip-baseline-test"))
-    require_options_at_most_once(args, ("--dry-run", "--skip-baseline-test"))
-    require_dry_run_skip_baseline_compatible(args)
-    project, actor = _require_project_admin(args, req)
-    pos = require_positional_count(args, 1, "project secret unset requires name")
-    name = pos[0]
-    _validate_env_name(name)
-    conn = require_home(req.globals.home)
-    try:
-        _version, _selector, cfg_row = _selected_config_row(conn, project, "latest-attempted")
-        data = project_config_json_obj(cfg_row["canonical_config_json"])
-        marker = data.setdefault("secret_env", {}).pop(name, None)
-    finally:
-        conn.close()
-    next_config = ProjectConfig.model_validate(data)
-    blocks = _apply_project_config(
-        args,
-        req,
-        project=project,
-        actor=actor,
-        next_config=next_config,
-        dry_run=flag(args, "--dry-run"),
-        skip_baseline=flag(args, "--skip-baseline-test"),
-    )
-    fields = dict(blocks[0].fields)
-    result_fields: list[tuple[str, Any]] = [
-        ("project id", project["project_id"]),
-        ("config version", fields.get("latest attempted config version")),
-        ("secret name", name),
-        ("action", "unset"),
-        ("secret fingerprint", marker.get("fingerprint") if isinstance(marker, dict) else None),
-        ("runtime affecting", fields.get("runtime affecting")),
-        ("validation status", fields.get("validation status")),
-    ]
-    result_fields.extend(_result_failure_tail(blocks[0].fields))
-    return [
-        ResultBlock(
-            "project_secret",
-            result_fields,
-        )
-    ]
+    from .project_config import cmd_project_secret_unset as _impl
+
+    return _impl(args, req)
 
 
-def _referenced_secret_ids(conn, project_id: str) -> set[str]:
-    referenced_ids: set[str] = set()
-    for cfg in all_rows(conn, "SELECT canonical_config_json FROM project_config_versions WHERE project_id = ?", (project_id,)):
-        for marker in project_config_json_obj(cfg["canonical_config_json"]).get("secret_env", {}).values():
-            if isinstance(marker, dict) and marker.get("secret_value_id"):
-                referenced_ids.add(marker["secret_value_id"])
-    return referenced_ids
+def _referenced_secret_ids(*args: Any, **kwargs: Any) -> Any:
+    from .project_config import _referenced_secret_ids as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_project_secret_gc(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--apply"))
-    require_options_at_most_once(args, ("--dry-run", "--apply"))
-    project, actor = _require_project_admin(args, req)
-    require_positional_count(args, 0, "project secret gc accepts no positional arguments")
-    require_exactly_one_option_pair(args, "--dry-run", "--apply", "project secret gc requires exactly one of --dry-run or --apply")
-    apply = flag(args, "--apply")
-    with Database(req.globals.home).tx() as conn:
-        referenced_ids = _referenced_secret_ids(conn, project["project_id"])
-        rows = all_rows(conn, "SELECT * FROM secret_values WHERE project_id = ? ORDER BY created_at", (project["project_id"],))
-        unreferenced = [row for row in rows if row["secret_value_id"] not in referenced_ids]
-        audit_id = None
-        if apply and unreferenced:
-            conn.executemany("DELETE FROM secret_values WHERE secret_value_id = ?", [(row["secret_value_id"],) for row in unreferenced])
-            audit_id = audit(
-                conn,
-                action="gc",
-                object_type="secret_value",
-                object_id=project["project_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                metadata={"schema_version": 1, "deleted_count": len(unreferenced)},
-            )
-    return [
-        ResultBlock(
-            "project_secret",
-            [
-                ("project id", project["project_id"]),
-                ("dry run", not apply),
-                ("deleted count", len(unreferenced)),
-                ("secret value id", [row["secret_value_id"] for row in unreferenced]),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
+    from .project_config import cmd_project_secret_gc as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_validate(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    require_positional_count(args, 0, "project validate accepts no positional arguments")
-    db = Database(req.globals.home)
-    with db.tx() as conn:
-        _interrupt_stale_running_records(conn, project_id=project["project_id"])
-        project = dict(_project_row(conn, project["project_id"]))
-        version = project["latest_attempted_config_version"]
-        cfg, secrets_map, cfg_json = _load_config_and_secrets(conn, project["project_id"], version)
-        source = _source_for_ref(conn, project["project_id"], cfg.source.default_source_ref)
-        validation_id = new_id("val", "manual")
-        now = utc_now()
-        conn.execute(
-            """
-            INSERT INTO project_validations(validation_id, project_id, config_version, source_ref, source_commit,
-              status, exit_code, reward_value, reward_parse_status, archive_status, started_at, ended_at, record_json)
-            VALUES (?, ?, ?, ?, ?, 'running', NULL, NULL, 'not_attempted', 'active', ?, NULL, ?)
-            """,
-            (
-                validation_id,
-                project["project_id"],
-                version,
-                source["source_ref"],
-                source["source_commit"],
-                now,
-                _execution_record_object_json(
-                    config_hash_value=config_hash(cfg_json),
-                    runner_type=cfg.runner.type,
-                    reward_type=cfg.reward.type,
-                ),
-            ),
-        )
-        conn.execute(
-            "UPDATE project_config_versions SET baseline_required = 1, validation_status = 'running' WHERE project_id = ? AND version = ?",
-            (project["project_id"], version),
-        )
-    with db.tx() as conn:
-        status, exit_code, reward, reward_parse_status, warning_codes = _run_validation(
-            conn,
-            req.globals.home,
-            project["project_id"],
-            validation_id,
-            source["source_ref"],
-            source["source_commit"],
-            version,
-            cfg,
-            secrets_map,
-        )
-        project_status = "valid" if status == "passed" else "invalid"
-        active_version = version if status == "passed" else project["active_valid_config_version"]
-        active_validation = validation_id if status == "passed" else project["active_validation_id"]
-        conn.execute(
-            "UPDATE projects SET status = ?, active_valid_config_version = ?, active_validation_id = ?, updated_at = ? WHERE project_id = ?",
-            (project_status, active_version, active_validation, utc_now(), project["project_id"]),
-        )
-        conn.execute(
-            "UPDATE project_config_versions SET validation_status = ? WHERE project_id = ? AND version = ?",
-            (status, project["project_id"], version),
-        )
-    next_action = "alab exp create --name <name>" if project_status == "valid" else "fix config or source and rerun alab project validate"
-    fields: list[tuple[str, Any]] = [
-        ("project id", project["project_id"]),
-        ("validation id", validation_id),
-        ("config version", version),
-        ("validation status", status),
-        ("exit code", exit_code),
-        ("reward", reward),
-        ("reward parse status", reward_parse_status),
-        ("project status", project_status),
-        ("warning code", warning_codes),
-    ]
-    failure_fields = _baseline_failure_fields(status, next_action)
-    if failure_fields:
-        fields.extend(failure_fields)
-    else:
-        fields.append(("next", next_action))
-    return [ResultBlock("validation", fields)]
+    from .project_validation import cmd_project_validate as _impl
+
+    return _impl(args, req)
 
 
-def _validation_row(conn, project_id: str, validation_id: str | None) -> Any:
-    validation_id = _complete_id_or_missing(validation_id, prefix="val", code="VALIDATION_NOT_FOUND", label="validation id")
-    row = one(conn, "SELECT * FROM project_validations WHERE project_id = ? AND validation_id = ?", (project_id, validation_id))
-    if row is None:
-        raise AlabError("VALIDATION_NOT_FOUND", "validation not found")
-    return row
+def _validation_row(*args: Any, **kwargs: Any) -> Any:
+    from .project_validation import _validation_row as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _validation_blockers(project: Any, row: Any) -> list[str]:
-    blockers: list[str] = []
-    if row["validation_id"] == project["active_validation_id"]:
-        blockers.append("active_validation")
-    if row["status"] == "running":
-        blockers.append("validation_running")
-    return blockers
+def _validation_blockers(*args: Any, **kwargs: Any) -> Any:
+    from .project_validation import _validation_blockers as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_project_validation_archive(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    validation_id = optional_positional_selector(args, "validation archive accepts exactly one validation id")
-    with Database(req.globals.home).tx() as conn:
-        _interrupt_stale_running_records(conn, project_id=project["project_id"])
-        row = _validation_row(conn, project["project_id"], validation_id)
-        blockers = _validation_blockers(project, row)
-        if blockers:
-            raise AlabError("RESOURCE_BUSY", ", ".join(blockers))
-        previous = row["archive_status"]
-        archived_at = row["archived_at"] if previous == "archived" and row["archived_at"] else utc_now()
-        audit_id = None
-        if previous != "archived":
-            conn.execute("UPDATE project_validations SET archive_status = 'archived', archived_at = ? WHERE validation_id = ?", (archived_at, row["validation_id"]))
-            audit_id = audit(
-                conn,
-                action="archive",
-                object_type="validation",
-                object_id=row["validation_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                metadata={
-                    "schema_version": 1,
-                    "previous_archive_status": previous,
-                    "archive_status": "archived",
-                    "archived_at": archived_at,
-                },
-            )
-    return [
-        ResultBlock(
-            "validation",
-            [
-                ("project id", project["project_id"]),
-                ("validation id", validation_id),
-                ("previous archive status", previous),
-                ("archive status", "archived"),
-                ("archived at", archived_at),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
+    from .project_validation import cmd_project_validation_archive as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_validation_unarchive(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    validation_id = optional_positional_selector(args, "validation unarchive accepts exactly one validation id")
-    with Database(req.globals.home).tx() as conn:
-        _interrupt_stale_running_records(conn, project_id=project["project_id"])
-        row = _validation_row(conn, project["project_id"], validation_id)
-        previous = row["archive_status"]
-        unarchived_at = utc_now() if previous != "active" else row["unarchived_at"]
-        audit_id = None
-        if previous != "active":
-            conn.execute("UPDATE project_validations SET archive_status = 'active', archived_at = NULL, unarchived_at = ? WHERE validation_id = ?", (unarchived_at, row["validation_id"]))
-            audit_id = audit(
-                conn,
-                action="unarchive",
-                object_type="validation",
-                object_id=row["validation_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                metadata={
-                    "schema_version": 1,
-                    "previous_archive_status": previous,
-                    "archive_status": "active",
-                    "unarchived_at": unarchived_at,
-                },
-            )
-    return [
-        ResultBlock(
-            "validation",
-            [
-                ("project id", project["project_id"]),
-                ("validation id", validation_id),
-                ("previous archive status", previous),
-                ("archive status", "active"),
-                ("unarchived at", unarchived_at),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
+    from .project_validation import cmd_project_validation_unarchive as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_validation_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--cascade", "--force", "--confirm", "--reason"))
-    require_options_at_most_once(args, ("--dry-run", "--cascade", "--reason"))
-    require_dry_run_unforced(args)
-    project, actor = _require_project_admin(args, req)
-    validation_id = optional_positional_selector(args, "validation remove accepts exactly one validation id")
-    dry_run = flag(args, "--dry-run")
-    cascade = flag(args, "--cascade")
-    conn = require_home(req.globals.home)
-    try:
-        _interrupt_stale_running_records(conn, project_id=project["project_id"])
-        conn.commit()
-        row = dict(_validation_row(conn, project["project_id"], validation_id))
-        blockers = _validation_blockers(project, row)
-        if row["archive_status"] != "archived":
-            blockers.append("target_not_archived")
-        artifact_rows = all_rows(conn, "SELECT * FROM artifacts WHERE project_id = ? AND validation_id = ? ORDER BY artifact_id", (project["project_id"], row["validation_id"]))
-        log_rows = all_rows(conn, "SELECT * FROM log_streams WHERE project_id = ? AND validation_id = ? ORDER BY log_id", (project["project_id"], row["validation_id"]))
-        counts = {"artifacts": len(artifact_rows), "logs": len(log_rows)}
-        active_dependent_artifacts = sum(1 for artifact in artifact_rows if artifact["archive_status"] != "archived")
-        active_dependent_logs = sum(1 for log in log_rows if log["archive_status"] != "archived")
-        if (counts["artifacts"] or counts["logs"]) and not cascade:
-            blockers.append("dependent_records_require_cascade")
-        if cascade and (active_dependent_artifacts or active_dependent_logs):
-            blockers.append("dependent_records_not_archived")
-        filesystem_targets = _artifact_log_filesystem_targets(
-            conn,
-            req.globals.home,
-            project["project_id"],
-            artifact_rows=artifact_rows,
-            log_rows=log_rows,
-        )
-    finally:
-        conn.close()
-    reason = _lifecycle_reason(args)
-    if dry_run:
-        return [
-            ResultBlock(
-                "validation",
-                [
-                    ("project id", project["project_id"]),
-                    ("validation id", row["validation_id"]),
-                    ("dry run", True),
-                    ("removed", False),
-                    ("cascade", cascade),
-                    ("audit id", None),
-                    ("blocker", blockers),
-                    ("deleted artifacts", counts["artifacts"]),
-                    ("deleted logs", counts["logs"]),
-                    ("active dependent artifacts", active_dependent_artifacts),
-                    ("active dependent logs", active_dependent_logs),
-                    ("deleted filesystem paths", len(filesystem_targets)),
-                    ("filesystem path", [str(target.path) for target in filesystem_targets]),
-                    ("planned trash move", [_trash_plan(req.globals.home, target.path) for target in filesystem_targets]),
-                ],
-            )
-        ]
-    require_force_confirm(args, row["validation_id"], "validation remove requires --force and matching --confirm")
-    if blockers:
-        raise AlabError("RESOURCE_BUSY", ", ".join(blockers))
-    audit_id = new_id("aud", "remove")
-    stages = _stage_targets_to_trash(req.globals.home, filesystem_targets, audit_id)
-    try:
-        with Database(req.globals.home).tx() as tx:
-            audit(
-                tx,
-                action="remove",
-                object_type="validation",
-                object_id=row["validation_id"],
-                actor=actor,
-                audit_id=audit_id,
-                project_id=project["project_id"],
-                cascade=cascade,
-                reason=reason,
-                metadata={
-                    "schema_version": 1,
-                    "deleted_artifact_count": counts["artifacts"],
-                    "deleted_log_count": counts["logs"],
-                    "active_dependent_artifact_count": active_dependent_artifacts,
-                    "active_dependent_log_count": active_dependent_logs,
-                    "filesystem_target_count": len(filesystem_targets),
-                    "filesystem_absent_count": sum(1 for stage in stages if stage.already_absent),
-                    "trash": [
-                        {
-                            "kind": target.kind,
-                            "object_id": target.object_id,
-                            "mode": stage.mode,
-                            "label": stage.audit_label,
-                            "original_path_hash": path_hash(stage.original_path) if stage.original_path else None,
-                            "already_absent": stage.already_absent,
-                        }
-                        for target, stage in zip(filesystem_targets, stages, strict=False)
-                    ],
-                },
-            )
-            tx.execute("DELETE FROM artifacts WHERE validation_id = ?", (row["validation_id"],))
-            tx.execute("DELETE FROM log_streams WHERE validation_id = ?", (row["validation_id"],))
-            tx.execute("DELETE FROM project_validations WHERE validation_id = ?", (row["validation_id"],))
-    except Exception as exc:
-        _raise_after_staged_trash_transaction_failure(exc, stages)
-    trash_cleanup_pending = _finalize_staged_trashes(req.globals.home, stages, project["project_id"])
-    return [
-        ResultBlock(
-            "validation",
-            [
-                ("project id", project["project_id"]),
-                ("validation id", row["validation_id"]),
-                ("dry run", False),
-                ("removed", True),
-                ("cascade", cascade),
-                ("audit id", audit_id),
-                ("blocker", []),
-                ("deleted artifacts", counts["artifacts"]),
-                ("deleted logs", counts["logs"]),
-                ("active dependent artifacts", active_dependent_artifacts),
-                ("active dependent logs", active_dependent_logs),
-                ("deleted filesystem paths", len(filesystem_targets)),
-                ("trash cleanup pending", trash_cleanup_pending),
-            ],
-        )
-    ]
+    from .project_validation import cmd_project_validation_remove as _impl
+
+    return _impl(args, req)
 
 
 def cmd_project_locks_clear_stale(args: list[str], req: Request) -> list[ResultBlock]:
@@ -4724,820 +3880,196 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
         _release_experiment_run_submit_lock(req.globals.home, operation_lock)
 
 
-def _reward_identity_from_config_json(config_json: dict[str, Any]) -> str:
-    reward = config_json.get("reward") or {}
-    comparable = {
-        "schema_version": 1,
-        "type": reward.get("type"),
-        "direction": reward.get("direction", "maximize"),
-        "primary_metric": reward.get("primary_metric", "reward"),
-        "path": reward.get("path"),
-        "pattern": reward.get("pattern"),
-    }
-    return canonical_json(comparable)
+def _reward_identity_from_config_json(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _reward_identity_from_config_json as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _reward_direction_from_config_json(config_json: dict[str, Any]) -> str:
-    reward = config_json.get("reward") or {}
-    direction = reward.get("direction", "maximize")
-    if direction not in {"maximize", "minimize"}:
-        raise AlabError("CONFIG_INVALID", "invalid reward direction in config")
-    return direction
+def _reward_direction_from_config_json(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _reward_direction_from_config_json as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _config_json_for_version(conn, project_id: str, version: int) -> dict[str, Any]:
-    row = one(
-        conn,
-        "SELECT canonical_config_json FROM project_config_versions WHERE project_id = ? AND version = ?",
-        (project_id, version),
-    )
-    if row is None:
-        raise AlabError("CONFIG_INVALID", "config version not found")
-    return project_config_json_obj(row["canonical_config_json"])
+def _config_json_for_version(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _config_json_for_version as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _current_visibility_policy(conn, project: Any) -> dict[str, Any]:
-    version = project["latest_attempted_config_version"] or project["active_valid_config_version"]
-    if not version:
-        return {"scope": "none", "experiment_ids": []}
-    config_json = _config_json_for_version(conn, project["project_id"], int(version))
-    return config_json.get("visibility") or {"scope": "none", "experiment_ids": []}
+def _current_visibility_policy(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _current_visibility_policy as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _intersect_visibility(current: dict[str, Any], upper_bound: dict[str, Any]) -> tuple[str, set[str]]:
-    current_scope = current.get("scope", "none")
-    upper_scope = upper_bound.get("scope", "none")
-    if "none" in {current_scope, upper_scope}:
-        return "none", set()
-    if current_scope == "same_project" and upper_scope == "same_project":
-        return "same_project", set()
-    if current_scope == "explicit" and upper_scope == "explicit":
-        return "explicit", set(current.get("experiment_ids") or []) & set(upper_bound.get("experiment_ids") or [])
-    if current_scope == "explicit":
-        return "explicit", set(current.get("experiment_ids") or [])
-    if upper_scope == "explicit":
-        return "explicit", set(upper_bound.get("experiment_ids") or [])
-    return "none", set()
+def _intersect_visibility(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _intersect_visibility as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _public_from_exp_visible(conn, project: Any, source_exp: Any) -> bool:
-    if source_exp["status"] not in {"open", "closed"}:
-        return False
-    upper_bound = experiment_policy_json_obj(source_exp["policy_json"]).get("visibility_upper_bound") or {"scope": "none", "experiment_ids": []}
-    scope, explicit_ids = _intersect_visibility(_current_visibility_policy(conn, project), upper_bound)
-    if scope == "same_project":
-        return True
-    if scope == "explicit":
-        return source_exp["exp_id"] in explicit_ids
-    return False
+def _public_from_exp_visible(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _public_from_exp_visible as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _visible_exp_ids(conn, project_id: str, actor: Actor) -> set[str] | None:
-    if actor.actor_type in {"root", "admin"}:
-        return None
-    if not actor.exp_id:
-        return set()
-    project = _project_row(conn, project_id)
-    source_exp = _exp_row(conn, project_id, actor.exp_id)
-    policy = experiment_policy_json_obj(source_exp["policy_json"]).get("visibility_upper_bound") or {"scope": "none", "experiment_ids": []}
-    scope, explicit_ids = _intersect_visibility(_current_visibility_policy(conn, project), policy)
-    visible = {actor.exp_id}
-    if scope == "same_project":
-        visible.update(row["exp_id"] for row in all_rows(conn, "SELECT exp_id FROM experiments WHERE project_id = ?", (project_id,)))
-    elif scope == "explicit":
-        visible.update(explicit_ids)
-    return visible
+def _visible_exp_ids(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _visible_exp_ids as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _append_visible_exp_clause(conn, project_id: str, actor: Actor, clauses: list[str], params: list[Any], *, column: str = "exp_id") -> None:
-    if actor.actor_type in {"root", "admin"}:
-        return
-    if not actor.exp_id:
-        clauses.append("1 = 0")
-        return
-    project = _project_row(conn, project_id)
-    source_exp = _exp_row(conn, project_id, actor.exp_id)
-    policy = experiment_policy_json_obj(source_exp["policy_json"]).get("visibility_upper_bound") or {"scope": "none", "experiment_ids": []}
-    scope, explicit_ids = _intersect_visibility(_current_visibility_policy(conn, project), policy)
-    if scope == "same_project":
-        clauses.append(f"{column} IS NOT NULL")
-        return
-    visible = {actor.exp_id}
-    if scope == "explicit":
-        visible.update(explicit_ids)
-    visible_clause, visible_params = _sql_in_clause(column, visible)
-    clauses.append(visible_clause)
-    params.extend(visible_params)
+def _append_visible_exp_clause(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _append_visible_exp_clause as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _exp_visible(conn, project_id: str, actor: Actor, exp_id: str | None) -> bool:
-    if actor.actor_type in {"root", "admin"}:
-        return True
-    if not exp_id:
-        return False
-    visible = _visible_exp_ids(conn, project_id, actor)
-    return exp_id in (visible or set())
+def _exp_visible(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _exp_visible as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _best_context(conn, project: Any, args: list[str]) -> tuple[int | None, str | None, str]:
-    explicit_version = _parse_positive_int_option(args, "--config-version")
-    if explicit_version is not None:
-        config_json = _config_json_for_version(conn, project["project_id"], explicit_version)
-        return explicit_version, None, _reward_direction_from_config_json(config_json)
-    active = project["active_valid_config_version"]
-    if active is None:
-        raise AlabError("PROJECT_INVALID", "best requires an active valid config or explicit --config-version")
-    config_json = _config_json_for_version(conn, project["project_id"], int(active))
-    return None, _reward_identity_from_config_json(config_json), _reward_direction_from_config_json(config_json)
+def _best_context(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _best_context as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _optional_best_context(conn, project: Any) -> tuple[str | None, str]:
-    active = project["active_valid_config_version"]
-    if active is None:
-        return None, "maximize"
-    config_json = _config_json_for_version(conn, project["project_id"], int(active))
-    return _reward_identity_from_config_json(config_json), _reward_direction_from_config_json(config_json)
+def _optional_best_context(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _optional_best_context as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _best_run_for_experiment(
-    conn,
-    *,
-    project_id: str,
-    exp_id: str,
-    direction: str,
-    config_version: int | None = None,
-    reward_identity: str | None = None,
-    include_archived_runs: bool = False,
-) -> tuple[Any | None, int]:
-    clauses = [
-        "project_id = ?",
-        "exp_id = ?",
-        "status = 'passed'",
-        "reward_parse_status = 'parsed'",
-        "reward_value IS NOT NULL",
-    ]
-    params: list[Any] = [project_id, exp_id]
-    if config_version is not None:
-        clauses.append("config_version = ?")
-        params.append(config_version)
-    if not include_archived_runs:
-        clauses.append("archive_status = 'active'")
-    rows = all_rows(conn, f"SELECT * FROM runs WHERE {' AND '.join(clauses)}", tuple(params))
-    identity_cache: dict[int, str] = {}
-    comparable: list[Any] = []
-    excluded = 0
-    for row in rows:
-        if reward_identity is not None:
-            version = int(row["config_version"])
-            if version not in identity_cache:
-                identity_cache[version] = _reward_identity_from_config_json(_config_json_for_version(conn, project_id, version))
-            if identity_cache[version] != reward_identity:
-                excluded += 1
-                continue
-        comparable.append(row)
-    comparable.sort(key=lambda row: row["exp_id"])
-    comparable.sort(key=lambda row: row["ended_at"] or "", reverse=True)
-    comparable.sort(key=lambda row: float(row["reward_value"]), reverse=direction == "maximize")
-    return (comparable[0] if comparable else None), excluded
+def _best_run_for_experiment(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _best_run_for_experiment as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _sql_in_clause(column: str, values: list[Any] | set[Any]) -> tuple[str, tuple[Any, ...]]:
-    ordered = sorted(values)
-    if not ordered:
-        return "1 = 0", ()
-    clauses: list[str] = []
-    params: list[Any] = []
-    for idx in range(0, len(ordered), 900):
-        chunk = ordered[idx : idx + 900]
-        placeholders = ", ".join("?" for _ in chunk)
-        clauses.append(f"{column} IN ({placeholders})")
-        params.extend(chunk)
-    return f"({' OR '.join(clauses)})", tuple(params)
+def _sql_in_clause(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _sql_in_clause as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _reward_identity_config_versions(conn, project_id: str, reward_identity: str | None) -> list[int] | None:
-    if reward_identity is None:
-        return None
-    versions: list[int] = []
-    for row in all_rows(conn, "SELECT version, canonical_config_json FROM project_config_versions WHERE project_id = ?", (project_id,)):
-        config_json = project_config_json_obj(row["canonical_config_json"])
-        if _reward_identity_from_config_json(config_json) == reward_identity:
-            versions.append(int(row["version"]))
-    return versions
+def _reward_identity_config_versions(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _reward_identity_config_versions as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _best_run_window_order(direction: str, run_alias: str = "r") -> str:
-    reward_direction = "DESC" if direction == "maximize" else "ASC"
-    return f"{run_alias}.reward_value {reward_direction}, {run_alias}.ended_at DESC, {run_alias}.exp_id ASC, {run_alias}.rowid ASC"
+def _best_run_window_order(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _best_run_window_order as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _best_run_sql_clauses(
-    *,
-    project_id: str,
-    config_version: int | None,
-    reward_config_versions: list[int] | None,
-    include_archived_runs: bool,
-    exp_ids: list[str] | None = None,
-    run_alias: str = "r",
-) -> tuple[list[str], list[Any]]:
-    prefix = f"{run_alias}."
-    clauses = [
-        f"{prefix}project_id = ?",
-        f"{prefix}status = 'passed'",
-        f"{prefix}reward_parse_status = 'parsed'",
-        f"{prefix}reward_value IS NOT NULL",
-    ]
-    params: list[Any] = [project_id]
-    if exp_ids is not None:
-        exp_clause, exp_params = _sql_in_clause(f"{prefix}exp_id", exp_ids)
-        clauses.append(exp_clause)
-        params.extend(exp_params)
-    if config_version is not None:
-        clauses.append(f"{prefix}config_version = ?")
-        params.append(config_version)
-    elif reward_config_versions is not None:
-        version_clause, version_params = _sql_in_clause(f"{prefix}config_version", reward_config_versions)
-        clauses.append(version_clause)
-        params.extend(version_params)
-    if not include_archived_runs:
-        clauses.append(f"{prefix}archive_status = 'active'")
-    return clauses, params
+def _best_run_sql_clauses(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _best_run_sql_clauses as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _append_experiment_search_clause(conn, clauses: list[str], params: list[Any], exp_alias: str, actor: Actor, query: str) -> None:
-    _register_observe_text_predicates(conn)
-    prefix = f"{exp_alias}."
-    search_clauses = [
-        f"alab_record_json_field_casefold_contains({prefix}metadata_json, 'name', ?) = 1",
-        f"alab_record_json_field_casefold_contains({prefix}metadata_json, 'goal', ?) = 1",
-        f"""
-        EXISTS (
-          SELECT 1 FROM project_config_versions pcv
-          WHERE pcv.project_id = {prefix}project_id
-            AND pcv.version = {prefix}bound_config_version
-            AND (
-              alab_casefold_contains(json_extract(pcv.canonical_config_json, '$.project.name'), ?) = 1
-              OR alab_casefold_contains(json_extract(pcv.canonical_config_json, '$.project.task'), ?) = 1
-              OR alab_casefold_contains(json_extract(pcv.canonical_config_json, '$.project.goal'), ?) = 1
-            )
-        )
-        """,
-        f"""
-        EXISTS (
-          SELECT 1 FROM experiment_tags et
-          WHERE et.project_id = {prefix}project_id
-            AND et.exp_id = {prefix}exp_id
-            AND alab_casefold_contains(et.tag_slug, ?) = 1
-        )
-        """,
-        f"""
-        EXISTS (
-          SELECT 1 FROM experiment_submissions es
-          WHERE es.project_id = {prefix}project_id
-            AND es.exp_id = {prefix}exp_id
-            AND (
-              alab_casefold_contains(es.summary, ?) = 1
-              OR alab_casefold_contains(es.feedback, ?) = 1
-            )
-        )
-        """,
-    ]
-    params.extend([query, query, query, query, query, query, query, query])
-    if actor.actor_type in {"root", "admin"}:
-        annotation_visibility_sql = "1 = 1"
-        annotation_params: list[Any] = []
-    else:
-        annotation_visibility_sql = """
-        (
-          json_extract(a.visibility_json, '$.scope') = 'project'
-          OR (
-            json_extract(a.visibility_json, '$.scope') = 'private'
-            AND json_extract(a.visibility_json, '$.creator_exp_id') = ?
-          )
-        )
-        """
-        annotation_params = [actor.exp_id]
-    search_clauses.append(
-        f"""
-        EXISTS (
-          SELECT 1
-          FROM annotations a
-          JOIN annotation_revisions ar
-            ON ar.annotation_id = a.annotation_id
-           AND ar.revision = a.current_revision
-          WHERE a.project_id = {prefix}project_id
-            AND a.status = 'active'
-            AND (a.target_id = {prefix}exp_id OR json_extract(a.target_json, '$.exp_id') = {prefix}exp_id)
-            AND {annotation_visibility_sql}
-            AND alab_casefold_contains(ar.body, ?) = 1
-        )
-        """
-    )
-    params.extend(annotation_params)
-    params.append(query)
-    clauses.append(f"({' OR '.join(search_clauses)})")
+def _append_experiment_search_clause(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _append_experiment_search_clause as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_query_clauses(
-    conn,
-    project_id: str,
-    actor: Actor,
-    args: list[str],
-    *,
-    table_alias: str = "e",
-    search_query: str | None = None,
-) -> tuple[list[str], list[Any]]:
-    prefix = f"{table_alias}."
-    clauses = [f"{prefix}project_id = ?"]
-    params: list[Any] = [project_id]
-    _append_visible_exp_clause(conn, project_id, actor, clauses, params, column=f"{prefix}exp_id")
-    if not flag(args, "--include-archived"):
-        clauses.append(f"{prefix}status != 'archived'")
-    status = _require_option_choice(command_arg(args, "--status"), "--status", EXPERIMENT_STATUSES)
-    if status:
-        clauses.append(f"{prefix}status = ?")
-        params.append(status)
-    source_id_filter = _complete_id_option(args, "--source-id", "src")
-    if source_id_filter:
-        clauses.append(f"{prefix}source_id = ?")
-        params.append(source_id_filter)
-    config_version_filter = _parse_positive_int_option(args, "--config-version")
-    if config_version_filter is not None:
-        clauses.append(f"{prefix}bound_config_version = ?")
-        params.append(config_version_filter)
-    _require_ordered_time_range(args, "--created-after", "--created-before")
-    _require_ordered_time_range(args, "--updated-after", "--updated-before")
-    for option, column, op in [
-        ("--created-after", "created_at", ">="),
-        ("--created-before", "created_at", "<="),
-        ("--updated-after", "updated_at", ">="),
-        ("--updated-before", "updated_at", "<="),
-    ]:
-        value = command_arg(args, option)
-        if value:
-            clauses.append(f"{prefix}{column} {op} ?")
-            params.append(parse_rfc3339_utc(value))
-    for tag in command_args(args, "--tag"):
-        tag_slug = _tag_slug(tag)
-        clauses.append(
-            f"""
-            EXISTS (
-              SELECT 1 FROM experiment_tags et
-              WHERE et.project_id = {prefix}project_id
-                AND et.exp_id = {prefix}exp_id
-                AND et.tag_slug = ?
-            )
-            """
-        )
-        params.append(tag_slug)
-    name_query = command_arg(args, "--name-query") or ""
-    if name_query:
-        _register_observe_text_predicates(conn)
-        clauses.append(f"alab_record_json_field_casefold_contains({prefix}metadata_json, 'name', ?) = 1")
-        params.append(name_query)
-    if search_query is not None:
-        _append_experiment_search_clause(conn, clauses, params, table_alias, actor, search_query)
-    return clauses, params
+def _experiment_query_clauses(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_query_clauses as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_candidate_sql(conn, project_id: str, actor: Actor, args: list[str], *, search_query: str | None = None) -> tuple[str, list[Any]]:
-    clauses, params = _experiment_query_clauses(conn, project_id, actor, args, search_query=search_query)
-    return f"SELECT e.rowid AS alab_exp_rowid, e.* FROM experiments e WHERE {' AND '.join(clauses)}", params
+def _experiment_candidate_sql(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_candidate_sql as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_requested_sort_field(args: list[str], *, default: str) -> str:
-    sort_text = command_arg(args, "--sort", default=default) or default
-    field, _sep, _direction = sort_text.partition(":")
-    return field
+def _experiment_requested_sort_field(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_requested_sort_field as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_order_limit_clause(
-    args: list[str],
-    *,
-    default: str,
-    exp_alias: str,
-    rowid_expression: str,
-    reward_expression: str | None = None,
-) -> tuple[str, tuple[Any, ...]]:
-    allowed = {
-        "created": f"{exp_alias}.created_at",
-        "updated": f"{exp_alias}.updated_at",
-        "name": f"alab_casefold(json_extract({exp_alias}.metadata_json, '$.name'))",
-        "status": f"LOWER({exp_alias}.status)",
-    }
-    if reward_expression is not None:
-        allowed["reward"] = reward_expression
-    return _sql_order_limit_clause(
-        args,
-        default=default,
-        allowed=allowed,
-        subject="experiments",
-        tie_breakers=(rowid_expression,),
-    )
+def _experiment_order_limit_clause(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_order_limit_clause as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _best_run_from_joined_experiment_row(row: Any) -> dict[str, Any] | None:
-    if row["alab_best_run_id"] is None:
-        return None
-    return {
-        "run_id": row["alab_best_run_id"],
-        "exp_id": row["exp_id"],
-        "commit_sha": row["alab_best_commit_sha"],
-        "config_version": row["alab_best_config_version"],
-        "reward_value": row["alab_best_reward_value"],
-        "reward_parse_status": row["alab_best_reward_parse_status"],
-        "archive_status": row["alab_best_archive_status"],
-        "ended_at": row["alab_best_ended_at"],
-    }
+def _best_run_from_joined_experiment_row(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _best_run_from_joined_experiment_row as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _reward_bound_sql(column: str, reward_min: float | None, reward_max: float | None) -> tuple[list[str], list[Any]]:
-    clauses: list[str] = []
-    params: list[Any] = []
-    if reward_min is not None:
-        clauses.append(f"{column} >= ?")
-        params.append(reward_min)
-    if reward_max is not None:
-        clauses.append(f"{column} <= ?")
-        params.append(reward_max)
-    return clauses, params
+def _reward_bound_sql(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _reward_bound_sql as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _best_runs_for_experiments(
-    conn,
-    *,
-    project_id: str,
-    exp_ids: list[str],
-    direction: str,
-    config_version: int | None = None,
-    reward_config_versions: list[int] | None = None,
-    include_archived_runs: bool = False,
-) -> dict[str, Any]:
-    if not exp_ids:
-        return {}
-    run_clauses, run_params = _best_run_sql_clauses(
-        project_id=project_id,
-        config_version=config_version,
-        reward_config_versions=reward_config_versions,
-        include_archived_runs=include_archived_runs,
-        exp_ids=exp_ids,
-    )
-    rows = all_rows(
-        conn,
-        f"""
-        SELECT * FROM (
-          SELECT r.*,
-            ROW_NUMBER() OVER (
-              PARTITION BY r.exp_id
-              ORDER BY {_best_run_window_order(direction)}
-            ) AS alab_best_rank
-          FROM runs r
-          WHERE {' AND '.join(run_clauses)}
-        )
-        WHERE alab_best_rank = 1
-        """,
-        tuple(run_params),
-    )
-    return {row["exp_id"]: row for row in rows}
+def _best_runs_for_experiments(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _best_runs_for_experiments as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_page_rows(
-    conn,
-    project_id: str,
-    actor: Actor,
-    args: list[str],
-    *,
-    search_query: str | None,
-    sort_default: str,
-) -> list[Any]:
-    _register_observe_text_predicates(conn)
-    candidate_sql, candidate_params = _experiment_candidate_sql(conn, project_id, actor, args, search_query=search_query)
-    order_sql, order_params = _experiment_order_limit_clause(
-        args,
-        default=sort_default,
-        exp_alias="e",
-        rowid_expression="e.rowid",
-    )
-    return all_rows(conn, f"{candidate_sql} {order_sql}", (*candidate_params, *order_params))
+def _experiment_page_rows(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_page_rows as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_rows_with_ranked_best(
-    conn,
-    project_id: str,
-    actor: Actor,
-    args: list[str],
-    *,
-    direction: str,
-    config_version: int | None,
-    reward_config_versions: list[int] | None,
-    include_archived_runs: bool,
-    reward_min: float | None,
-    reward_max: float | None,
-    search_query: str | None,
-    sort_default: str,
-) -> list[tuple[Any, dict[str, Any] | None]]:
-    _register_observe_text_predicates(conn)
-    candidate_sql, candidate_params = _experiment_candidate_sql(conn, project_id, actor, args, search_query=search_query)
-    run_clauses, run_params = _best_run_sql_clauses(
-        project_id=project_id,
-        config_version=config_version,
-        reward_config_versions=reward_config_versions,
-        include_archived_runs=include_archived_runs,
-    )
-    outer_clauses, outer_params = _reward_bound_sql("rb.reward_value", reward_min, reward_max)
-    outer_where = f"WHERE {' AND '.join(outer_clauses)}" if outer_clauses else ""
-    order_sql, order_params = _experiment_order_limit_clause(
-        args,
-        default=sort_default,
-        exp_alias="ce",
-        rowid_expression="ce.alab_exp_rowid",
-        reward_expression="rb.reward_value",
-    )
-    rows = all_rows(
-        conn,
-        f"""
-        WITH candidate_experiments AS (
-          {candidate_sql}
-        ),
-        ranked_best_runs AS (
-          SELECT r.run_id, r.exp_id, r.commit_sha, r.config_version, r.reward_value,
-                 r.reward_parse_status, r.archive_status, r.ended_at,
-            ROW_NUMBER() OVER (
-              PARTITION BY r.exp_id
-              ORDER BY {_best_run_window_order(direction)}
-            ) AS alab_best_rank
-          FROM runs r
-          JOIN candidate_experiments ce ON ce.exp_id = r.exp_id
-          WHERE {' AND '.join(run_clauses)}
-        )
-        SELECT ce.*,
-               rb.run_id AS alab_best_run_id,
-               rb.commit_sha AS alab_best_commit_sha,
-               rb.config_version AS alab_best_config_version,
-               rb.reward_value AS alab_best_reward_value,
-               rb.reward_parse_status AS alab_best_reward_parse_status,
-               rb.archive_status AS alab_best_archive_status,
-               rb.ended_at AS alab_best_ended_at
-        FROM candidate_experiments ce
-        LEFT JOIN ranked_best_runs rb ON rb.exp_id = ce.exp_id AND rb.alab_best_rank = 1
-        {outer_where}
-        {order_sql}
-        """,
-        (*candidate_params, *run_params, *outer_params, *order_params),
-    )
-    return [(row, _best_run_from_joined_experiment_row(row)) for row in rows]
+def _experiment_rows_with_ranked_best(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_rows_with_ranked_best as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_list_search_rows_with_best(
-    conn,
-    project_id: str,
-    actor: Actor,
-    args: list[str],
-    *,
-    direction: str,
-    reward_config_versions: list[int] | None,
-    reward_min: float | None,
-    reward_max: float | None,
-    search_query: str | None,
-    sort_default: str,
-) -> list[tuple[Any, Any | None]]:
-    sort_field = _experiment_requested_sort_field(args, default=sort_default)
-    if sort_field == "reward" or reward_min is not None or reward_max is not None:
-        return _experiment_rows_with_ranked_best(
-            conn,
-            project_id,
-            actor,
-            args,
-            direction=direction,
-            config_version=None,
-            reward_config_versions=reward_config_versions,
-            include_archived_runs=False,
-            reward_min=reward_min,
-            reward_max=reward_max,
-            search_query=search_query,
-            sort_default=sort_default,
-        )
-    rows = _experiment_page_rows(conn, project_id, actor, args, search_query=search_query, sort_default=sort_default)
-    exp_ids = [row["exp_id"] for row in rows]
-    best_by_exp = _best_runs_for_experiments(
-        conn,
-        project_id=project_id,
-        exp_ids=exp_ids,
-        direction=direction,
-        reward_config_versions=reward_config_versions,
-    )
-    return [(row, best_by_exp.get(row["exp_id"])) for row in rows]
+def _experiment_list_search_rows_with_best(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_list_search_rows_with_best as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _incomparable_best_run_count(
-    conn,
-    *,
-    candidate_sql: str,
-    candidate_params: list[Any],
-    project_id: str,
-    reward_config_versions: list[int] | None,
-    include_archived_runs: bool,
-) -> int:
-    if reward_config_versions is None:
-        return 0
-    run_clauses, run_params = _best_run_sql_clauses(
-        project_id=project_id,
-        config_version=None,
-        reward_config_versions=None,
-        include_archived_runs=include_archived_runs,
-    )
-    version_clause, version_params = _sql_in_clause("r.config_version", reward_config_versions)
-    run_clauses.append(f"NOT ({version_clause})")
-    row = one(
-        conn,
-        f"""
-        WITH candidate_experiments AS (
-          {candidate_sql}
-        )
-        SELECT COUNT(*) AS count
-        FROM runs r
-        JOIN candidate_experiments ce ON ce.exp_id = r.exp_id
-        WHERE {' AND '.join(run_clauses)}
-        """,
-        (*candidate_params, *run_params, *version_params),
-    )
-    return int(row["count"] if row else 0)
+def _incomparable_best_run_count(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _incomparable_best_run_count as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_best_rows_with_excluded_count(
-    conn,
-    project_id: str,
-    actor: Actor,
-    args: list[str],
-    *,
-    direction: str,
-    config_version: int | None,
-    reward_config_versions: list[int] | None,
-    include_archived_runs: bool,
-    reward_min: float | None,
-    reward_max: float | None,
-) -> tuple[list[tuple[Any, dict[str, Any] | None]], int]:
-    _register_observe_text_predicates(conn)
-    candidate_sql, candidate_params = _experiment_candidate_sql(conn, project_id, actor, args)
-    excluded_count = _incomparable_best_run_count(
-        conn,
-        candidate_sql=candidate_sql,
-        candidate_params=candidate_params,
-        project_id=project_id,
-        reward_config_versions=reward_config_versions,
-        include_archived_runs=include_archived_runs,
-    )
-    run_clauses, run_params = _best_run_sql_clauses(
-        project_id=project_id,
-        config_version=config_version,
-        reward_config_versions=reward_config_versions,
-        include_archived_runs=include_archived_runs,
-    )
-    outer_clauses, outer_params = _reward_bound_sql("rb.reward_value", reward_min, reward_max)
-    outer_where = f"WHERE {' AND '.join(outer_clauses)}" if outer_clauses else ""
-    reward_direction = "DESC" if direction == "maximize" else "ASC"
-    limit, offset = _parse_limit_offset(args)
-    rows = all_rows(
-        conn,
-        f"""
-        WITH candidate_experiments AS (
-          {candidate_sql}
-        ),
-        ranked_best_runs AS (
-          SELECT r.run_id, r.exp_id, r.commit_sha, r.config_version, r.reward_value,
-                 r.reward_parse_status, r.archive_status, r.ended_at,
-            ROW_NUMBER() OVER (
-              PARTITION BY r.exp_id
-              ORDER BY {_best_run_window_order(direction)}
-            ) AS alab_best_rank
-          FROM runs r
-          JOIN candidate_experiments ce ON ce.exp_id = r.exp_id
-          WHERE {' AND '.join(run_clauses)}
-        )
-        SELECT ce.*,
-               rb.run_id AS alab_best_run_id,
-               rb.commit_sha AS alab_best_commit_sha,
-               rb.config_version AS alab_best_config_version,
-               rb.reward_value AS alab_best_reward_value,
-               rb.reward_parse_status AS alab_best_reward_parse_status,
-               rb.archive_status AS alab_best_archive_status,
-               rb.ended_at AS alab_best_ended_at
-        FROM candidate_experiments ce
-        JOIN ranked_best_runs rb ON rb.exp_id = ce.exp_id AND rb.alab_best_rank = 1
-        {outer_where}
-        ORDER BY rb.reward_value {reward_direction}, rb.ended_at DESC, ce.exp_id ASC
-        LIMIT ? OFFSET ?
-        """,
-        (*candidate_params, *run_params, *outer_params, limit, offset),
-    )
-    return [(row, _best_run_from_joined_experiment_row(row)) for row in rows], excluded_count
+def _experiment_best_rows_with_excluded_count(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_best_rows_with_excluded_count as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _experiment_result_block(
-    conn,
-    row: Any,
-    *,
-    best_run: Any | None = None,
-    reward_parse_status: str | None = None,
-) -> ResultBlock:
-    meta = experiment_metadata_obj(row["metadata_json"])
-    source = one(conn, "SELECT source_ref FROM sources WHERE source_id = ?", (row["source_id"],))
-    tags = _tag_values(conn, row["exp_id"])
-    return ResultBlock(
-        "experiment",
-        [
-            ("project id", row["project_id"]),
-            ("exp id", row["exp_id"]),
-            ("experiment name", meta.get("name")),
-            ("experiment status", row["status"]),
-            ("source id", row["source_id"]),
-            ("source ref", source["source_ref"] if source else None),
-            ("tag", tags),
-            ("latest run id", row["latest_run_id"]),
-            ("latest commit", row["latest_commit"]),
-            ("final run id", row["final_run_id"]),
-            ("final commit", row["final_commit"]),
-            ("best run id", best_run["run_id"] if best_run else None),
-            ("reward", best_run["reward_value"] if best_run else None),
-            ("reward parse status", (best_run["reward_parse_status"] if best_run else reward_parse_status) or "none"),
-            ("created at", row["created_at"]),
-            ("updated at", row["updated_at"]),
-            ("closed at", row["closed_at"]),
-            ("archived at", row["archived_at"]),
-        ],
-    )
+def _experiment_result_block(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _experiment_result_block as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _require_experiment_query_options_at_most_once(args: list[str], *, allow_sort: bool) -> None:
-    options = [
-        "--include-archived",
-        "--status",
-        "--name-query",
-        "--source-id",
-        "--config-version",
-        "--created-after",
-        "--created-before",
-        "--updated-after",
-        "--updated-before",
-        "--reward-min",
-        "--reward-max",
-        "--limit",
-        "--offset",
-    ]
-    if allow_sort:
-        options.append("--sort")
-    require_options_at_most_once(args, tuple(options))
+def _require_experiment_query_options_at_most_once(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_query import _require_experiment_query_options_at_most_once as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_exp_list(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(
-        args,
-        (
-            "--project",
-            "--include-archived",
-            "--status",
-            "--name-query",
-            "--source-id",
-            "--config-version",
-            "--created-after",
-            "--created-before",
-            "--updated-after",
-            "--updated-before",
-            "--tag",
-            "--reward-min",
-            "--reward-max",
-            "--sort",
-            "--limit",
-            "--offset",
-        ),
-    )
-    _require_experiment_query_options_at_most_once(args, allow_sort=True)
-    project_id = _project_id_from_request(args, req)
-    actor = _authorize_observe(req, project_id)
-    require_positional_count(args, 0, "exp list accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        identity, direction = _optional_best_context(conn, project)
-        reward_config_versions = _reward_identity_config_versions(conn, project_id, identity)
-        reward_min = _parse_float_option(args, "--reward-min")
-        reward_max = _parse_float_option(args, "--reward-max")
-        _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        rows_with_best = _experiment_list_search_rows_with_best(
-            conn,
-            project_id,
-            actor,
-            args,
-            direction=direction,
-            reward_config_versions=reward_config_versions,
-            reward_min=reward_min,
-            reward_max=reward_max,
-            search_query=None,
-            sort_default="updated:desc",
-        )
-        return [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best]
-    finally:
-        conn.close()
+    from .experiment_query import cmd_exp_list as _impl
+
+    return _impl(args, req)
 
 
 def _exp_row(conn, project_id: str, exp_id: str | None) -> Any:
@@ -5549,494 +4081,57 @@ def _exp_row(conn, project_id: str, exp_id: str | None) -> Any:
 
 
 def cmd_exp_search(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(
-        args,
-        (
-            "--project",
-            "--query",
-            "--include-archived",
-            "--status",
-            "--name-query",
-            "--source-id",
-            "--config-version",
-            "--created-after",
-            "--created-before",
-            "--updated-after",
-            "--updated-before",
-            "--tag",
-            "--reward-min",
-            "--reward-max",
-            "--sort",
-            "--limit",
-            "--offset",
-        ),
-    )
-    require_options_at_most_once(args, ("--query",))
-    _require_experiment_query_options_at_most_once(args, allow_sort=True)
-    query = command_arg(args, "--query", required=True).casefold()
-    project_id = _project_id_from_request(args, req)
-    actor = _authorize_observe(req, project_id)
-    require_positional_count(args, 0, "exp search accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        identity, direction = _optional_best_context(conn, project)
-        reward_config_versions = _reward_identity_config_versions(conn, project_id, identity)
-        reward_min = _parse_float_option(args, "--reward-min")
-        reward_max = _parse_float_option(args, "--reward-max")
-        _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        rows_with_best = _experiment_list_search_rows_with_best(
-            conn,
-            project_id,
-            actor,
-            args,
-            direction=direction,
-            reward_config_versions=reward_config_versions,
-            reward_min=reward_min,
-            reward_max=reward_max,
-            search_query=query,
-            sort_default="updated:desc",
-        )
-        return [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best]
-    finally:
-        conn.close()
+    from .experiment_query import cmd_exp_search as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_show(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--include-archived"))
-    require_options_at_most_once(args, ("--include-archived",))
-    project_id = _project_id_from_request(args, req)
-    actor = _authorize_observe(req, project_id)
-    exp_id = optional_positional_selector(args, "exp show accepts exactly one experiment id")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        exp_id = _complete_id_or_missing(exp_id, prefix="exp", code="EXPERIMENT_NOT_FOUND", label="experiment id")
-        exp = one(conn, "SELECT * FROM experiments WHERE project_id = ? AND exp_id = ?", (project_id, exp_id))
-        if exp is None:
-            if actor.actor_type == "token":
-                raise AlabError("SCOPE_VIOLATION", "experiment is not visible or not found")
-            raise AlabError("EXPERIMENT_NOT_FOUND", "experiment not found")
-        if not _exp_visible(conn, project_id, actor, exp["exp_id"]):
-            raise AlabError("SCOPE_VIOLATION", "experiment is not visible or not found")
-        identity, direction = _optional_best_context(conn, project)
-        best, _excluded = _best_run_for_experiment(conn, project_id=project_id, exp_id=exp["exp_id"], direction=direction, reward_identity=identity, include_archived_runs=flag(args, "--include-archived"))
-        return [_experiment_result_block(conn, exp, best_run=best)]
-    finally:
-        conn.close()
+    from .experiment_query import cmd_exp_show as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_best(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(
-        args,
-        (
-            "--project",
-            "--include-archived",
-            "--status",
-            "--name-query",
-            "--source-id",
-            "--config-version",
-            "--created-after",
-            "--created-before",
-            "--updated-after",
-            "--updated-before",
-            "--tag",
-            "--reward-min",
-            "--reward-max",
-            "--sort",
-            "--limit",
-            "--offset",
-        ),
-    )
-    _require_experiment_query_options_at_most_once(args, allow_sort=False)
-    require_options_at_most_once(args, ("--sort",))
-    project_id = _project_id_from_request(args, req)
-    actor = _authorize_observe(req, project_id)
-    if command_arg(args, "--sort") is not None:
-        raise AlabError("CONFIG_INVALID", "--sort is not supported for experiment best")
-    require_positional_count(args, 0, "exp best accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        project = _project_row(conn, project_id)
-        config_version, identity, direction = _best_context(conn, project, args)
-        reward_config_versions = _reward_identity_config_versions(conn, project_id, identity)
-        reward_min = _parse_float_option(args, "--reward-min")
-        reward_max = _parse_float_option(args, "--reward-max")
-        _require_ordered_range(reward_min, reward_max, "--reward-min", "--reward-max")
-        rows_with_best, excluded_count = _experiment_best_rows_with_excluded_count(
-            conn,
-            project_id,
-            actor,
-            args,
-            direction=direction,
-            config_version=config_version,
-            reward_config_versions=reward_config_versions,
-            include_archived_runs=flag(args, "--include-archived"),
-            reward_min=reward_min,
-            reward_max=reward_max,
-        )
-        blocks = [_experiment_result_block(conn, row, best_run=best) for row, best in rows_with_best]
-        if excluded_count:
-            blocks.append(
-                ResultBlock(
-                    "warning",
-                    [
-                        ("warning code", "BEST_INCOMPARABLE_RUNS_EXCLUDED"),
-                        ("warning reason", "runs with incompatible reward policy identity were excluded"),
-                        ("excluded count", excluded_count),
-                    ],
-                )
-            )
-        return blocks
-    finally:
-        conn.close()
+    from .experiment_query import cmd_exp_best as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_archive(args: list[str], req: Request) -> list[ResultBlock]:
-    for removed_flag in ("--remove-worktree", "--force-remove-worktree"):
-        if flag(args, removed_flag):
-            raise AlabError("CONFIG_INVALID", f"{removed_flag} was removed from exp archive; use exp worktree remove explicitly")
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp archive accepts exactly one experiment id")
-    with Database(req.globals.home).tx() as conn:
-        exp = _exp_row(conn, project["project_id"], exp_id)
-        previous = exp["status"]
-        archived_at = exp["archived_at"] or utc_now()
-        if previous != "archived":
-            if one(conn, "SELECT lock_name FROM locks WHERE exp_id = ? LIMIT 1", (exp["exp_id"],)):
-                raise AlabError("RESOURCE_BUSY", "experiment has active locks")
-            conn.execute(
-                "UPDATE experiments SET status = 'archived', pre_archive_status = ?, archived_at = ?, updated_at = ? WHERE exp_id = ?",
-                (previous, archived_at, archived_at, exp["exp_id"]),
-            )
-            audit(
-                conn,
-                action="archive",
-                object_type="experiment",
-                object_id=exp["exp_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                exp_id=exp["exp_id"],
-                metadata={
-                    "schema_version": 1,
-                    "previous_status": previous,
-                    "experiment_status": "archived",
-                    "archived_at": archived_at,
-                },
-            )
-        return [
-            ResultBlock(
-                "experiment",
-                [
-                    ("exp id", exp["exp_id"]),
-                    ("previous status", previous),
-                    ("experiment status", "archived"),
-                    ("archived at", archived_at),
-                ],
-            )
-        ]
+    from .experiment_lifecycle import cmd_exp_archive as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_unarchive(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp unarchive accepts exactly one experiment id")
-    with Database(req.globals.home).tx() as conn:
-        exp = _exp_row(conn, project["project_id"], exp_id)
-        previous = exp["status"]
-        restored = exp["pre_archive_status"] or "closed"
-        now = utc_now() if previous == "archived" else None
-        if previous == "archived":
-            conn.execute(
-                "UPDATE experiments SET status = ?, pre_archive_status = NULL, archived_at = NULL, updated_at = ? WHERE exp_id = ?",
-                (restored, now, exp["exp_id"]),
-            )
-            audit(
-                conn,
-                action="unarchive",
-                object_type="experiment",
-                object_id=exp["exp_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                exp_id=exp["exp_id"],
-                metadata={
-                    "schema_version": 1,
-                    "previous_status": previous,
-                    "experiment_status": restored,
-                    "unarchived_at": now,
-                },
-            )
-        return [
-            ResultBlock(
-                "experiment",
-                [
-                    ("exp id", exp["exp_id"]),
-                    ("previous status", previous),
-                    ("experiment status", restored if previous == "archived" else previous),
-                    ("unarchived at", now),
-                ],
-            )
-        ]
+    from .experiment_lifecycle import cmd_exp_unarchive as _impl
+
+    return _impl(args, req)
 
 
-def _stored_relative_path(base: Path, stored: str | None) -> Path | None:
-    if not stored:
-        return None
-    path = Path(stored)
-    return path if path.is_absolute() else base / path
+def _stored_relative_path(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_lifecycle import _stored_relative_path as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _artifact_log_filesystem_targets(conn, home: Home, project_id: str, *, artifact_rows: list[Any] | None = None, log_rows: list[Any] | None = None) -> list[FilesystemRemovalTarget]:
-    artifact_rows = artifact_rows or []
-    log_rows = log_rows or []
-    _project_root, _repo_git, artifact_store = _project_paths(home, project_id)
-    targets: list[FilesystemRemovalTarget] = []
-    artifact_ids = {row["artifact_id"] for row in artifact_rows}
-    log_ids = {row["log_id"] for row in log_rows}
-    seen: set[tuple[str, str]] = set()
+def _artifact_log_filesystem_targets(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_lifecycle import _artifact_log_filesystem_targets as _impl
 
-    for row in artifact_rows:
-        blob_path = row["blob_path"]
-        if not blob_path:
-            continue
-        key = ("artifact", blob_path)
-        if key in seen:
-            continue
-        seen.add(key)
-        refs = all_rows(conn, "SELECT artifact_id FROM artifacts WHERE project_id = ? AND blob_path = ?", (project_id, blob_path))
-        if any(ref["artifact_id"] not in artifact_ids for ref in refs):
-            continue
-        targets.append(FilesystemRemovalTarget("artifact", row["artifact_id"], _stored_relative_path(artifact_store, blob_path) or artifact_store / blob_path))
-
-    for row in log_rows:
-        file_path = row["file_path"]
-        if not file_path:
-            continue
-        key = ("log", file_path)
-        if key in seen:
-            continue
-        seen.add(key)
-        refs = all_rows(conn, "SELECT log_id FROM log_streams WHERE project_id = ? AND file_path = ?", (project_id, file_path))
-        if any(ref["log_id"] not in log_ids for ref in refs):
-            continue
-        targets.append(FilesystemRemovalTarget("log", row["log_id"], _stored_relative_path(artifact_store, file_path) or artifact_store / file_path))
-    return targets
+    return _impl(*args, **kwargs)
 
 
-def _experiment_remove_filesystem_targets(conn, home: Home, project_id: str, exp_id: str) -> list[FilesystemRemovalTarget]:
-    _project_root, _repo_git, artifact_store = _project_paths(home, project_id)
-    targets: list[FilesystemRemovalTarget] = []
-    seen: set[str] = set()
+def _experiment_remove_filesystem_targets(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_lifecycle import _experiment_remove_filesystem_targets as _impl
 
-    def add(kind: str, object_id: str, path: Path | None) -> None:
-        if path is None:
-            return
-        key = str(path.expanduser())
-        if key in seen:
-            return
-        seen.add(key)
-        targets.append(FilesystemRemovalTarget(kind=kind, object_id=object_id, path=path))
-
-    for row in all_rows(
-        conn,
-        """
-        SELECT path_registry_id, context_type, token_id, path
-        FROM path_registry
-        WHERE project_id = ? AND exp_id = ? AND status = 'active'
-        ORDER BY context_type, path_registry_id
-        """,
-        (project_id, exp_id),
-    ):
-        object_id = row["token_id"] if row["context_type"] == "inspection" and row["token_id"] else row["path_registry_id"]
-        add(row["context_type"], object_id, Path(row["path"]))
-
-    for row in all_rows(
-        conn,
-        """
-        SELECT DISTINCT l.file_path
-        FROM log_streams l
-        WHERE l.project_id = ? AND l.exp_id = ? AND l.file_path IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM log_streams other
-            WHERE other.project_id = l.project_id
-              AND other.file_path = l.file_path
-              AND COALESCE(other.exp_id, '') != ?
-          )
-        ORDER BY l.file_path
-        """,
-        (project_id, exp_id, exp_id),
-    ):
-        add("log", row["file_path"], _stored_relative_path(artifact_store, row["file_path"]))
-
-    for row in all_rows(
-        conn,
-        """
-        SELECT DISTINCT a.blob_path
-        FROM artifacts a
-        WHERE a.project_id = ? AND a.exp_id = ? AND a.blob_path IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM artifacts other
-            WHERE other.project_id = a.project_id
-              AND other.blob_path = a.blob_path
-              AND COALESCE(other.exp_id, '') != ?
-          )
-        ORDER BY a.blob_path
-        """,
-        (project_id, exp_id, exp_id),
-    ):
-        add("artifact", row["blob_path"], _stored_relative_path(artifact_store, row["blob_path"]))
-    return targets
+    return _impl(*args, **kwargs)
 
 
 def cmd_exp_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--cascade", "--force", "--confirm", "--reason"))
-    require_options_at_most_once(args, ("--dry-run", "--cascade", "--reason"))
-    require_dry_run_unforced(args)
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp remove accepts exactly one experiment id")
-    dry_run = flag(args, "--dry-run")
-    cascade = flag(args, "--cascade")
-    conn = require_home(req.globals.home)
-    try:
-        exp = dict(_exp_row(conn, project["project_id"], exp_id))
-        blockers = [] if exp["status"] == "archived" else ["target_not_archived"]
-        if one(conn, "SELECT lock_name FROM locks WHERE exp_id = ? LIMIT 1", (exp["exp_id"],)):
-            blockers.append("experiment_has_active_lock")
-        counts = {
-            "runs": one(conn, "SELECT count(*) AS c FROM runs WHERE exp_id = ?", (exp["exp_id"],))["c"],
-            "artifacts": one(conn, "SELECT count(*) AS c FROM artifacts WHERE exp_id = ?", (exp["exp_id"],))["c"],
-            "logs": one(conn, "SELECT count(*) AS c FROM log_streams WHERE exp_id = ?", (exp["exp_id"],))["c"],
-            "annotations": one(conn, "SELECT count(*) AS c FROM annotations WHERE project_id = ? AND target_id = ?", (project["project_id"], exp["exp_id"]))["c"],
-            "tags": one(conn, "SELECT count(*) AS c FROM experiment_tags WHERE exp_id = ?", (exp["exp_id"],))["c"],
-            "submissions": one(conn, "SELECT count(*) AS c FROM experiment_submissions WHERE exp_id = ?", (exp["exp_id"],))["c"],
-        }
-        filesystem_targets = _experiment_remove_filesystem_targets(conn, req.globals.home, project["project_id"], exp["exp_id"])
-        _project_root, repo_git, _artifact_store = _project_paths(req.globals.home, project["project_id"])
-        branch_ref = _experiment_branch_ref(exp["branch_name"])
-        branch_ref_exists = _git_ref_commit(repo_git, branch_ref) is not None
-    finally:
-        conn.close()
-    reason = _lifecycle_reason(args)
-    if dry_run:
-        return [
-            ResultBlock(
-                "experiment",
-                [
-                    ("exp id", exp["exp_id"]),
-                    ("dry run", True),
-                    ("removed", False),
-                    ("cascade", cascade),
-                    ("audit id", None),
-                    ("blocker", blockers),
-                    ("deleted runs", counts["runs"]),
-                    ("deleted artifacts", counts["artifacts"]),
-                    ("deleted logs", counts["logs"]),
-                    ("deleted annotations", counts["annotations"]),
-                    ("deleted tags", counts["tags"]),
-                    ("deleted submissions", counts["submissions"]),
-                    ("branch ref", branch_ref),
-                    ("branch ref exists", branch_ref_exists),
-                    ("deleted filesystem paths", len(filesystem_targets)),
-                    ("filesystem path", [str(target.path) for target in filesystem_targets]),
-                    ("planned trash move", [_trash_plan(req.globals.home, target.path) for target in filesystem_targets]),
-                ],
-            )
-        ]
-    require_force_confirm(args, exp["exp_id"], "experiment remove requires --force and matching --confirm")
-    if not cascade:
-        raise AlabError("CONFIG_INVALID", "experiment remove requires --cascade")
-    if blockers:
-        raise AlabError("RESOURCE_BUSY", ", ".join(blockers))
-    _project_root, repo_git, _artifact_store = _project_paths(req.globals.home, project["project_id"])
-    audit_id = new_id("aud", "remove")
-    stages = _stage_targets_to_trash(req.globals.home, filesystem_targets, audit_id)
-    branch_deletion: GitRefDeletion | None = None
-    try:
-        branch_deletion = _delete_experiment_branch_ref(repo_git, exp["branch_name"])
-        with Database(req.globals.home).tx() as tx:
-            now = utc_now()
-            tx.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE exp_id = ? AND credential_type = 'token' AND status = 'active'", (now, exp["exp_id"]))
-            tx.execute(
-                "UPDATE path_registry SET status = 'removed', removed_at = ?, removed_by_credential_id = ?, updated_at = ? WHERE exp_id = ? AND status = 'active'",
-                (now, actor.credential_id, now, exp["exp_id"]),
-            )
-            audit(
-                tx,
-                action="remove",
-                object_type="experiment",
-                object_id=exp["exp_id"],
-                actor=actor,
-                audit_id=audit_id,
-                project_id=project["project_id"],
-                exp_id=exp["exp_id"],
-                cascade=True,
-                reason=reason,
-                metadata={
-                    "schema_version": 1,
-                    "branch_ref": branch_deletion.branch_ref,
-                    "branch_ref_commit": branch_deletion.commit,
-                    "branch_ref_deleted": branch_deletion.deleted,
-                    "branch_ref_already_absent": branch_deletion.already_absent,
-                    "filesystem_target_count": len(filesystem_targets),
-                    "filesystem_absent_count": sum(1 for stage in stages if stage.already_absent),
-                    "trash": [
-                        {
-                            "kind": target.kind,
-                            "object_id": target.object_id,
-                            "mode": stage.mode,
-                            "label": stage.audit_label,
-                            "original_path_hash": path_hash(stage.original_path) if stage.original_path else None,
-                            "already_absent": stage.already_absent,
-                        }
-                        for target, stage in zip(filesystem_targets, stages, strict=False)
-                    ],
-                },
-            )
-            tx.execute("DELETE FROM annotation_revisions WHERE annotation_id IN (SELECT annotation_id FROM annotations WHERE project_id = ? AND target_id = ?)", (project["project_id"], exp["exp_id"]))
-            tx.execute("DELETE FROM annotations WHERE project_id = ? AND target_id = ?", (project["project_id"], exp["exp_id"]))
-            for table in ["experiment_tags", "experiment_submissions", "runs", "artifacts", "log_streams"]:
-                tx.execute(f"DELETE FROM {table} WHERE exp_id = ?", (exp["exp_id"],))
-            tx.execute("DELETE FROM experiments WHERE exp_id = ?", (exp["exp_id"],))
-    except Exception as exc:
-        branch_restore_exc: Exception | None = None
-        try:
-            _restore_experiment_branch_ref(repo_git, branch_deletion)
-        except Exception as restore_exc:
-            branch_restore_exc = restore_exc
-        if branch_restore_exc is not None:
-            try:
-                _restore_staged_trashes(stages)
-            except Exception as restore_exc:
-                detail = f"database update failed and trash restore failed: {restore_exc}; branch restore failed: {branch_restore_exc}"
-                raise AlabError("STORAGE_ERROR", detail, "alab context repair") from restore_exc
-            raise AlabError("STORAGE_ERROR", f"database update failed and branch restore failed: {branch_restore_exc}", "alab context repair") from branch_restore_exc
-        _raise_after_staged_trash_transaction_failure(exc, stages)
-    _prune_missing_git_worktrees(repo_git)
-    trash_cleanup_pending = _finalize_staged_trashes(req.globals.home, stages, project["project_id"])
-    return [
-        ResultBlock(
-            "experiment",
-            [
-                ("exp id", exp["exp_id"]),
-                ("dry run", False),
-                ("removed", True),
-                ("cascade", True),
-                ("audit id", audit_id),
-                ("deleted runs", counts["runs"]),
-                ("deleted artifacts", counts["artifacts"]),
-                ("deleted logs", counts["logs"]),
-                ("deleted annotations", counts["annotations"]),
-                ("deleted tags", counts["tags"]),
-                ("deleted submissions", counts["submissions"]),
-                ("branch ref", branch_deletion.branch_ref if branch_deletion else branch_ref),
-                ("deleted branch ref", branch_deletion.deleted if branch_deletion else False),
-                ("branch ref existed", not branch_deletion.already_absent if branch_deletion else branch_ref_exists),
-                ("deleted filesystem paths", len(filesystem_targets)),
-                ("trash cleanup pending", trash_cleanup_pending),
-            ],
-        )
-    ]
+    from .experiment_lifecycle import cmd_exp_remove as _impl
+
+    return _impl(args, req)
 
 
 def _authorize_tag(req: Request, project_id: str, exp_id: str) -> Actor:
@@ -6118,101 +4213,34 @@ def cmd_exp_tag_list(args: list[str], req: Request) -> list[ResultBlock]:
     return [ResultBlock("tag", [("exp id", exp_id), ("tag", None), ("action", "list"), ("tags", tags)])]
 
 
-def _resolve_exp_commit(
-    conn,
-    home: Home,
-    project_id: str,
-    exp: Any,
-    selector: str | None,
-    *,
-    allow_head_alias: bool = False,
-) -> str:
-    selector = selector or "latest"
-    _project_root, repo_git, _artifact_store = _project_paths(home, project_id)
-    branch_ref = f"refs/heads/{exp['branch_name']}"
-    if selector == "latest" or (allow_head_alias and selector in {"HEAD", "head"}):
-        if exp["latest_commit"]:
-            commit = exp["latest_commit"]
-        else:
-            commit = (
-                run_cmd(["git", f"--git-dir={repo_git}", "rev-parse", f"{branch_ref}^{{commit}}"])
-                .stdout.decode("utf-8", errors="replace")
-                .strip()
-            )
-    elif selector == "final":
-        commit = exp["final_commit"]
-        if not commit:
-            raise AlabError("CONFIG_INVALID", "experiment has no final commit")
-    elif selector == "best":
-        project = _project_row(conn, project_id)
-        reward_identity, direction = _optional_best_context(conn, project)
-        row, _excluded = _best_run_for_experiment(
-            conn,
-            project_id=project_id,
-            exp_id=exp["exp_id"],
-            direction=direction,
-            reward_identity=reward_identity,
-        )
-        if row is None:
-            raise AlabError("CONFIG_INVALID", "experiment has no qualifying best run")
-        commit = row["commit_sha"]
-    else:
-        if not _is_commit_sha_selector(selector):
-            raise AlabError("CONFIG_INVALID", "commit selector must be latest, final, best, or a commit SHA")
-        commit = _resolve_commit_sha_selector(repo_git, selector)
-        reachable = run_cmd(
-            ["git", f"--git-dir={repo_git}", "merge-base", "--is-ancestor", commit, branch_ref],
-            check=False,
-        )
-        if reachable.returncode != 0:
-            raise AlabError("CONFIG_INVALID", "commit is not reachable from the source experiment branch")
-    if not commit:
-        raise AlabError("CONFIG_INVALID", "commit selector did not resolve")
-    return commit
+def _resolve_exp_commit(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _resolve_exp_commit as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _resolve_commit_sha_selector(repo_git: Path, selector: str) -> str:
-    prefix = selector.lower()
-    candidates = run_cmd(
-        ["git", f"--git-dir={repo_git}", "rev-parse", f"--disambiguate={prefix}"],
-        check=False,
-    )
-    if candidates.returncode != 0:
-        raise AlabError("CONFIG_INVALID", "commit selector did not resolve")
-    object_ids = [line.strip() for line in candidates.stdout.decode("utf-8", errors="replace").splitlines() if line.strip()]
-    if len(object_ids) != 1:
-        if object_ids:
-            raise AlabError("CONFIG_INVALID", "commit selector is ambiguous")
-        raise AlabError("CONFIG_INVALID", "commit selector did not resolve")
-    resolved = run_cmd(
-        ["git", f"--git-dir={repo_git}", "rev-parse", f"{object_ids[0]}^{{commit}}"],
-        check=False,
-    )
-    if resolved.returncode != 0:
-        raise AlabError("CONFIG_INVALID", "commit selector did not resolve")
-    commit = resolved.stdout.decode("utf-8", errors="replace").strip()
-    if not commit:
-        raise AlabError("CONFIG_INVALID", "commit selector did not resolve")
-    return commit
+def _resolve_commit_sha_selector(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _resolve_commit_sha_selector as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _path_registry_row_for_token(conn, token_id: str) -> Any | None:
-    return one(conn, "SELECT * FROM path_registry WHERE token_id = ? AND status = 'active'", (token_id,))
+def _path_registry_row_for_token(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _path_registry_row_for_token as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _token_path_status(conn, token_id: str) -> str:
-    row = _path_registry_row_for_token(conn, token_id)
-    if row is None:
-        return "removed"
-    return "present" if Path(row["path"]).exists() else "missing"
+def _token_path_status(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _token_path_status as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _active_worktree_token(conn, exp_id: str) -> Any | None:
-    return one(
-        conn,
-        "SELECT * FROM credentials WHERE exp_id = ? AND credential_type = 'token' AND token_mode = 'worktree' AND status = 'active'",
-        (exp_id,),
-    )
+def _active_worktree_token(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _active_worktree_token as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def _source_branch_ref(source_ref: str) -> str:
@@ -6221,29 +4249,22 @@ def _source_branch_ref(source_ref: str) -> str:
     return f"refs/heads/{source_ref}"
 
 
-def _experiment_branch_ref(branch_name: str) -> str:
-    if not branch_name.startswith("alab/exp/"):
-        raise AlabError("GIT_ERROR", "refusing to delete unexpected experiment branch")
-    return f"refs/heads/{branch_name}"
+def _experiment_branch_ref(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _experiment_branch_ref as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _git_ref_commit(repo_git: Path, branch_ref: str) -> str | None:
-    result = run_cmd(["git", f"--git-dir={repo_git}", "rev-parse", "--verify", f"{branch_ref}^{{commit}}"], check=False)
-    if result.returncode != 0:
-        return None
-    return result.stdout.decode("utf-8", errors="replace").strip() or None
+def _git_ref_commit(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _git_ref_commit as _impl
+
+    return _impl(*args, **kwargs)
 
 
-def _delete_experiment_branch_ref(repo_git: Path, branch_name: str) -> GitRefDeletion:
-    branch_ref = _experiment_branch_ref(branch_name)
-    commit = _git_ref_commit(repo_git, branch_ref)
-    if commit is None:
-        return GitRefDeletion(branch_ref, None, False, True)
-    result = run_cmd(["git", f"--git-dir={repo_git}", "update-ref", "-d", branch_ref], check=False)
-    if result.returncode != 0:
-        reason = result.stderr.decode("utf-8", errors="replace").strip() or "failed to delete experiment branch ref"
-        raise AlabError("GIT_ERROR", reason)
-    return GitRefDeletion(branch_ref, commit, True, False)
+def _delete_experiment_branch_ref(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _delete_experiment_branch_ref as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def _delete_source_ref(repo_git: Path, source_ref: str) -> GitRefDeletion:
@@ -6258,13 +4279,10 @@ def _delete_source_ref(repo_git: Path, source_ref: str) -> GitRefDeletion:
     return GitRefDeletion(branch_ref, commit, True, False)
 
 
-def _restore_experiment_branch_ref(repo_git: Path, deletion: GitRefDeletion | None) -> None:
-    if deletion is None or not deletion.deleted or deletion.commit is None:
-        return
-    result = run_cmd(["git", f"--git-dir={repo_git}", "update-ref", deletion.branch_ref, deletion.commit], check=False)
-    if result.returncode != 0:
-        reason = result.stderr.decode("utf-8", errors="replace").strip() or "failed to restore experiment branch ref"
-        raise AlabError("GIT_ERROR", reason)
+def _restore_experiment_branch_ref(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _restore_experiment_branch_ref as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def _restore_source_ref(repo_git: Path, deletion: GitRefDeletion | None) -> None:
@@ -6276,582 +4294,64 @@ def _restore_source_ref(repo_git: Path, deletion: GitRefDeletion | None) -> None
         raise AlabError("GIT_ERROR", reason)
 
 
-def _prune_missing_git_worktrees(repo_git: Path) -> None:
-    run_cmd(["git", f"--git-dir={repo_git}", "worktree", "prune"], check=False)
+def _prune_missing_git_worktrees(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _prune_missing_git_worktrees as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_exp_worktree_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--dry-run", "--force", "--confirm", "--reason"))
-    require_options_at_most_once(args, ("--dry-run", "--reason"))
-    require_dry_run_unforced(args)
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp worktree remove accepts exactly one experiment id")
-    dry_run = flag(args, "--dry-run")
-    conn = require_home(req.globals.home)
-    try:
-        exp = dict(_exp_row(conn, project["project_id"], exp_id))
-        path_row = one(conn, "SELECT * FROM path_registry WHERE exp_id = ? AND context_type = 'experiment' AND status = 'active'", (exp["exp_id"],))
-        token = _active_worktree_token(conn, exp["exp_id"])
-        old_path = path_row["path"] if path_row else exp["worktree_path"]
-        dirty_state = _worktree_dirty_state(old_path)
-        token_revoked = bool(token)
-        token_id = token["credential_id"] if token else None
-    finally:
-        conn.close()
-    reason = _lifecycle_reason(args)
-    if dry_run:
-        return [
-            ResultBlock(
-                "worktree",
-                [
-                    ("exp id", exp["exp_id"]),
-                    ("old worktree path", old_path),
-                    ("worktree state", exp["worktree_state"]),
-                    ("dry run", True),
-                    ("removed", False),
-                    ("path exists", _path_present(Path(old_path)) if old_path else False),
-                    ("dirty state", dirty_state),
-                    ("token revocation target", token_id),
-                    ("token revoked", token_revoked),
-                    ("planned trash move", _trash_plan(req.globals.home, old_path)),
-                    ("audit id", None),
-                ],
-            )
-        ]
-    require_force_confirm(args, exp["exp_id"], "exp worktree remove requires --force and matching --confirm")
-    _project_root, repo_git, _artifact_store = _project_paths(req.globals.home, project["project_id"])
-    audit_id = new_id("aud", "remove")
-    stage = _stage_path_to_trash(req.globals.home, old_path, audit_id)
-    try:
-        with Database(req.globals.home).tx() as tx:
-            now = utc_now()
-            if token:
-                tx.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_id = ?", (now, token["credential_id"]))
-            tx.execute(
-                "UPDATE path_registry SET status = 'removed', removed_at = ?, removed_by_credential_id = ?, updated_at = ? WHERE exp_id = ? AND context_type = 'experiment' AND status = 'active'",
-                (now, actor.credential_id, now, exp["exp_id"]),
-            )
-            tx.execute(
-                "UPDATE experiments SET worktree_state = 'removed', worktree_path = NULL, worktree_path_hash = NULL, updated_at = ? WHERE exp_id = ?",
-                (now, exp["exp_id"]),
-            )
-            audit(
-                tx,
-                action="remove",
-                object_type="worktree",
-                object_id=exp["exp_id"],
-                actor=actor,
-                audit_id=audit_id,
-                project_id=project["project_id"],
-                exp_id=exp["exp_id"],
-                reason=reason,
-                metadata={
-                    "schema_version": 1,
-                    "filesystem_path_already_absent": stage.already_absent,
-                    "dirty_state": dirty_state,
-                    "token_revocation_target": token_id,
-                    "trash": {
-                        "mode": stage.mode,
-                        "label": stage.audit_label,
-                        "original_path_hash": path_hash(stage.original_path) if stage.original_path else None,
-                    },
-                },
-            )
-    except Exception as exc:
-        _raise_after_staged_trash_transaction_failure(exc, [stage])
-    _prune_missing_git_worktrees(repo_git)
-    trash_cleanup_pending = _finalize_staged_trash(req.globals.home, stage, project["project_id"])
-    return [
-        ResultBlock(
-            "worktree",
-            [
-                ("exp id", exp["exp_id"]),
-                ("old worktree path", old_path),
-                ("worktree state", "removed"),
-                ("dry run", False),
-                ("removed", True),
-                ("path existed", not stage.already_absent),
-                ("dirty state", dirty_state),
-                ("token revocation target", token_id),
-                ("token revoked", token_revoked),
-                ("trash path", stage.audit_label),
-                ("trash cleanup pending", trash_cleanup_pending),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
+    from .experiment_access import cmd_exp_worktree_remove as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_worktree_restore(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--path"))
-    require_options_at_most_once(args, ("--path",))
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp worktree restore accepts exactly one experiment id")
-    restore_path = Path(command_arg(args, "--path", required=True)).expanduser().resolve()
-    conn = require_home(req.globals.home)
-    try:
-        _assert_new_context_path(conn, target=restore_path, project_id=project["project_id"], context_type="experiment", label="restore")
-        exp = dict(_exp_row(conn, project["project_id"], exp_id))
-        if exp["worktree_state"] == "active":
-            raise AlabError("RESOURCE_BUSY", "experiment already has an active worktree")
-        old_token = _active_worktree_token(conn, exp["exp_id"])
-        home_id = one(conn, "SELECT home_id FROM homes LIMIT 1")["home_id"]
-    finally:
-        conn.close()
-    _project_root, repo_git, _artifact_store = _project_paths(req.globals.home, project["project_id"])
-    run_cmd(["git", f"--git-dir={repo_git}", "worktree", "add", str(restore_path), exp["branch_name"]])
-    restore_path_hash = path_hash(restore_path)
-    with Database(req.globals.home).tx() as tx:
-        now = utc_now()
-        revoked_token_id = None
-        if old_token:
-            revoked_token_id = old_token["credential_id"]
-            tx.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_id = ?", (now, revoked_token_id))
-        token_id, raw_token = create_credential(
-            tx,
-            credential_type="token",
-            project_id=project["project_id"],
-            exp_id=exp["exp_id"],
-            token_mode="worktree",
-            registered_path_hash=restore_path_hash,
-            metadata={"schema_version": 1, "token_mode": "worktree", "created_for_path_hash": restore_path_hash},
-        )
-        write_marker(
-            restore_path,
-            {
-                "marker_version": 1,
-                "home_id": home_id,
-                "context_type": "experiment",
-                "project_id": project["project_id"],
-                "exp_id": exp["exp_id"],
-                "token_id": token_id,
-                "created_at": now,
-            },
-        )
-        write_token(restore_path, raw_token)
-        _write_git_exclude(restore_path)
-        path_registry_id = new_id("path", "experiment")
-        tx.execute(
-            """
-            INSERT INTO path_registry(path_registry_id, path_hash, path, context_type, home_id, project_id,
-              exp_id, token_id, status, created_at, updated_at)
-            VALUES (?, ?, ?, 'experiment', ?, ?, ?, ?, 'active', ?, ?)
-            """,
-            (path_registry_id, restore_path_hash, str(restore_path), home_id, project["project_id"], exp["exp_id"], token_id, now, now),
-        )
-        tx.execute(
-            "UPDATE experiments SET worktree_path = ?, worktree_path_hash = ?, worktree_state = 'active', updated_at = ? WHERE exp_id = ?",
-            (str(restore_path), restore_path_hash, now, exp["exp_id"]),
-        )
-        audit(
-            tx,
-            action="restore",
-            object_type="worktree",
-            object_id=exp["exp_id"],
-            actor=actor,
-            project_id=project["project_id"],
-            exp_id=exp["exp_id"],
-            metadata={
-                "schema_version": 1,
-                "branch": exp["branch_name"],
-                "worktree_state": "active",
-                "restored_path_hash": restore_path_hash,
-                "path_registry_id": path_registry_id,
-                "revoked_token_id": revoked_token_id,
-                "created_token_id": token_id,
-                "token_mode": "worktree",
-            },
-        )
-    return [
-        ResultBlock(
-            "worktree",
-            [
-                ("exp id", exp["exp_id"]),
-                ("branch", exp["branch_name"]),
-                ("worktree path", str(restore_path)),
-                ("worktree state", "active"),
-                ("token path", str(restore_path / ".alab" / "token")),
-                ("revoked token id", revoked_token_id),
-                ("new token id", token_id),
-            ],
-        )
-    ]
+    from .experiment_access import cmd_exp_worktree_restore as _impl
+
+    return _impl(args, req)
 
 
-def _credential_selector_sql(args: list[str], exp_id: str) -> tuple[str, tuple[Any, ...]]:
-    require_options_at_most_once(args, ("--token-id", "--mode", "--all"))
-    token_id = _complete_id_option(args, "--token-id", "cred")
-    raw_mode = command_arg(args, "--mode")
-    all_flag = flag(args, "--all")
-    if all_flag and (token_id or raw_mode):
-        raise AlabError("CONFIG_INVALID", "--all conflicts with --token-id or --mode")
-    mode = _require_option_choice(raw_mode, "--mode", TOKEN_MODES)
-    if token_id:
-        return "exp_id = ? AND credential_id = ? AND credential_type = 'token'", (exp_id, token_id)
-    if mode:
-        return "exp_id = ? AND token_mode = ? AND credential_type = 'token'", (exp_id, mode)
-    if all_flag:
-        return "exp_id = ? AND credential_type = 'token'", (exp_id,)
-    return "exp_id = ? AND token_mode = 'worktree' AND credential_type = 'token'", (exp_id,)
+def _credential_selector_sql(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _credential_selector_sql as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_exp_token_list(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--token-id", "--mode", "--all"))
-    require_options_at_most_once(args, ("--token-id", "--mode", "--all"))
-    project, _actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp token list accepts exactly one experiment id")
-    conn = require_home(req.globals.home)
-    try:
-        _exp_row(conn, project["project_id"], exp_id)
-        where, params = _credential_selector_sql(args, exp_id)
-        rows = all_rows(conn, f"SELECT * FROM credentials WHERE {where} ORDER BY created_at", params)
-        return [
-            ResultBlock(
-                "credential",
-                [
-                    ("project id", project["project_id"]),
-                    ("exp id", row["exp_id"]),
-                    ("token id", row["credential_id"]),
-                    ("token mode", row["token_mode"]),
-                    ("status", row["status"]),
-                    ("path status", _token_path_status(conn, row["credential_id"])),
-                    ("created at", row["created_at"]),
-                    ("revoked at", row["revoked_at"]),
-                ],
-            )
-            for row in rows
-        ]
-    finally:
-        conn.close()
+    from .experiment_access import cmd_exp_token_list as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_token_revoke(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--token-id", "--mode", "--all"))
-    require_options_at_most_once(args, ("--token-id", "--mode", "--all"))
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp token revoke accepts exactly one experiment id")
-    with Database(req.globals.home).tx() as conn:
-        _exp_row(conn, project["project_id"], exp_id)
-        where, params = _credential_selector_sql(args, exp_id)
-        rows = all_rows(conn, f"SELECT * FROM credentials WHERE {where} AND status = 'active'", params)
-        if not rows:
-            raise AlabError("CREDENTIAL_NOT_FOUND", "active token not found")
-        now = utc_now()
-        blocks: list[ResultBlock] = []
-        for row in rows:
-            conn.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_id = ?", (now, row["credential_id"]))
-            audit(
-                conn,
-                action="revoke",
-                object_type="credential",
-                object_id=row["credential_id"],
-                actor=actor,
-                project_id=project["project_id"],
-                exp_id=exp_id,
-                metadata={
-                    "schema_version": 1,
-                    "credential_type": row["credential_type"],
-                    "token_mode": row["token_mode"],
-                    "previous_status": row["status"],
-                    "credential_status": "revoked",
-                    "revoked_at": now,
-                    "registered_path_hash": row["registered_path_hash"],
-                },
-            )
-            blocks.append(
-                ResultBlock(
-                    "credential",
-                    [
-                        ("project id", project["project_id"]),
-                        ("exp id", exp_id),
-                        ("token id", row["credential_id"]),
-                        ("token mode", row["token_mode"]),
-                        ("status", "revoked"),
-                        ("revoked at", now),
-                    ],
-                )
-            )
-        return blocks
+    from .experiment_access import cmd_exp_token_revoke as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_token_regenerate(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--token-id", "--mode", "--all"))
-    project, actor = _require_project_admin(args, req)
-    exp_id = optional_positional_selector(args, "exp token regenerate accepts exactly one experiment id")
-    require_options_at_most_once(args, ("--token-id", "--mode", "--all"))
-    raw_mode = command_arg(args, "--mode", default="worktree")
-    if command_arg(args, "--token-id") or flag(args, "--all"):
-        raise AlabError("CONFIG_INVALID", "regenerate selects one token mode only")
-    mode = _require_option_choice(raw_mode, "--mode", TOKEN_MODES)
-    with Database(req.globals.home).tx() as conn:
-        _exp_row(conn, project["project_id"], exp_id)
-        old = one(conn, "SELECT * FROM credentials WHERE exp_id = ? AND token_mode = ? AND credential_type = 'token' AND status = 'active' ORDER BY created_at DESC LIMIT 1", (exp_id, mode))
-        if old is None:
-            raise AlabError("CREDENTIAL_NOT_FOUND", "active token not found")
-        path_row = _path_registry_row_for_token(conn, old["credential_id"])
-        if path_row is None:
-            raise AlabError("CONTEXT_NOT_FOUND", "active token has no active registered path")
-        now = utc_now()
-        conn.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_id = ?", (now, old["credential_id"]))
-        new_token_id, raw_token = create_credential(
-            conn,
-            credential_type="token",
-            project_id=project["project_id"],
-            exp_id=exp_id,
-            token_mode=mode,
-            registered_path_hash=path_row["path_hash"],
-            metadata={"schema_version": 1, "token_mode": mode, "created_for_path_hash": path_row["path_hash"]},
-        )
-        conn.execute("UPDATE path_registry SET token_id = ?, updated_at = ? WHERE path_registry_id = ?", (new_token_id, now, path_row["path_registry_id"]))
-        path = Path(path_row["path"])
-        write_token(path, raw_token)
-        marker = context_marker_obj((path / ".alab" / "context.json").read_text(encoding="utf-8"))
-        marker["token_id"] = new_token_id
-        write_marker(path, marker)
-        _write_git_exclude(path)
-        audit(
-            conn,
-            action="regenerate",
-            object_type="credential",
-            object_id=new_token_id,
-            actor=actor,
-            project_id=project["project_id"],
-            exp_id=exp_id,
-            metadata={
-                "schema_version": 1,
-                "credential_type": "token",
-                "token_mode": mode,
-                "revoked_credential_id": old["credential_id"],
-                "created_credential_id": new_token_id,
-                "revoked_at": now,
-                "registered_path_hash": path_row["path_hash"],
-            },
-        )
-    return [
-        ResultBlock(
-            "credential",
-            [
-                ("project id", project["project_id"]),
-                ("exp id", exp_id),
-                ("revoked token id", old["credential_id"]),
-                ("new token id", new_token_id),
-                ("token mode", mode),
-                ("token path", str(path / ".alab" / "token")),
-                ("created at", now),
-            ],
-        )
-    ]
+    from .experiment_access import cmd_exp_token_regenerate as _impl
+
+    return _impl(args, req)
 
 
 def cmd_exp_checkout(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--path", "--commit"))
-    require_options_at_most_once(args, ("--path", "--commit"))
-    project_id = _project_id_from_request(args, req)
-    actor = _authorize_observe(req, project_id)
-    exp_id = optional_positional_selector(args, "exp checkout accepts exactly one experiment id")
-    commit_selector = _exp_commit_selector_filter(command_arg(args, "--commit"))
-    checkout_path = Path(command_arg(args, "--path", required=True)).expanduser().resolve()
-    conn = require_home(req.globals.home)
-    try:
-        _project_row(conn, project_id)
-        _assert_new_context_path(conn, target=checkout_path, project_id=project_id, context_type="inspection", label="inspection checkout")
-        exp = _exp_row(conn, project_id, exp_id)
-        if actor.actor_type == "token" and not _exp_visible(conn, project_id, actor, exp["exp_id"]):
-            raise AlabError("SCOPE_VIOLATION", "experiment is not visible to this token")
-        commit = _resolve_exp_commit(conn, req.globals.home, project_id, exp, commit_selector)
-        home_id = one(conn, "SELECT home_id FROM homes LIMIT 1")["home_id"]
-    finally:
-        conn.close()
-    _project_root, repo_git, _artifact_store = _project_paths(req.globals.home, project_id)
-    run_cmd(["git", f"--git-dir={repo_git}", "worktree", "add", "--detach", str(checkout_path), commit])
-    with Database(req.globals.home).tx() as tx:
-        now = utc_now()
-        checkout_path_hash = path_hash(checkout_path)
-        path_registry_id = new_id("path", "inspection")
-        token_id, raw_token = create_credential(
-            tx,
-            credential_type="token",
-            project_id=project_id,
-            exp_id=exp["exp_id"],
-            token_mode="inspection",
-            registered_path_hash=checkout_path_hash,
-            metadata={
-                "schema_version": 1,
-                "token_mode": "inspection",
-                "created_for_path_hash": checkout_path_hash,
-            },
-        )
-        write_marker(
-            checkout_path,
-            {
-                "marker_version": 1,
-                "home_id": home_id,
-                "context_type": "inspection",
-                "project_id": project_id,
-                "exp_id": exp["exp_id"],
-                "token_id": token_id,
-                "inspection_commit": commit,
-                "created_at": now,
-            },
-        )
-        write_token(checkout_path, raw_token)
-        _write_git_exclude(checkout_path)
-        tx.execute(
-            """
-            INSERT INTO path_registry(path_registry_id, path_hash, path, context_type, home_id, project_id,
-              exp_id, token_id, status, created_at, updated_at)
-            VALUES (?, ?, ?, 'inspection', ?, ?, ?, ?, 'active', ?, ?)
-            """,
-            (path_registry_id, checkout_path_hash, str(checkout_path), home_id, project_id, exp["exp_id"], token_id, now, now),
-        )
-        audit(
-            tx,
-            action="add",
-            object_type="inspection_checkout",
-            object_id=token_id,
-            actor=actor,
-            project_id=project_id,
-            exp_id=exp["exp_id"],
-            metadata={
-                "schema_version": 1,
-                "credential_type": "token",
-                "token_mode": "inspection",
-                "created_token_id": token_id,
-                "inspection_commit": commit,
-                "path_registry_id": path_registry_id,
-                "created_for_path_hash": checkout_path_hash,
-            },
-        )
-    return [
-        ResultBlock(
-            "inspection_checkout",
-            [
-                ("exp id", exp["exp_id"]),
-                ("inspection path", str(checkout_path)),
-                ("inspection commit", commit),
-                ("token path", str(checkout_path / ".alab" / "token")),
-                ("token id", token_id),
-                ("next", f"cd {checkout_path} && alab status"),
-            ],
-        )
-    ]
+    from .experiment_access import cmd_exp_checkout as _impl
+
+    return _impl(args, req)
 
 
-def _authorize_checkout_remove(req: Request, project_id: str, path_row: Any) -> Actor:
-    raw = req.globals.key
-    if raw:
-        conn = require_home(req.globals.home)
-        try:
-            return verify_raw_credential(conn, raw, required=("root", "admin"), project_id=project_id)
-        finally:
-            conn.close()
-    if req.context and req.context.context_type == "inspection" and req.context.token_id == path_row["token_id"]:
-        conn = require_home(req.globals.home)
-        try:
-            token = read_token(req.context.path)
-            return verify_raw_credential(conn, token, required="token", project_id=project_id, exp_id=path_row["exp_id"], token_mode="inspection", path_hash=req.context.path_hash)
-        finally:
-            conn.close()
-    raise AlabError("AUTH_REQUIRED", "checkout remove requires admin/root key or matching inspection token context")
+def _authorize_checkout_remove(*args: Any, **kwargs: Any) -> Any:
+    from .experiment_access import _authorize_checkout_remove as _impl
+
+    return _impl(*args, **kwargs)
 
 
 def cmd_exp_checkout_remove(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--token-id", "--path", "--dry-run", "--force", "--confirm", "--reason"))
-    require_options_at_most_once(args, ("--dry-run", "--reason"))
-    require_dry_run_unforced(args)
-    project_id = _project_id_from_request(args, req)
-    require_exactly_one_option_pair(args, "--token-id", "--path", "checkout remove requires exactly one of --token-id or --path")
-    token_id = _complete_id_option(args, "--token-id", "cred")
-    path_arg = command_arg(args, "--path")
-    require_positional_count(args, 0, "exp checkout remove accepts no positional arguments")
-    conn = require_home(req.globals.home)
-    try:
-        if token_id:
-            path_row = one(conn, "SELECT * FROM path_registry WHERE project_id = ? AND token_id = ? AND context_type = 'inspection' AND status = 'active'", (project_id, token_id))
-        else:
-            ph = path_hash(Path(path_arg).expanduser().resolve())
-            path_row = one(conn, "SELECT * FROM path_registry WHERE project_id = ? AND path_hash = ? AND context_type = 'inspection' AND status = 'active'", (project_id, ph))
-        if path_row is None:
-            raise AlabError("CONTEXT_NOT_FOUND", "inspection checkout not found")
-        actor = _authorize_checkout_remove(req, project_id, path_row)
-    finally:
-        conn.close()
-    dry_run = flag(args, "--dry-run")
-    expected_confirm = path_row["token_id"] if token_id else path_row["path_hash"]
-    reason = _lifecycle_reason(args)
-    if dry_run:
-        return [
-            ResultBlock(
-                "inspection_checkout",
-                [
-                    ("exp id", path_row["exp_id"]),
-                    ("inspection path", path_row["path"]),
-                    ("token id", path_row["token_id"]),
-                    ("dry run", True),
-                    ("removed", False),
-                    ("path exists", _path_present(Path(path_row["path"]))),
-                    ("token revocation target", path_row["token_id"]),
-                    ("token revoked", True),
-                    ("planned trash move", _trash_plan(req.globals.home, path_row["path"])),
-                    ("audit id", None),
-                ],
-            )
-        ]
-    require_force_confirm(args, expected_confirm, "checkout remove requires --force and matching --confirm")
-    _project_root, repo_git, _artifact_store = _project_paths(req.globals.home, project_id)
-    audit_id = new_id("aud", "remove")
-    stage = _stage_path_to_trash(req.globals.home, path_row["path"], audit_id)
-    try:
-        with Database(req.globals.home).tx() as tx:
-            now = utc_now()
-            tx.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_id = ?", (now, path_row["token_id"]))
-            tx.execute(
-                "UPDATE path_registry SET status = 'removed', removed_at = ?, removed_by_credential_id = ?, updated_at = ? WHERE path_registry_id = ?",
-                (now, actor.credential_id, now, path_row["path_registry_id"]),
-            )
-            audit(
-                tx,
-                action="remove",
-                object_type="inspection_checkout",
-                object_id=path_row["token_id"],
-                actor=actor,
-                audit_id=audit_id,
-                project_id=project_id,
-                exp_id=path_row["exp_id"],
-                reason=reason,
-                metadata={
-                    "schema_version": 1,
-                    "filesystem_path_already_absent": stage.already_absent,
-                    "token_revocation_target": path_row["token_id"],
-                    "trash": {
-                        "mode": stage.mode,
-                        "label": stage.audit_label,
-                        "original_path_hash": path_hash(stage.original_path) if stage.original_path else None,
-                    },
-                },
-            )
-    except Exception as exc:
-        _raise_after_staged_trash_transaction_failure(exc, [stage])
-    _prune_missing_git_worktrees(repo_git)
-    trash_cleanup_pending = _finalize_staged_trash(req.globals.home, stage, project_id)
-    return [
-        ResultBlock(
-            "inspection_checkout",
-            [
-                ("exp id", path_row["exp_id"]),
-                ("inspection path", path_row["path"]),
-                ("token id", path_row["token_id"]),
-                ("dry run", False),
-                ("removed", True),
-                ("path existed", not stage.already_absent),
-                ("token revocation target", path_row["token_id"]),
-                ("token revoked", True),
-                ("trash path", stage.audit_label),
-                ("trash cleanup pending", trash_cleanup_pending),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
+    from .experiment_access import cmd_exp_checkout_remove as _impl
+
+    return _impl(args, req)
 
 
 def _authorize_observe(req: Request, project_id: str | None, *, admin_required: bool = False) -> Actor:

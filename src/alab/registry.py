@@ -27,6 +27,17 @@ from .credentials import (
     cmd_key_revoke,
 )
 from .dashboard import cmd_dashboard
+from .experiment_access import (
+    cmd_exp_checkout,
+    cmd_exp_checkout_remove,
+    cmd_exp_token_list,
+    cmd_exp_token_regenerate,
+    cmd_exp_token_revoke,
+    cmd_exp_worktree_remove,
+    cmd_exp_worktree_restore,
+)
+from .experiment_lifecycle import cmd_exp_archive, cmd_exp_remove, cmd_exp_unarchive
+from .experiment_query import cmd_exp_best, cmd_exp_list, cmd_exp_search, cmd_exp_show
 from .feedback import cmd_feedback, cmd_feedback_archive, cmd_feedback_list, cmd_feedback_show
 from .maintenance import cmd_backup_prune, cmd_cache_prune
 from .observe import (
@@ -48,6 +59,25 @@ from .observe import (
     cmd_observe_runs_show,
     cmd_observe_runs_unarchive,
 )
+from .project_config import (
+    cmd_project_config_export,
+    cmd_project_config_import,
+    cmd_project_config_set,
+    cmd_project_config_show,
+    cmd_project_env_list,
+    cmd_project_env_set,
+    cmd_project_env_unset,
+    cmd_project_secret_gc,
+    cmd_project_secret_list,
+    cmd_project_secret_set,
+    cmd_project_secret_unset,
+)
+from .project_validation import (
+    cmd_project_validate,
+    cmd_project_validation_archive,
+    cmd_project_validation_remove,
+    cmd_project_validation_unarchive,
+)
 from .rendering import ResultBlock
 from .report import cmd_report
 from .service_models import LongRunningResult, Request
@@ -58,47 +88,18 @@ from .services import (
     cmd_config_validate,
     cmd_context_repair,
     cmd_context_show,
-    cmd_exp_archive,
-    cmd_exp_best,
-    cmd_exp_checkout,
-    cmd_exp_checkout_remove,
     cmd_exp_create,
-    cmd_exp_list,
-    cmd_exp_remove,
-    cmd_exp_search,
-    cmd_exp_show,
     cmd_exp_tag_add,
     cmd_exp_tag_list,
     cmd_exp_tag_remove,
-    cmd_exp_token_list,
-    cmd_exp_token_regenerate,
-    cmd_exp_token_revoke,
-    cmd_exp_unarchive,
-    cmd_exp_worktree_remove,
-    cmd_exp_worktree_restore,
     cmd_help,
     cmd_project_archive,
-    cmd_project_config_export,
-    cmd_project_config_import,
-    cmd_project_config_set,
-    cmd_project_config_show,
-    cmd_project_env_list,
-    cmd_project_env_set,
-    cmd_project_env_unset,
     cmd_project_init,
     cmd_project_list,
     cmd_project_locks_clear_stale,
     cmd_project_remove,
-    cmd_project_secret_gc,
-    cmd_project_secret_list,
-    cmd_project_secret_set,
-    cmd_project_secret_unset,
     cmd_project_show,
     cmd_project_unarchive,
-    cmd_project_validate,
-    cmd_project_validation_archive,
-    cmd_project_validation_remove,
-    cmd_project_validation_unarchive,
     cmd_run,
     cmd_status,
     cmd_submit,

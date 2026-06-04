@@ -8122,3 +8122,26 @@
 - `git diff --check`
 - Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
 - Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
+## 2026-06-04 Stable-Boundary Project and Experiment Service Extraction
+
+已实现：
+
+- 将 project config/env/secret command handlers 及其本地 config/secret helpers 从 `src/alab/services.py` 移入 `src/alab/project_config.py`。
+- 将 project validation create/archive/unarchive/remove handlers 以及 validation-row/blocker helpers 移入 `src/alab/project_validation.py`。
+- 将 experiment list/search/show/best handlers 以及 visibility/query/best-ranking helpers 移入 `src/alab/experiment_query.py`，包括注册到同一 handlers 的 observe experiment aliases。
+- 将 experiment archive/unarchive/remove handlers 以及 experiment-remove filesystem target helpers 移入 `src/alab/experiment_lifecycle.py`。
+- 将 experiment worktree remove/restore、token list/revoke/regenerate、inspection checkout create/remove handlers 以及对应 Git/path/token helpers 移入 `src/alab/experiment_access.py`。
+- 更新 `src/alab/registry.py`，使这些 command families 直接从抽出的 modules 注册。
+- 保留 legacy `src/alab/services.py` compatibility wrappers，以兼容仍通过历史 services module 导入 private helpers 的现有内部调用方和 tests。
+- 将 project init、与 experiment creation 共享的 source bootstrap、global config、context、run/submit、project list/show/archive/remove/locks、experiment create/tags 和 remaining core lifecycle helpers 继续保留在 `src/alab/services.py`，避免 line-count-only 过度拆分。
+- 更新 progress/audit/pipeline/closed-gap documentation，并同步中文文档。
+
+验证：
+
+- Registry binding check：确认 `project config/env/secret` commands 绑定到 `alab.project_config`，`project validate/validation` commands 绑定到 `alab.project_validation`，`exp list/search/show/best` 以及 observe experiment aliases 绑定到 `alab.experiment_query`，`exp archive/unarchive/remove` 绑定到 `alab.experiment_lifecycle`，worktree/token/checkout commands 绑定到 `alab.experiment_access`。
+- Relevant ruff check：`.venv/bin/ruff check src/alab/experiment_access.py src/alab/experiment_lifecycle.py src/alab/experiment_query.py src/alab/project_config.py src/alab/project_validation.py src/alab/services.py src/alab/registry.py src/alab/observe.py src/alab/sources.py src/alab/annotations.py src/alab/report.py`
+- Forced compile check：`.venv/bin/python -m compileall -f src/alab/experiment_access.py src/alab/experiment_lifecycle.py src/alab/experiment_query.py src/alab/project_config.py src/alab/project_validation.py src/alab/services.py src/alab/registry.py src/alab/observe.py src/alab/sources.py src/alab/annotations.py src/alab/report.py`
+- Focused object-family regression checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_project_config_mutation_and_validate_success_fields_follow_cli_spec tests/test_cli_contract.py::test_project_env_success_fields_follow_cli_spec tests/test_cli_contract.py::test_project_secret_success_fields_follow_cli_spec tests/test_cli_contract.py::test_project_secret_gc_success_fields_follow_cli_spec tests/test_cli_contract.py::test_project_validation_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_observe_success_fields_follow_cli_spec tests/test_cli_contract.py::test_observe_read_aliases_render_equivalent_outputs tests/test_cli_contract.py::test_experiment_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_remove_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_worktree_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_token_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_checkout_success_fields_follow_cli_spec tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_visibility_scope_selector_errors_are_non_disclosing_and_side_effect_free tests/test_cli_contract.py::test_hard_remove_dry_runs_preserve_database_and_filesystem tests/test_smoke.py::test_worktree_remove_restores_staged_trash_after_transaction_failure tests/test_smoke.py::test_experiment_remove_restores_branch_and_trash_after_transaction_failure tests/test_smoke.py::test_checkout_remove_restores_staged_trash_after_transaction_failure tests/test_smoke.py::test_validation_remove_restores_staged_trash_after_transaction_failure`
+- Focused docs/audit sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- Full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
