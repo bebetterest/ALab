@@ -7,7 +7,6 @@ from typing import Any
 from .errors import AlabError
 from .timeutil import parse_rfc3339_utc
 
-
 OPTIONS_WITH_VALUES = {
     "--home",
     "--output",
