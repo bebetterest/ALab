@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 import alab.cli as cli
+import alab.maintenance as maintenance_services
 import alab.observe as observe_services
 import alab.services as services
 import alab.sources as source_services
@@ -1343,7 +1344,7 @@ def test_cache_prune_docker_image_failure_renders_warning_and_keeps_entry(tmp_pa
         assert tag == "alab-cache:failed-prune"
         return False, "fake docker refused removal"
 
-    monkeypatch.setattr(services, "prune_docker_image", fake_prune_docker_image)
+    monkeypatch.setattr(maintenance_services, "prune_docker_image", fake_prune_docker_image)
 
     assert run(["--home", str(home), "--key", root_key, "cache", "prune", "--docker-images"]) == 0
     out = capsys.readouterr().out

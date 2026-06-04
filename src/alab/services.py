@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import errno
 import fnmatch
 import hashlib
 import hmac
@@ -22,7 +21,6 @@ from .auth import (
     Actor,
     create_credential,
     credential_metadata_obj,
-    new_home_id,
     read_token,
     verify_raw_credential,
     write_token,
@@ -58,6 +56,22 @@ from .errors import AlabError, error_exit_code
 from .home import DEFAULT_CONFIG, Home, ensure_layout, is_initialized
 from .ids import new_id, require_complete_id, slugify
 from .proc import run_cmd
+from .removal import (
+    _delete_trash_path,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _finalize_staged_trash,
+    _finalize_staged_trashes,
+    _path_present,
+    _raise_after_staged_trash_transaction_failure,
+    _record_pending_trash_cleanup,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _remove_path_if_safe,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _remove_trash_cache_path,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _restore_staged_trash,  # noqa: F401 - compatibility export for legacy alab.services callers
+    _restore_staged_trashes,
+    _stage_path_to_trash,
+    _stage_targets_to_trash,
+    _trash_plan,
+    _worktree_dirty_state,
+)
 from .rendering import ResultBlock, multiline_text
 from .runner import (
     DOCKER_CAPABILITY_KEYS,
@@ -66,7 +80,6 @@ from .runner import (
     docker_runtime_fingerprint,
     load_harbor_task,
     probe_docker_capabilities,
-    prune_docker_image,
     run_configured_runner,
     store_log_file,
 )
@@ -108,7 +121,6 @@ from .service_contracts import (
 from .service_models import (
     DEFAULT_SOURCE_IMPORT_LIMITS,
     EXPERIMENT_STATUSES,
-    KEY_ROLES,
     TOKEN_MODES,
     VISIBILITY_SCOPES,
     AdapterDerivedSource,
@@ -120,7 +132,7 @@ from .service_models import (
     RunExecutionSummary,
     SourceImportLimits,
     SourceImportResult,
-    TrashStage,
+    TrashStage,  # noqa: F401 - compatibility export for legacy alab.services callers
 )
 from .service_models import (
     ResolvedRemovalTarget as _ResolvedRemovalTarget,
@@ -232,197 +244,6 @@ def _tag_slug(value: str) -> str:
 
 def cmd_help(args: list[str], req: Request) -> list[ResultBlock]:
     raise AlabError("CONFIG_INVALID", "help is handled by the CLI help renderer")
-
-
-def cmd_auth_init(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ())
-    require_positional_count(args, 0, "auth init accepts no positional arguments")
-    home = req.globals.home
-    if home.path.exists() and any(home.path.iterdir()) and not is_initialized(home):
-        raise AlabError("HOME_EXISTS", "home exists and is not an initialized ALab home")
-    if is_initialized(home):
-        raise AlabError("HOME_EXISTS", "ALab home is already initialized")
-    ensure_layout(home)
-    db = Database(home)
-    db.migrate()
-    with db.tx() as conn:
-        now = utc_now()
-        home_id = new_home_id()
-        conn.execute(
-            "INSERT INTO homes(home_id, schema_version, created_at, updated_at) VALUES (?, 1, ?, ?)",
-            (home_id, now, now),
-        )
-        _, raw_root = create_credential(conn, credential_type="root", metadata={"schema_version": 1})
-    return [
-        ResultBlock(
-            "auth",
-            [
-                ("home", str(home.path)),
-                ("home id", home_id),
-                ("root key", raw_root),
-                ("created", now),
-            ],
-        )
-    ]
-
-
-def cmd_auth_root_regenerate(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ())
-    actor = require_actor(req, "root")
-    require_positional_count(args, 0, "auth root regenerate accepts no positional arguments")
-    db = Database(req.globals.home)
-    with db.tx() as conn:
-        now = utc_now()
-        conn.execute(
-            "UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_type = 'root' AND status = 'active'",
-            (now,),
-        )
-        key_id, raw = create_credential(conn, credential_type="root", metadata={"schema_version": 1})
-        home_id = one(conn, "SELECT home_id FROM homes LIMIT 1")["home_id"]
-        audit(
-            conn,
-            action="regenerate",
-            object_type="credential",
-            object_id=key_id,
-            actor=actor,
-            metadata={
-                "schema_version": 1,
-                "credential_type": "root",
-                "revoked_credential_id": actor.credential_id,
-                "created_credential_id": key_id,
-                "revoked_at": now,
-            },
-        )
-    return [
-        ResultBlock(
-            "auth",
-            [
-                ("home", str(req.globals.home.path)),
-                ("home id", home_id),
-                ("root key", raw),
-                ("revoked key id", actor.credential_id),
-                ("created key id", key_id),
-            ],
-        )
-    ]
-
-
-def cmd_key_create(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--role"))
-    require_options_at_most_once(args, ("--project", "--role"))
-    actor = require_actor(req, "root")
-    require_positional_count(args, 0, "key create accepts no positional arguments")
-    project_id = command_arg(args, "--project") or (req.context.project_id if req.context else None)
-    role = _require_option_choice(command_arg(args, "--role", default="admin"), "--role", KEY_ROLES)
-    with Database(req.globals.home).tx() as conn:
-        _project_row(conn, project_id)
-        key_id, raw_admin = create_credential(conn, credential_type="admin", project_id=project_id, metadata={"schema_version": 1, "role": "admin"})
-        row = one(conn, "SELECT created_at FROM credentials WHERE credential_id = ?", (key_id,))
-        audit(conn, action="add", object_type="credential", object_id=key_id, actor=actor, project_id=project_id)
-    return [
-        ResultBlock(
-            "credential",
-            [
-                ("project id", project_id),
-                ("key id", key_id),
-                ("role", role),
-                ("admin key", raw_admin),
-                ("created", row["created_at"] if row else None),
-            ],
-        )
-    ]
-
-
-def cmd_key_list(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--root"))
-    require_options_at_most_once(args, ("--project", "--root"))
-    root_scope = flag(args, "--root")
-    explicit_project_id = command_arg(args, "--project")
-    project_id = explicit_project_id or (req.context.project_id if req.context else None)
-    if root_scope and explicit_project_id:
-        raise AlabError("CONFIG_INVALID", "--root conflicts with --project")
-    if root_scope:
-        require_actor(req, "root")
-        require_positional_count(args, 0, "key list accepts no positional arguments", options_with_values=("--project",))
-        conn = require_home(req.globals.home)
-        try:
-            rows = all_rows(conn, "SELECT * FROM credentials WHERE credential_type = 'root' ORDER BY created_at", ())
-            return [
-                ResultBlock(
-                    "credential",
-                    [
-                        ("key id", row["credential_id"]),
-                        ("credential type", row["credential_type"]),
-                        ("status", row["status"]),
-                        ("created at", row["created_at"]),
-                        ("revoked at", row["revoked_at"]),
-                    ],
-                )
-                for row in rows
-            ]
-        finally:
-            conn.close()
-    require_actor(req, ("root", "admin"), project_id=project_id)
-    require_positional_count(args, 0, "key list accepts no positional arguments", options_with_values=("--project",))
-    conn = require_home(req.globals.home)
-    try:
-        _project_row(conn, project_id)
-        rows = all_rows(conn, "SELECT * FROM credentials WHERE credential_type = 'admin' AND project_id = ? ORDER BY created_at", (project_id,))
-        return [
-            ResultBlock(
-                "credential",
-                [
-                    ("project id", project_id),
-                    ("key id", row["credential_id"]),
-                    ("role", "admin"),
-                    ("status", row["status"]),
-                    ("created at", row["created_at"]),
-                    ("revoked at", row["revoked_at"]),
-                ],
-            )
-            for row in rows
-        ]
-    finally:
-        conn.close()
-
-def cmd_key_revoke(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project",))
-    require_options_at_most_once(args, ("--project",))
-    actor = require_actor(req, "root")
-    key_id = optional_positional_selector(args, "key revoke accepts exactly one key id")
-    key_id = _complete_id_or_missing(key_id, prefix="cred", code="CREDENTIAL_NOT_FOUND", label="key id")
-    project_id = command_arg(args, "--project") or (req.context.project_id if req.context else None)
-    with Database(req.globals.home).tx() as conn:
-        row = one(conn, "SELECT * FROM credentials WHERE credential_id = ?", (key_id,))
-        if row is None:
-            raise AlabError("CREDENTIAL_NOT_FOUND", "credential not found")
-        if project_id and row["project_id"] != project_id:
-            raise AlabError("CREDENTIAL_NOT_FOUND", "credential not found in project")
-        if row["credential_type"] == "root" and row["status"] == "active":
-            active_roots = one(conn, "SELECT count(*) AS c FROM credentials WHERE credential_type = 'root' AND status = 'active'")["c"]
-            if active_roots <= 1:
-                raise AlabError("CONFIG_INVALID", "cannot revoke the only active root key")
-        revoked_at = row["revoked_at"] or utc_now()
-        if row["status"] != "revoked":
-            conn.execute("UPDATE credentials SET status = 'revoked', revoked_at = ? WHERE credential_id = ?", (revoked_at, key_id))
-            audit(
-                conn,
-                action="revoke",
-                object_type="credential",
-                object_id=key_id,
-                actor=actor,
-                project_id=row["project_id"],
-                exp_id=row["exp_id"],
-                metadata={
-                    "schema_version": 1,
-                    "credential_type": row["credential_type"],
-                    "token_mode": row["token_mode"],
-                    "previous_status": row["status"],
-                    "credential_status": "revoked",
-                    "revoked_at": revoked_at,
-                },
-            )
-    return [ResultBlock("credential", [("key id", key_id), ("status", "revoked"), ("revoked at", revoked_at)])]
 
 
 def cmd_config_show(args: list[str], req: Request) -> list[ResultBlock]:
@@ -3735,355 +3556,6 @@ def cmd_project_locks_clear_stale(args: list[str], req: Request) -> list[ResultB
             ],
         )
     ]
-
-
-def _parse_days(args: list[str], name: str) -> int | None:
-    value = command_arg(args, name)
-    if value is None:
-        return None
-    try:
-        days = int(value)
-    except ValueError as exc:
-        raise AlabError("CONFIG_INVALID", f"{name} must be an integer number of days") from exc
-    if days < 0:
-        raise AlabError("CONFIG_INVALID", f"{name} must be zero or greater")
-    return days
-
-
-def _remove_path_if_safe(path: Path, root: Path) -> None:
-    resolved = path.expanduser().resolve()
-    root_resolved = root.expanduser().resolve()
-    if resolved == root_resolved or not str(resolved).startswith(str(root_resolved) + os.sep):
-        raise AlabError("CONFIG_INVALID", "refusing to prune a path outside ALab home")
-    if not resolved.exists():
-        return
-    if resolved.is_dir():
-        shutil.rmtree(resolved)
-    else:
-        resolved.unlink()
-
-
-def _path_present(path: Path | None) -> bool:
-    return bool(path and (path.exists() or path.is_symlink()))
-
-
-def _trash_plan(home: Home, target: str | Path | None) -> str | None:
-    if not target:
-        return None
-    path = Path(target)
-    return f"{path} -> {home.tmp_path / 'trash' / '<audit_id>' / (path.name or 'path')}"
-
-
-def _worktree_dirty_state(path: str | Path | None) -> str:
-    if not path:
-        return "missing"
-    worktree = Path(path)
-    if not _path_present(worktree):
-        return "missing"
-    result = run_cmd(["git", "-C", str(worktree), "status", "--porcelain"], check=False)
-    if result.returncode != 0:
-        return "unknown"
-    return "dirty" if result.stdout.strip() else "clean"
-
-
-def _stage_path_to_trash(home: Home, target: str | Path | None, audit_id: str) -> TrashStage:
-    if not target:
-        return TrashStage(audit_id, None, None, None, "none", False, True)
-    source = Path(target).expanduser()
-    if not _path_present(source):
-        return TrashStage(audit_id, source, None, None, "none", False, True)
-    resolved = source.resolve()
-    home_resolved = home.path.resolve()
-    if resolved == home_resolved:
-        raise AlabError("STORAGE_ERROR", "refusing to trash ALab home")
-    home_trash_dir = home.tmp_path / "trash" / audit_id
-    created_home_trash_dir = not home_trash_dir.exists()
-    trash_name = source.name or "path"
-    home_trash_path = home_trash_dir / trash_name
-    if home_trash_path.exists():
-        digest = path_hash(source).split(":", 1)[1][:12]
-        home_trash_path = home_trash_dir / f"{trash_name}-{digest}"
-    try:
-        home_trash_dir.mkdir(parents=True, exist_ok=True)
-        source.rename(home_trash_path)
-        return TrashStage(
-            audit_id,
-            source,
-            home_trash_path,
-            str(home_trash_path.relative_to(home.path)),
-            "home",
-            True,
-            False,
-        )
-    except OSError as exc:
-        if exc.errno != errno.EXDEV:
-            if created_home_trash_dir:
-                shutil.rmtree(home_trash_dir, ignore_errors=True)
-            raise AlabError("STORAGE_ERROR", f"failed to stage path for trash: {exc}") from exc
-        if created_home_trash_dir:
-            shutil.rmtree(home_trash_dir, ignore_errors=True)
-        same_parent = source.parent / f".alab-trash-{audit_id}"
-        if same_parent.exists():
-            digest = path_hash(source).split(":", 1)[1][:12]
-            same_parent = source.parent / f".alab-trash-{audit_id}-{digest}"
-        try:
-            source.rename(same_parent)
-        except OSError as fallback_exc:
-            raise AlabError("STORAGE_ERROR", f"failed to stage path in same-parent trash: {fallback_exc}") from fallback_exc
-        return TrashStage(audit_id, source, same_parent, same_parent.name, "same_parent", True, False)
-
-
-def _stage_targets_to_trash(home: Home, targets: list[FilesystemRemovalTarget], audit_id: str) -> list[TrashStage]:
-    stages: list[TrashStage] = []
-    try:
-        for target in targets:
-            stages.append(_stage_path_to_trash(home, target.path, audit_id))
-    except Exception:
-        for stage in reversed(stages):
-            try:
-                _restore_staged_trash(stage)
-            except Exception:
-                pass
-        raise
-    return stages
-
-
-def _restore_staged_trash(stage: TrashStage) -> None:
-    if not stage.moved or stage.original_path is None or stage.trash_path is None:
-        return
-    if _path_present(stage.original_path):
-        raise AlabError("STORAGE_ERROR", "cannot restore trashed path because original path is occupied")
-    stage.trash_path.rename(stage.original_path)
-    if stage.mode == "home":
-        try:
-            stage.trash_path.parent.rmdir()
-        except OSError:
-            pass
-
-
-def _restore_staged_trashes(stages: list[TrashStage]) -> None:
-    for stage in reversed(stages):
-        _restore_staged_trash(stage)
-
-
-def _raise_after_staged_trash_transaction_failure(exc: Exception, stages: list[TrashStage], *, next_action: str = "alab context repair") -> None:
-    try:
-        _restore_staged_trashes(stages)
-    except Exception as restore_exc:
-        raise AlabError("STORAGE_ERROR", f"database update failed and trash restore failed: {restore_exc}", next_action) from restore_exc
-    if isinstance(exc, AlabError):
-        raise exc
-    raise AlabError("STORAGE_ERROR", f"database update failed after trash staging: {type(exc).__name__}", next_action) from exc
-
-
-def _delete_trash_path(stage: TrashStage, home: Home) -> None:
-    if not stage.moved or stage.trash_path is None:
-        return
-    resolved = stage.trash_path.resolve()
-    home_trash = (home.tmp_path / "trash").resolve()
-    if stage.mode == "home":
-        if not str(resolved).startswith(str(home_trash) + os.sep):
-            raise AlabError("STORAGE_ERROR", "refusing to delete unexpected home trash path")
-    elif stage.mode == "same_parent":
-        if not stage.trash_path.name.startswith(".alab-trash-"):
-            raise AlabError("STORAGE_ERROR", "refusing to delete unexpected same-parent trash path")
-    else:
-        raise AlabError("STORAGE_ERROR", "unknown trash staging mode")
-    if stage.trash_path.is_dir() and not stage.trash_path.is_symlink():
-        shutil.rmtree(stage.trash_path)
-    else:
-        stage.trash_path.unlink()
-    if stage.mode == "home":
-        try:
-            stage.trash_path.parent.rmdir()
-        except OSError:
-            pass
-
-
-def _record_pending_trash_cleanup(home: Home, stage: TrashStage, project_id: str | None, deletion_error: Exception) -> None:
-    if not stage.moved or stage.trash_path is None:
-        return
-    now = utc_now()
-    metadata = {
-        "schema_version": 1,
-        "safe_summary": f"pending trash cleanup for {stage.audit_label}",
-        "inputs_hash": path_hash(stage.original_path) if stage.original_path else stage.audit_id,
-        "warnings": [f"trash deletion failed: {type(deletion_error).__name__}"],
-    }
-    metadata_json = canonical_json(cache_metadata_json_obj(canonical_json(metadata)))
-    with Database(home).tx() as conn:
-        conn.execute(
-            """
-            INSERT INTO cache_entries(cache_id, cache_kind, cache_key, project_id, path, docker_tag,
-              size_bytes, status, metadata_json, created_at, last_used_at, removed_at)
-            VALUES (?, 'trash', ?, ?, ?, NULL, NULL, 'active', ?, ?, ?, NULL)
-            """,
-            (new_id("cache", "trash"), stage.audit_id, project_id, str(stage.trash_path), metadata_json, now, now),
-        )
-
-
-def _finalize_staged_trash(home: Home, stage: TrashStage, project_id: str | None) -> bool:
-    if not stage.moved:
-        return False
-    try:
-        _delete_trash_path(stage, home)
-    except Exception as exc:
-        _record_pending_trash_cleanup(home, stage, project_id, exc)
-        return True
-    return False
-
-
-def _finalize_staged_trashes(home: Home, stages: list[TrashStage], project_id: str | None) -> bool:
-    pending = False
-    for stage in stages:
-        pending = _finalize_staged_trash(home, stage, project_id) or pending
-    return pending
-
-
-def _remove_trash_cache_path(path: Path, home: Home) -> None:
-    resolved = path.expanduser().resolve()
-    home_trash = (home.tmp_path / "trash").resolve()
-    if str(resolved).startswith(str(home_trash) + os.sep):
-        if resolved.exists():
-            if resolved.is_dir() and not resolved.is_symlink():
-                shutil.rmtree(resolved)
-            else:
-                resolved.unlink()
-        return
-    if path.name.startswith(".alab-trash-"):
-        if resolved.exists():
-            if resolved.is_dir() and not resolved.is_symlink():
-                shutil.rmtree(resolved)
-            else:
-                resolved.unlink()
-        return
-    raise AlabError("CONFIG_INVALID", "refusing to prune an unexpected trash path")
-
-
-def _parse_backup_keep(args: list[str]) -> int | None:
-    keep_value = command_arg(args, "--keep")
-    if keep_value is None:
-        return None
-    try:
-        keep = int(keep_value)
-    except ValueError as exc:
-        raise AlabError("CONFIG_INVALID", "--keep must be an integer") from exc
-    if keep < 0:
-        raise AlabError("CONFIG_INVALID", "--keep must be zero or greater")
-    return keep
-
-
-def cmd_backup_prune(args: list[str], req: Request) -> list[ResultBlock]:
-    actor = require_actor(req, "root")
-    require_known_options(args, ("--keep", "--older-than"))
-    require_exactly_one_option_pair(args, "--keep", "--older-than", "backup prune requires exactly one of --keep or --older-than")
-    require_positional_count(args, 0, "backup prune accepts no positional arguments")
-    keep = _parse_backup_keep(args)
-    older_than = _parse_days(args, "--older-than")
-    backups = sorted(req.globals.home.backups_path.glob("*.db"), key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
-    if keep is not None:
-        prune = backups[keep:]
-    else:
-        threshold = datetime.now(UTC) - timedelta(days=older_than or 0)
-        prune = [path for path in backups if datetime.fromtimestamp(path.stat().st_mtime, UTC) < threshold]
-    pruned: list[str] = []
-    for path in prune:
-        _remove_path_if_safe(path, req.globals.home.path)
-        pruned.append(str(path))
-    with Database(req.globals.home).tx() as conn:
-        audit_id = audit(
-            conn,
-            action="prune",
-            object_type="backup",
-            object_id="backups",
-            actor=actor,
-            metadata={"schema_version": 1, "pruned_count": len(pruned)},
-        )
-    return [ResultBlock("backup_prune", [("backup pruned count", len(pruned)), ("backup path", pruned), ("audit id", audit_id)])]
-
-
-def _cache_cutoff(args: list[str]) -> str | None:
-    days = _parse_days(args, "--older-than")
-    if days is None:
-        return None
-    return (datetime.now(UTC) - timedelta(days=days)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def cmd_cache_prune(args: list[str], req: Request) -> list[ResultBlock]:
-    actor = require_actor(req, "root")
-    require_known_options(args, ("--all", "--docker-images", "--skydiscover-envs", "--trash", "--trash-all", "--older-than"))
-    require_options_at_most_once(args, ("--all", "--docker-images", "--skydiscover-envs", "--trash", "--trash-all", "--older-than"))
-    all_flag = flag(args, "--all")
-    explicit_selectors = [flag(args, "--docker-images"), flag(args, "--skydiscover-envs"), flag(args, "--trash"), flag(args, "--trash-all")]
-    if all_flag and any(explicit_selectors):
-        raise AlabError("CONFIG_INVALID", "--all conflicts with specific cache selectors")
-    if all_flag and command_arg(args, "--older-than") is not None:
-        raise AlabError("CONFIG_INVALID", "--all conflicts with --older-than")
-    if not all_flag and not any(explicit_selectors):
-        raise AlabError("CONFIG_INVALID", "cache prune requires at least one selector")
-    if flag(args, "--trash") and flag(args, "--trash-all"):
-        raise AlabError("CONFIG_INVALID", "--trash conflicts with --trash-all")
-    if flag(args, "--trash-all") and command_arg(args, "--older-than") is not None:
-        raise AlabError("CONFIG_INVALID", "--trash-all conflicts with --older-than")
-    if flag(args, "--trash") and command_arg(args, "--older-than") is None:
-        raise AlabError("CONFIG_INVALID", "--trash requires --older-than")
-    if not flag(args, "--trash") and command_arg(args, "--older-than") is not None and not all_flag:
-        raise AlabError("CONFIG_INVALID", "--older-than is only valid with --trash")
-    require_positional_count(args, 0, "cache prune accepts no positional arguments")
-    kinds: set[str] = set()
-    if all_flag or flag(args, "--docker-images"):
-        kinds.add("docker_image")
-    if all_flag or flag(args, "--skydiscover-envs"):
-        kinds.add("skydiscover_python_env")
-    if all_flag or flag(args, "--trash") or flag(args, "--trash-all"):
-        kinds.add("trash")
-    cutoff = None if all_flag or flag(args, "--trash-all") else _cache_cutoff(args)
-    warnings: list[tuple[str, str]] = []
-    with Database(req.globals.home).tx() as conn:
-        clauses = ["status = 'active'"]
-        params: list[Any] = []
-        placeholders = ", ".join("?" for _ in kinds)
-        clauses.append(f"cache_kind IN ({placeholders})")
-        params.extend(sorted(kinds))
-        if cutoff:
-            clauses.append("(cache_kind != 'trash' OR COALESCE(last_used_at, created_at) < ?)")
-            params.append(cutoff)
-        rows = all_rows(conn, f"SELECT * FROM cache_entries WHERE {' AND '.join(clauses)} ORDER BY cache_kind, cache_key", tuple(params))
-        pruned_count = 0
-        for row in rows:
-            if row["cache_kind"] == "docker_image" and row["docker_tag"]:
-                removed, reason = prune_docker_image(row["docker_tag"])
-                if not removed:
-                    warnings.append(("DOCKER_CACHE_PRUNE_FAILED", f"{row['docker_tag']}: {reason}"))
-                    continue
-            if row["path"]:
-                if row["cache_kind"] == "trash":
-                    _remove_trash_cache_path(Path(row["path"]), req.globals.home)
-                else:
-                    _remove_path_if_safe(Path(row["path"]), req.globals.home.path)
-            conn.execute("UPDATE cache_entries SET status = 'removed', removed_at = ? WHERE cache_id = ?", (utc_now(), row["cache_id"]))
-            pruned_count += 1
-        audit_id = audit(
-            conn,
-            action="prune",
-            object_type="cache",
-            object_id="cache",
-            actor=actor,
-            metadata={"schema_version": 1, "cache_kinds": sorted(kinds), "pruned_count": pruned_count, "warning_count": len(warnings)},
-        )
-    blocks = [
-        ResultBlock(
-            "cache_prune",
-            [
-                ("cache pruned count", pruned_count),
-                ("cache kind", sorted(kinds)),
-                ("audit id", audit_id),
-            ],
-        )
-    ]
-    for code, reason in warnings:
-        blocks.append(ResultBlock("warning", [("warning code", code), ("warning reason", reason)]))
-    return blocks
 
 
 def cmd_status(args: list[str], req: Request) -> list[ResultBlock]:

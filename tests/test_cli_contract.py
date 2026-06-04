@@ -1422,10 +1422,7 @@ def _documented_warning_codes(spec_path: Path) -> set[str]:
 
 
 def _implemented_warning_codes() -> set[str]:
-    source_paths = [
-        Path(__file__).resolve().parents[1] / "src" / "alab" / name
-        for name in ("auth.py", "cli.py", "services.py", "runner.py", "source_import.py")
-    ]
+    source_paths = sorted((Path(__file__).resolve().parents[1] / "src" / "alab").glob("*.py"))
     codes: set[str] = set()
 
     def collect(node: ast.AST) -> None:

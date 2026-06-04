@@ -7956,6 +7956,49 @@
 - Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
 - Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
 
+## 2026-06-04 Workspace Review
+
+已复核：
+
+- 重新检查 credentials、maintenance 和 removal helper extraction batch 后的 open workspace diff。
+- 确认 `src/alab/registry.py` 从对应 object-family modules 注册抽出的 auth/key 与 backup/cache handlers。
+- 确认 `tests/test_smoke.py` 通过 `src/alab/maintenance.py` patch Docker cache pruning，并且 warning-code catalog scan 现在覆盖 `src/alab/*.py` 下的 runtime modules。
+- 确认剩余 `src/alab/services.py` 内容仍属于 tightly coupled config/project/experiment/run/submit/context/lifecycle core，不应只为降低行数继续拆。
+- 更新 progress 与 completion-audit 英文/中文文档，记录 2026-06-04 workspace-review validation。
+
+验证：
+
+- Compile check：`.venv/bin/python -m compileall -q src/alab/maintenance.py src/alab/credentials.py src/alab/removal.py src/alab/services.py src/alab/registry.py tests/test_smoke.py tests/test_cli_contract.py`
+- Relevant full ruff check：`.venv/bin/ruff check src/alab/maintenance.py src/alab/credentials.py src/alab/removal.py src/alab/services.py src/alab/registry.py src/alab/observe.py tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py tests/test_auth.py`
+- Focused maintenance and warning-code checks：`.venv/bin/python -m pytest -q tests/test_smoke.py::test_auth_init_and_config_show tests/test_smoke.py::test_cache_prune_removes_trash_cache_entries tests/test_smoke.py::test_cache_prune_docker_image_failure_renders_warning_and_keeps_entry tests/test_cli_contract.py::test_non_remove_documented_conflicts_fail_without_side_effects tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_warning_code_catalogs_cover_implemented_warning_codes`
+- Focused docs/audit sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
+- Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Maintenance Service Extraction
+
+已实现：
+
+- 将 backup prune 和 cache prune command handlers 从 `src/alab/services.py` 移入 `src/alab/maintenance.py`。
+- 将 retention parsing 和 cache cutoff helpers 随 handlers 一起移动，使 backup/cache option validation 继续局部归属于 maintenance command family。
+- 更新 `src/alab/registry.py`，使 maintenance commands 从抽出的 module 注册。
+- 更新 CLI warning-code catalog test，使其扫描 `src/alab/*.py` 下的 runtime modules，而不是维护容易 stale 的手写 service-file list。
+- 继续复用 `src/alab/removal.py` 中的 shared safe path deletion 和 trash-cache deletion helpers，使 maintenance commands 与 lifecycle removals 使用同一 filesystem safety boundary。
+- 将 project、experiment、run/submit、context、config 和 tightly coupled lifecycle handlers 继续保留在 `src/alab/services.py`；当前 object-family extraction 已关闭，不继续做 line-count-only splits。
+- 更新 progress/audit/pipeline/closed-gap documentation，并同步中文文档。
+
+验证：
+
+- Compile check：`.venv/bin/python -m compileall -q src/alab/maintenance.py src/alab/credentials.py src/alab/removal.py src/alab/services.py src/alab/registry.py tests/test_smoke.py tests/test_cli_contract.py`
+- Relevant full ruff check：`.venv/bin/ruff check src/alab/maintenance.py src/alab/credentials.py src/alab/removal.py src/alab/services.py src/alab/registry.py src/alab/observe.py tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py tests/test_auth.py`
+- Focused maintenance checks：`.venv/bin/python -m pytest -q tests/test_smoke.py::test_auth_init_and_config_show tests/test_smoke.py::test_cache_prune_removes_trash_cache_entries tests/test_smoke.py::test_cache_prune_docker_image_failure_renders_warning_and_keeps_entry tests/test_cli_contract.py::test_non_remove_documented_conflicts_fail_without_side_effects tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Focused registry-derived CLI contract checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Focused docs/audit sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
+- Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
 ## 2026-06-03 Audit Service Object-Family Extraction
 
 已实现：
@@ -8034,5 +8077,48 @@
 - Compile check：`.venv/bin/python -m compileall -q src/alab tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
 - Relevant full ruff check：`.venv/bin/ruff check src/alab/sources.py src/alab/services.py src/alab/registry.py src/alab/report.py src/alab/observe.py src/alab/annotations.py tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
 - Focused registry/source/annotation/observe contract and smoke checks：`.venv/bin/python -m pytest -q tests/test_migrations.py::test_annotation_target_and_visibility_json_contracts tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_source_lifecycle_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_origin_variants_success_fields_follow_cli_spec tests/test_cli_contract.py::test_source_import_warning_success_fields_follow_cli_spec tests/test_cli_contract.py::test_annotation_success_fields_follow_cli_spec tests/test_cli_contract.py::test_experiment_observe_success_fields_follow_cli_spec tests/test_smoke.py::test_config_source_observe_and_tags tests/test_smoke.py::test_tokens_checkout_worktree_and_annotations tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
+- Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Removal Helper Extraction
+
+已实现：
+
+- 将 shared path presence、trash planning、trash staging/restore/finalize、pending trash cleanup、worktree dirty-state 和 safe prune helpers 从 `src/alab/services.py` 移入 `src/alab/removal.py`。
+- 在 `src/alab/services.py` 保留同名 compatibility imports，支持现有 tests 和仍通过 legacy service module 读取这些 private helpers 的调用方。
+- 更新 `src/alab/observe.py`，使其直接从 `src/alab/removal.py` 导入 trash/remove helpers，减少对 `services.py` 的反向依赖。
+- 将 project、experiment、run/submit、context、config、credential 和 tightly coupled lifecycle handlers 继续保留在 `src/alab/services.py`，避免只为降低行数而过度拆分。
+- 更新 progress/audit/pipeline/closed-gap documentation，并同步中文文档。
+
+验证：
+
+- Compile check：`.venv/bin/python -m compileall -q src/alab/services.py src/alab/removal.py src/alab/observe.py`
+- Import-order fix：`.venv/bin/ruff check --select I --fix src/alab/services.py src/alab/removal.py src/alab/observe.py`
+- Relevant full ruff check：`.venv/bin/ruff check src/alab/removal.py src/alab/services.py src/alab/observe.py tests/test_smoke.py tests/test_migrations.py tests/test_cli_contract.py`
+- Focused removal/trash lifecycle checks：`.venv/bin/python -m pytest -q tests/test_smoke.py::test_trash_staging_uses_same_parent_fallback_on_cross_device_rename tests/test_smoke.py::test_worktree_remove_restores_staged_trash_after_transaction_failure tests/test_smoke.py::test_experiment_remove_restores_branch_and_trash_after_transaction_failure tests/test_smoke.py::test_project_remove_restores_whole_tree_trash_after_transaction_failure tests/test_smoke.py::test_validation_remove_restores_staged_trash_after_transaction_failure tests/test_smoke.py::test_observe_remove_restores_staged_trash_after_transaction_failure tests/test_smoke.py::test_cache_prune_removes_trash_cache_entries tests/test_smoke.py::test_artifact_and_log_remove_use_reference_counted_trash tests/test_smoke.py::test_run_remove_cascades_logs_artifacts_and_updates_experiment_metadata`
+- Focused docs/audit sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
+- Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`
+
+## 2026-06-03 Credentials Service Extraction
+
+已实现：
+
+- 将 auth init/root-regenerate 和 key create/list/revoke command handlers 从 `src/alab/services.py` 移入 `src/alab/credentials.py`。
+- 更新 `src/alab/registry.py`，使 auth/key commands 从抽出的 credentials module 注册。
+- 在 `src/alab/credentials.py` 内保留小型 credential-local project/id lookup helpers，避免反向导入 `services.py`。
+- 将 project、experiment、run/submit、context、config 和 tightly coupled lifecycle handlers 继续保留在 `src/alab/services.py`，避免大范围 line-count-only extraction。
+- 更新 progress/audit/pipeline/closed-gap documentation，并同步中文文档。
+
+验证：
+
+- Compile check：`.venv/bin/python -m compileall -q src/alab/credentials.py src/alab/services.py src/alab/registry.py`
+- Import-order fix：`.venv/bin/ruff check --select I --fix src/alab/credentials.py src/alab/services.py src/alab/registry.py`
+- Relevant full ruff check：`.venv/bin/ruff check src/alab/credentials.py src/alab/removal.py src/alab/services.py src/alab/registry.py src/alab/observe.py tests/test_cli_contract.py tests/test_smoke.py tests/test_migrations.py`
+- Focused auth/key lifecycle checks：`.venv/bin/python -m pytest -q tests/test_auth.py tests/test_smoke.py::test_auth_init_and_config_show tests/test_cli_contract.py::test_auth_root_regenerate_revokes_previous_root_and_audits tests/test_cli_contract.py::test_key_lifecycle_success_fields_follow_cli_spec`
+- Focused registry-derived CLI contract checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_documented_command_options_are_accepted_by_registered_handlers tests/test_cli_contract.py::test_registered_command_handlers_gate_unknown_options tests/test_cli_contract.py::test_registered_command_handlers_validate_positional_arguments tests/test_cli_contract.py::test_known_option_allowlists_use_declared_options tests/test_cli_contract.py::test_known_option_allowlists_cover_literal_option_reads tests/test_cli_contract.py::test_literal_value_option_reads_are_registered_for_positional_parsing tests/test_cli_contract.py::test_known_options_are_duplicate_guarded_or_explicitly_repeatable tests/test_cli_contract.py::test_registered_command_typed_value_options_reject_invalid_values_without_side_effects`
+- Focused docs/audit sync checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- `git diff --check`
 - Sandbox full default suite `.venv/bin/python -m pytest -q` 只在 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content` 因 dashboard loopback bind `PermissionError` 失败。
 - Elevated full default suite with loopback socket access：`.venv/bin/python -m pytest -q`

@@ -9,6 +9,12 @@ from .db import Database, all_rows, one
 from .errors import AlabError
 from .home import Home
 from .ids import new_id
+from .removal import (
+    _finalize_staged_trashes,
+    _raise_after_staged_trash_transaction_failure,
+    _stage_targets_to_trash,
+    _trash_plan,
+)
 from .rendering import ResultBlock, multiline_text
 from .service_args import (
     _append_time_filter,
@@ -47,14 +53,10 @@ from .services import (
     _complete_id_or_missing,
     _exp_visible,
     _experiment_branch_ref,
-    _finalize_staged_trashes,
     _git_ref_commit,
     _interrupt_stale_running_records,
     _project_id_from_request,
     _project_paths,
-    _raise_after_staged_trash_transaction_failure,
-    _stage_targets_to_trash,
-    _trash_plan,
 )
 from .timeutil import utc_now
 

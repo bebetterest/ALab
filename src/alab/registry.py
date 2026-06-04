@@ -19,8 +19,16 @@ from .catalog import (
     cmd_catalog_skydiscover_show,
     cmd_catalog_skydiscover_update,
 )
+from .credentials import (
+    cmd_auth_init,
+    cmd_auth_root_regenerate,
+    cmd_key_create,
+    cmd_key_list,
+    cmd_key_revoke,
+)
 from .dashboard import cmd_dashboard
 from .feedback import cmd_feedback, cmd_feedback_archive, cmd_feedback_list, cmd_feedback_show
+from .maintenance import cmd_backup_prune, cmd_cache_prune
 from .observe import (
     cmd_observe_artifacts_archive,
     cmd_observe_artifacts_export,
@@ -44,10 +52,6 @@ from .rendering import ResultBlock
 from .report import cmd_report
 from .service_models import LongRunningResult, Request
 from .services import (
-    cmd_auth_init,
-    cmd_auth_root_regenerate,
-    cmd_backup_prune,
-    cmd_cache_prune,
     cmd_config_reset,
     cmd_config_set,
     cmd_config_show,
@@ -73,9 +77,6 @@ from .services import (
     cmd_exp_worktree_remove,
     cmd_exp_worktree_restore,
     cmd_help,
-    cmd_key_create,
-    cmd_key_list,
-    cmd_key_revoke,
     cmd_project_archive,
     cmd_project_config_export,
     cmd_project_config_import,
