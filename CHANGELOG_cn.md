@@ -3,6 +3,17 @@
 ALab 的重要变更记录在这里。每次发布改变用户可见行为时，都要与
 `CHANGELOG.md` 保持同步。
 
+## [0.1.3] - 2026-06-04
+
+### 变更
+
+- 将更多稳定边界的 service object families 从 `src/alab/services.py` 拆出，包括 project lifecycle、project config、project validation、experiment query、experiment lifecycle、experiment access、credential、maintenance、annotation、observe、report、source、catalog、audit、dashboard 和 feedback handlers，同时保持已注册 CLI behavior 不变。
+- 通过 lazy exports 集中维护 legacy `alab.services` 对已拆出 handlers 和 helpers 的 compatibility access。
+
+### 修复
+
+- 恢复 legacy `alab.services` 对已拆出的 SkyDiscover catalog constants/helpers 和 registered command handlers 的访问，使 external callers 和 opt-in tests 仍能解析 historical names。
+
 ## [0.1.2] - 2026-05-31
 
 ### 新增

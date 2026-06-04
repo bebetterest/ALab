@@ -3,6 +3,17 @@
 All notable ALab changes are recorded here. Keep this file in sync with
 `CHANGELOG_cn.md` whenever a release changes user-visible behavior.
 
+## [0.1.3] - 2026-06-04
+
+### Changed
+
+- Split additional stable service object families out of `src/alab/services.py`, including project lifecycle, project config, project validation, experiment query, experiment lifecycle, experiment access, credential, maintenance, annotation, observe, report, source, catalog, audit, dashboard, and feedback handlers, while preserving registered CLI behavior.
+- Centralized legacy `alab.services` compatibility access for extracted handlers and helpers through lazy exports.
+
+### Fixed
+
+- Restored legacy `alab.services` access for extracted SkyDiscover catalog constants/helpers and registered command handlers so external callers and opt-in tests can continue resolving historical names.
+
 ## [0.1.2] - 2026-05-31
 
 ### Added
