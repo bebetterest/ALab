@@ -177,12 +177,16 @@ ALAB_HOME="$PWD/.alab-demo/home" alab exp create \
 cd <worktree-path>
 ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab status
 ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab run --message "baseline demo run"
-ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab submit \
+ ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab submit \
   --message "final demo candidate" \
   --summary "The demo candidate prints a parseable reward." \
   --feedback "The latest run passed with reward 1.0." \
   --ref none
 ```
+
+如果 project 配置为 `runner.type = "none"` 且 `reward.type = "none"`，则没有
+evaluator。该 free evaluation mode 下跳过 `alab run`，直接 submit；submission
+会记录 `final run id: none`，并且不参与 best reward ranking。
 
 常用后续 commands：
 
@@ -204,7 +208,7 @@ alab observe experiments best
 - **Source**：从 local path、Git repo、empty source、Harbor task source 或 SkyDiscover initial program 导入的 immutable snapshot。
 - **Experiment**：绑定到一个 source 和一个 config version 的隔离 Git branch/worktree。
 - **Run**：针对某个 experiment commit 的一次 evaluator execution，包含 status、reward、logs、artifacts 和 warning codes。
-- **Submit**：用 final summary、feedback、final run、final commit 和 explicit refs 关闭 experiment。
+- **Submit**：用 final summary、feedback、final commit、explicit refs，以及 final run 或 free evaluation project 的 `final run id: none` 关闭 experiment。
 - **Feedback**：HOME-level plaintext notes，用于 suggestions、questions、bugs 或其他 agent observations，每条记录在 `feedback/` 下独立存放。任何 initialized-home role 都可提交 feedback；root 可以 list、show 和 archive records，且不创建 SQLite 或 audit rows。
 - **Dashboard**：root-only local browser panel，用于 read-only inspection。它只绑定 `127.0.0.1`，使用随机 browser session token，为 large homes 提供 bounded paginated read models，且不写 ALab records。
 - **Reports**：Markdown evidence exports，用于 project-level owner handoffs 或 visible experiment contexts，不包含 raw secrets、hidden log contents 或 artifact bytes。
@@ -214,8 +218,8 @@ alab observe experiments best
 
 Project behavior 由 TOML config 控制：
 
-- `[runner]`：runner type、command/shell、working directory、timeout、Docker fields、Harbor task refs 或 SkyDiscover task refs。
-- `[reward]`：reward type 和 primary metric。支持 `exit_code`、`file`、`stdout_regex`、`harbor`、`skydiscover`。
+- `[runner]`：runner type、command/shell、working directory、timeout、Docker fields、Harbor task refs、SkyDiscover task refs，或用于 free evaluation 的 `type = "none"`。
+- `[reward]`：reward type 和 primary metric。支持 `exit_code`、`file`、`stdout_regex`、`harbor`、`skydiscover` 和 `none`。`reward.type = "none"` 必须与 `runner.type = "none"` 成对使用。
 - `[artifacts]` 和 `[logs]`：captured output roots、glob patterns 和 byte limits。
 - `[env]` 和 `[secret_env]`：显式 environment injection。Secret values 是本地 plaintext，但不渲染或 export。
 - `[mutable]`：experiment 在 run 或 submit 时允许修改的 paths。

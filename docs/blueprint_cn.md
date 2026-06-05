@@ -24,8 +24,8 @@ ALab 负责 project 结构和本地记录。V1 不启动 agent、不调度 agent
 - Project：任务定义、canonical Git 仓库、source 版本、runner 配置、reward 策略、mutable path 策略、visibility 策略、validation 记录、credential 和 experiment。
 - Source：导入到 project 仓库中的不可变代码快照，通过 `alab/source/<source_id>` 引用。
 - Experiment：一次具名尝试，包含 Git branch、worktree、scoped token、tag、run 记录、artifact、annotation 和可选 final submission。
-- Run：对某个 commit 的评估，包含 log、status、reward、metric、artifact、runner metadata 和 config version。
-- Project validation：project 级 baseline run，用于证明所选 source、runner、reward、artifact、environment、timeout 和 policy 配置可以执行。
+- Run：对某个 commit 的评估，包含 log、status、reward、metric、artifact、runner metadata 和 config version。Free evaluation projects 不创建 run rows。
+- Project validation：project 级 baseline run，用于证明所选 source、runner、reward、artifact、environment、timeout 和 policy 配置可以执行；成对配置 `runner.type = "none"` 和 `reward.type = "none"` 的 free evaluation configs 则记录为 `not_required`。
 - Annotation：挂在 experiment、run、artifact、repo path 或 repo line range 上的 revisioned note。
 
 V1 成功标准是：本地用户可以初始化 ALab、创建 project、验证 baseline、从可复用 source 版本创建 experiment，让 agent 在不反复输入 project key 的情况下 run/submit，并能按照明确的协作可见性规则查看本地历史。
@@ -184,6 +184,7 @@ Experiment worktree 和 inspection checkout 可由 root/admin maintenance comman
 
 Adapter 决策：
 
+- 成对的 `runner.type = "none"` 和 `reward.type = "none"` 为 local/Git/empty projects 定义 free evaluation mode。它会跳过 baseline evaluator execution、拒绝 `alab run`、允许直接 `alab submit`、存储 `final_run_id = NULL`，并且 submission 不参与 best reward ranking。
 - Docker runner 使用显式 whitelist 配置面：image 或 dockerfile plus context、network `default|none`、build args、build target、platform、container user、CPU limit 和 memory limit。Host networking 在 V1 不支持，也不属于计划中的 Docker surface。V1 拒绝 Docker Compose、raw Docker argument passthrough、privileged mode 和 extra host mounts。Docker-backed runner 不继承 host environment，只接收 `[env]`、`[secret_env]` 和 ALab internal variables。缺失的 `runner.image` 会自动 pull。Dockerfile build context 遵循 `.dockerignore`，cache key 包含 Dockerfile content、`.dockerignore` 和 effective filtered build context。
 - Harbor 支持 single-step Linux task、shared verifier、separate verifier 和安全的 task-relative `source` import。它拒绝 Windows task、multi-step task、Docker Compose、GPU、MCP、external service、raw Docker passthrough、task-declared host mount 和 placeholder value。
 - Harbor separate verifier 支持 image 或 `tests/Dockerfile`；verifier workspace mount 是临时且可写的；hidden verifier logs 仅 admin 可见。

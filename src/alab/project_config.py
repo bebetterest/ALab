@@ -12,6 +12,7 @@ from .configs import (
     ProjectConfig,
     config_hash,
     dumps_toml,
+    is_free_evaluation_config,
     load_project_config,
     project_config_json_obj,
     set_nested_toml_value,
@@ -203,6 +204,7 @@ def _apply_project_config(
         )
         new_hash = config_hash(config_json)
         runtime_affecting = _runtime_signature(current_json) != _runtime_signature(config_json)
+        free_evaluation = is_free_evaluation_config(next_config)
         if new_hash == current_row["config_hash"]:
             return [
                 ResultBlock(
@@ -223,7 +225,9 @@ def _apply_project_config(
         validation_id = new_id("val", "config")
         inherited_validation_id = project["active_validation_id"] if not runtime_affecting else None
         validation_status = (
-            "running"
+            "not_required"
+            if runtime_affecting and free_evaluation
+            else "running"
             if runtime_affecting and not skip_baseline
             else "skipped"
             if runtime_affecting
@@ -240,7 +244,7 @@ def _apply_project_config(
                 new_version,
                 canonical_json(project_config_json_obj(canonical_json(config_json))),
                 new_hash,
-                1 if runtime_affecting else 0,
+                1 if runtime_affecting and not free_evaluation else 0,
                 validation_status,
                 inherited_validation_id,
                 now,
@@ -263,9 +267,9 @@ def _apply_project_config(
                     new_version,
                     source["source_ref"],
                     source["source_commit"],
-                    "skipped" if skip_baseline else "running",
+                    "not_required" if free_evaluation else "skipped" if skip_baseline else "running",
                     now,
-                    now if skip_baseline else None,
+                    now if free_evaluation or skip_baseline else None,
                     _execution_record_object_json(
                         config_hash_value=new_hash,
                         runner_type=next_config.runner.type,
@@ -273,14 +277,18 @@ def _apply_project_config(
                     ),
                 ),
             )
-        next_active = (
-            new_version
-            if not runtime_affecting and project["active_valid_config_version"]
-            else project["active_valid_config_version"]
-        )
-        next_active_validation = project["active_validation_id"]
         next_status = project["status"]
-        if runtime_affecting and skip_baseline:
+        if runtime_affecting and free_evaluation:
+            next_active = new_version
+            next_active_validation = validation_id
+            next_status = "valid"
+        elif not runtime_affecting and project["active_valid_config_version"]:
+            next_active = new_version
+            next_active_validation = project["active_validation_id"]
+        else:
+            next_active = project["active_valid_config_version"]
+            next_active_validation = project["active_validation_id"]
+        if runtime_affecting and skip_baseline and not free_evaluation:
             next_status = "invalid"
         tx.execute(
             """
@@ -297,7 +305,7 @@ def _apply_project_config(
                 project["project_id"],
             ),
         )
-    if runtime_affecting and not skip_baseline:
+    if runtime_affecting and not skip_baseline and not free_evaluation:
         with db.tx() as tx:
             validation_status, exit_code, reward, reward_parse_status, warning_codes = (
                 _run_validation(
@@ -336,7 +344,13 @@ def _apply_project_config(
                 (validation_status, project["project_id"], new_version),
             )
     else:
-        project_status = "invalid" if runtime_affecting and skip_baseline else project["status"]
+        project_status = (
+            "valid"
+            if runtime_affecting and free_evaluation
+            else "invalid"
+            if runtime_affecting and skip_baseline
+            else project["status"]
+        )
     next_action = (
         "alab exp create --name <name>" if project_status == "valid" else "alab project validate"
     )

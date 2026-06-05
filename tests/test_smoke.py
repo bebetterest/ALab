@@ -2715,6 +2715,118 @@ primary_metric = "reward"
         ).fetchone()
     assert after_import_dry_run_counts == before_import_dry_run_counts
     assert import_dry_run_project == (reverted_metadata_version, reverted_metadata_version, recovered_project[2])
+
+    free_import_json = json.loads(json.dumps(latest_config_json))
+    free_import_json["runner"] = {"type": "none"}
+    free_import_json["reward"] = {"type": "none", "direction": "maximize", "primary_metric": "reward"}
+    free_import_path = tmp_path / "free-import.toml"
+    free_import_path.write_text(services.dumps_toml(free_import_json), encoding="utf-8")
+    assert run(["--home", str(home), "--key", admin_key, "project", "config", "import", "--project", project_id, "--config", str(free_import_path)]) == 0
+    free_import_out = capsys.readouterr().out
+    assert _field_labels(free_import_out) == _project_config_set_field_labels()
+    free_import_version = int(_field(free_import_out, "latest attempted config version"))
+    assert free_import_version == reverted_metadata_version + 1
+    assert "runtime affecting: true" in free_import_out
+    assert "validation status: not_required" in free_import_out
+    assert "project status: valid" in free_import_out
+    assert "next: alab exp create --name <name>" in free_import_out
+    with sqlite3.connect(home / "alab.db") as conn:
+        free_project = conn.execute(
+            """
+            SELECT status, latest_attempted_config_version, active_valid_config_version,
+              active_validation_id
+            FROM projects
+            WHERE project_id = ?
+            """,
+            (project_id,),
+        ).fetchone()
+        free_config_row = conn.execute(
+            """
+            SELECT baseline_required, validation_status
+            FROM project_config_versions
+            WHERE project_id = ? AND version = ?
+            """,
+            (project_id, free_import_version),
+        ).fetchone()
+        free_validation_row = conn.execute(
+            """
+            SELECT status, exit_code, reward_value, reward_parse_status, ended_at
+            FROM project_validations
+            WHERE validation_id = ?
+            """,
+            (free_project[3],),
+        ).fetchone()
+        free_counts = {
+            "configs": conn.execute("SELECT COUNT(*) FROM project_config_versions WHERE project_id = ?", (project_id,)).fetchone()[0],
+            "validations": conn.execute("SELECT COUNT(*) FROM project_validations WHERE project_id = ?", (project_id,)).fetchone()[0],
+            "audit": conn.execute("SELECT COUNT(*) FROM audit_events WHERE project_id = ?", (project_id,)).fetchone()[0],
+        }
+    assert free_project[:3] == ("valid", free_import_version, free_import_version)
+    assert free_project[3]
+    assert free_config_row == (0, "not_required")
+    assert free_validation_row[:4] == ("not_required", None, None, "not_attempted")
+    assert free_validation_row[4]
+
+    inherited_free_import_json = json.loads(json.dumps(free_import_json))
+    inherited_free_import_json["project"]["goal"] = "Document direct-submit context"
+    inherited_free_import_path = tmp_path / "inherited-free-import.toml"
+    inherited_free_import_path.write_text(services.dumps_toml(inherited_free_import_json), encoding="utf-8")
+    assert run(["--home", str(home), "--key", admin_key, "project", "config", "import", "--project", project_id, "--config", str(inherited_free_import_path)]) == 0
+    inherited_free_import_out = capsys.readouterr().out
+    assert _field_labels(inherited_free_import_out) == _project_config_set_field_labels()
+    inherited_free_version = int(_field(inherited_free_import_out, "latest attempted config version"))
+    assert inherited_free_version == free_import_version + 1
+    assert "runtime affecting: false" in inherited_free_import_out
+    assert "validation status: inherited" in inherited_free_import_out
+    with sqlite3.connect(home / "alab.db") as conn:
+        inherited_free_project = conn.execute(
+            "SELECT latest_attempted_config_version, active_valid_config_version, active_validation_id FROM projects WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        inherited_free_config_row = conn.execute(
+            "SELECT validation_status, inherited_from_validation_id FROM project_config_versions WHERE project_id = ? AND version = ?",
+            (project_id, inherited_free_version),
+        ).fetchone()
+    assert inherited_free_project == (inherited_free_version, inherited_free_version, free_project[3])
+    assert inherited_free_config_row == ("inherited", free_project[3])
+
+    assert run(["--home", str(home), "--key", admin_key, "project", "validate", "--project", project_id]) == 0
+    inherited_validate_out = capsys.readouterr().out
+    assert _field_labels(inherited_validate_out) == _project_validation_field_labels()
+    inherited_validation_id = _field(inherited_validate_out, "validation id")
+    assert "validation status: not_required" in inherited_validate_out
+    with sqlite3.connect(home / "alab.db") as conn:
+        validated_free_project = conn.execute(
+            "SELECT latest_attempted_config_version, active_valid_config_version, active_validation_id FROM projects WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        validated_free_config_row = conn.execute(
+            "SELECT baseline_required, validation_status, inherited_from_validation_id FROM project_config_versions WHERE project_id = ? AND version = ?",
+            (project_id, inherited_free_version),
+        ).fetchone()
+        free_counts = {
+            "configs": conn.execute("SELECT COUNT(*) FROM project_config_versions WHERE project_id = ?", (project_id,)).fetchone()[0],
+            "validations": conn.execute("SELECT COUNT(*) FROM project_validations WHERE project_id = ?", (project_id,)).fetchone()[0],
+            "audit": conn.execute("SELECT COUNT(*) FROM audit_events WHERE project_id = ?", (project_id,)).fetchone()[0],
+        }
+    assert validated_free_project == (inherited_free_version, inherited_free_version, inherited_validation_id)
+    assert validated_free_config_row == (0, "not_required", None)
+
+    invalid_free_import_json = json.loads(json.dumps(free_import_json))
+    invalid_free_import_json["reward"] = {"type": "exit_code", "direction": "maximize", "primary_metric": "reward"}
+    invalid_free_import_path = tmp_path / "invalid-free-import.toml"
+    invalid_free_import_path.write_text(services.dumps_toml(invalid_free_import_json), encoding="utf-8")
+    assert run(["--home", str(home), "--key", admin_key, "project", "config", "import", "--project", project_id, "--config", str(invalid_free_import_path)]) == 2
+    invalid_free_import_err = capsys.readouterr().err
+    assert _field_labels(invalid_free_import_err) == _error_field_labels()
+    assert "runner.type none and reward.type none must be configured together" in invalid_free_import_err
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert {
+            "configs": conn.execute("SELECT COUNT(*) FROM project_config_versions WHERE project_id = ?", (project_id,)).fetchone()[0],
+            "validations": conn.execute("SELECT COUNT(*) FROM project_validations WHERE project_id = ?", (project_id,)).fetchone()[0],
+            "audit": conn.execute("SELECT COUNT(*) FROM audit_events WHERE project_id = ?", (project_id,)).fetchone()[0],
+        } == free_counts
+
     long_reason = "r" * 65537
     assert run(["--home", str(home), "--key", root_key, "project", "remove", "--project", project_id, "--dry-run", "--reason", long_reason]) == 2
     project_reason_err = capsys.readouterr().err
@@ -6982,6 +7094,230 @@ primary_metric = "reward"
     closed_exp_err = capsys.readouterr().err
     assert _field_labels(closed_exp_err) == _error_field_labels()
     assert "error code: EXPERIMENT_CLOSED" in closed_exp_err
+
+
+def test_free_evaluation_project_allows_direct_submit_without_runs(tmp_path, monkeypatch, capsys) -> None:
+    home = tmp_path / "home"
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.py").write_text('print("free")\n', encoding="utf-8")
+    config = tmp_path / "alab.free.toml"
+    config.write_text(
+        """
+schema_version = 1
+
+[project]
+name = "Free Evaluation Project"
+task = "Accept direct submissions"
+allow_public_exp_create = true
+
+[runner]
+type = "none"
+
+[reward]
+type = "none"
+direction = "maximize"
+primary_metric = "reward"
+
+[secret_env]
+API_TOKEN = "active-secret"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert run(["--home", str(home), "auth", "init"]) == 0
+    root_key = _field(capsys.readouterr().out, "root key")
+    assert run(["--home", str(home), "--key", root_key, "project", "init", "local", "--config", str(config), "--source-path", str(source)]) == 0
+    project_out = capsys.readouterr().out
+    assert _field_labels(project_out) == _project_init_field_labels()
+    project_id = _field(project_out, "project id")
+    admin_key = _field(project_out, "admin key")
+    assert "project status: valid" in project_out
+    assert "validation status: not_required" in project_out
+    assert "next: alab exp create" in project_out
+    with sqlite3.connect(home / "alab.db") as conn:
+        validation = conn.execute(
+            """
+            SELECT pcv.validation_status, pcv.baseline_required, pv.status, pv.exit_code,
+              pv.reward_value, pv.reward_parse_status, p.active_valid_config_version, p.active_validation_id
+            FROM projects p
+            JOIN project_config_versions pcv
+              ON pcv.project_id = p.project_id
+             AND pcv.version = p.active_valid_config_version
+            JOIN project_validations pv
+              ON pv.validation_id = p.active_validation_id
+            WHERE p.project_id = ?
+            """,
+            (project_id,),
+        ).fetchone()
+    assert validation[:7] == ("not_required", 0, "not_required", None, None, "not_attempted", 1)
+    assert validation[7]
+
+    assert run(["--home", str(home), "--key", admin_key, "project", "validate", "--project", project_id]) == 0
+    validate_out = capsys.readouterr().out
+    assert _field_labels(validate_out) == _project_validation_field_labels()
+    manual_validation_id = _field(validate_out, "validation id")
+    assert "validation status: not_required" in validate_out
+    assert "reward parse status: not_attempted" in validate_out
+    assert "project status: valid" in validate_out
+    with sqlite3.connect(home / "alab.db") as conn:
+        manual_validation = conn.execute(
+            """
+            SELECT p.status, p.active_valid_config_version, p.active_validation_id,
+              pcv.validation_status, pcv.baseline_required, pv.status, pv.exit_code,
+              pv.reward_value, pv.reward_parse_status, pv.ended_at
+            FROM projects p
+            JOIN project_config_versions pcv
+              ON pcv.project_id = p.project_id
+             AND pcv.version = p.active_valid_config_version
+            JOIN project_validations pv
+              ON pv.validation_id = p.active_validation_id
+            WHERE p.project_id = ?
+            """,
+            (project_id,),
+        ).fetchone()
+    assert manual_validation[:9] == (
+        "valid",
+        1,
+        manual_validation_id,
+        "not_required",
+        0,
+        "not_required",
+        None,
+        None,
+        "not_attempted",
+    )
+    assert manual_validation[9]
+
+    clean_worktree = tmp_path / "free-clean"
+    assert run(["--home", str(home), "exp", "create", "--project", project_id, "--name", "free-clean", "--path", str(clean_worktree)]) == 0
+    clean_create_out = capsys.readouterr().out
+    assert "alab submit --message <message>" in clean_create_out
+    clean_exp_id = _field(clean_create_out, "exp id")
+
+    monkeypatch.chdir(clean_worktree)
+    assert run(["--home", str(home), "run", "--message", "should not run"]) == 4
+    run_err = capsys.readouterr().err
+    assert _field_labels(run_err) == _error_field_labels()
+    assert "error code: COMMAND_UNAVAILABLE" in run_err
+    assert "free evaluation experiments do not support alab run" in run_err
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM runs WHERE exp_id = ?", (clean_exp_id,)).fetchone()[0] == 0
+
+    assert run(["--home", str(home), "submit", "--message", "clean final", "--summary", "done", "--feedback", "ok", "--ref", "none"]) == 0
+    clean_submit_out = capsys.readouterr().out
+    assert _field_labels(clean_submit_out) == _submission_field_labels()
+    assert "submit accepted: true" in clean_submit_out
+    assert "final run id: none" in clean_submit_out
+    clean_final_commit = _field(clean_submit_out, "final commit")
+    with sqlite3.connect(home / "alab.db") as conn:
+        clean_row = conn.execute(
+            """
+            SELECT e.status, e.final_run_id, e.final_commit, e.latest_run_id, s.final_run_id,
+              (SELECT COUNT(*) FROM runs WHERE exp_id = e.exp_id),
+              (SELECT COUNT(*) FROM log_streams WHERE exp_id = e.exp_id),
+              (SELECT COUNT(*) FROM artifacts WHERE exp_id = e.exp_id)
+            FROM experiments e
+            JOIN experiment_submissions s ON s.exp_id = e.exp_id
+            WHERE e.exp_id = ?
+            """,
+            (clean_exp_id,),
+        ).fetchone()
+    assert clean_row == ("closed", None, clean_final_commit, None, None, 0, 0, 0)
+
+    dirty_worktree = tmp_path / "free-dirty"
+    assert run(["--home", str(home), "exp", "create", "--project", project_id, "--name", "free-dirty", "--path", str(dirty_worktree)]) == 0
+    dirty_exp_id = _field(capsys.readouterr().out, "exp id")
+    monkeypatch.chdir(dirty_worktree)
+    (dirty_worktree / "main.py").write_text('print("changed")\n', encoding="utf-8")
+    assert run(["--home", str(home), "submit", "--message", "dirty final", "--summary", "changed", "--feedback", "ok", "--ref", "none"]) == 0
+    dirty_submit_out = capsys.readouterr().out
+    assert "final run id: none" in dirty_submit_out
+    dirty_final_commit = _field(dirty_submit_out, "final commit")
+    assert _git(["log", "-1", "--pretty=%s"], dirty_worktree) == "ALab submit: dirty final"
+    assert "ALab-Evaluation: none" in _git(["log", "-1", "--pretty=%B"], dirty_worktree)
+    assert _git(["status", "--porcelain"], dirty_worktree) == ""
+    with sqlite3.connect(home / "alab.db") as conn:
+        dirty_row = conn.execute(
+            "SELECT status, final_run_id, final_commit, latest_run_id FROM experiments WHERE exp_id = ?",
+            (dirty_exp_id,),
+        ).fetchone()
+        assert dirty_row == ("closed", None, dirty_final_commit, None)
+        assert conn.execute("SELECT COUNT(*) FROM runs WHERE exp_id = ?", (dirty_exp_id,)).fetchone()[0] == 0
+        assert conn.execute("SELECT final_run_id FROM experiment_submissions WHERE exp_id = ?", (dirty_exp_id,)).fetchone()[0] is None
+
+    assert run(["--home", str(home), "exp", "show", dirty_exp_id, "--project", project_id]) == 0
+    exp_show_out = capsys.readouterr().out
+    assert "final run id: none" in exp_show_out
+    assert f"final commit: {dirty_final_commit}" in exp_show_out
+    report_path = tmp_path / "free-report.md"
+    assert run(["--home", str(home), "--key", admin_key, "report", "--project", project_id, "--exp", dirty_exp_id, "--out", str(report_path)]) == 0
+    capsys.readouterr()
+    report_text = report_path.read_text(encoding="utf-8")
+    assert "| final run | none |" in report_text
+    assert "| final commit | " + dirty_final_commit + " |" in report_text
+    assert run(["--home", str(home), "--key", admin_key, "exp", "best", "--project", project_id]) == 0
+    assert _field_labels(capsys.readouterr().out) == []
+
+    rerun_worktree = tmp_path / "free-rerun"
+    assert run(["--home", str(home), "exp", "create", "--project", project_id, "--name", "free-rerun", "--path", str(rerun_worktree)]) == 0
+    rerun_exp_id = _field(capsys.readouterr().out, "exp id")
+    monkeypatch.chdir(rerun_worktree)
+    assert run(["--home", str(home), "submit", "--message", "rerun", "--summary", "done", "--feedback", "ok", "--ref", "none", "--rerun"]) == 2
+    rerun_err = capsys.readouterr().err
+    assert _field_labels(rerun_err) == _error_field_labels()
+    assert "free evaluation experiments do not support --rerun" in rerun_err
+    assert run(["--home", str(home), "submit", "--message", "secret", "--summary", "contains active-secret", "--feedback", "ok", "--ref", "none"]) == 2
+    secret_err = capsys.readouterr().err
+    assert _field_labels(secret_err) == _error_field_labels()
+    assert "submit summary contains an active secret value" in secret_err
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM runs WHERE exp_id = ?", (rerun_exp_id,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM experiment_submissions WHERE exp_id = ?", (rerun_exp_id,)).fetchone()[0] == 0
+
+    blocked_worktree = tmp_path / "free-blocked"
+    assert (
+        run(
+            [
+                "--home",
+                str(home),
+                "exp",
+                "create",
+                "--project",
+                project_id,
+                "--name",
+                "free-blocked",
+                "--path",
+                str(blocked_worktree),
+                "--mutable-include",
+                "allowed.txt",
+            ]
+        )
+        == 0
+    )
+    blocked_exp_id = _field(capsys.readouterr().out, "exp id")
+    monkeypatch.chdir(blocked_worktree)
+    blocked_head = _git(["rev-parse", "HEAD"], blocked_worktree)
+    (blocked_worktree / "main.py").write_text('print("blocked")\n', encoding="utf-8")
+    assert run(["--home", str(home), "submit", "--message", "blocked", "--summary", "done", "--feedback", "ok", "--ref", "none"]) == 4
+    blocked_err = capsys.readouterr().err
+    assert _field_labels(blocked_err) == _error_field_labels()
+    assert "error code: SCOPE_VIOLATION" in blocked_err
+    assert _git(["rev-parse", "HEAD"], blocked_worktree) == blocked_head
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM runs WHERE exp_id = ?", (blocked_exp_id,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM experiment_submissions WHERE exp_id = ?", (blocked_exp_id,)).fetchone()[0] == 0
+
+    assert run(["--home", str(home), "--key", admin_key, "exp", "archive", dirty_exp_id, "--project", project_id]) == 0
+    capsys.readouterr()
+    assert run(["--home", str(home), "--key", admin_key, "exp", "remove", dirty_exp_id, "--project", project_id, "--dry-run", "--cascade"]) == 0
+    dry_remove_out = capsys.readouterr().out
+    assert "deleted submissions: 1" in dry_remove_out
+    assert run(["--home", str(home), "--key", admin_key, "exp", "remove", dirty_exp_id, "--project", project_id, "--force", "--confirm", dirty_exp_id, "--cascade"]) == 0
+    capsys.readouterr()
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM experiment_submissions WHERE exp_id = ?", (dirty_exp_id,)).fetchone()[0] == 0
 
 
 def test_submit_result_failures_and_input_preflight(tmp_path, monkeypatch, capsys) -> None:

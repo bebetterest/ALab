@@ -54,16 +54,16 @@ alab audit list|show --project <project_id> ...
   注意点：Project report 要求 admin/root authority。Experiment report 遵循 observe visibility。Report 包含 summaries 和 metadata，但不包含 raw keys、tokens、raw secrets、hidden-log contents 或 artifact bytes。
 - **`project config show`**：查看 retained config metadata。
   关键参数：可选 `--project`；`--version latest-attempted|active-valid|<n>`。
-  注意点：显示 runner/reward/artifact/env/secret fingerprints，但不显示 raw secret values。
+  注意点：显示 runner/reward/artifact/env/secret fingerprints，但不显示 raw secret values。Free evaluation projects 会显示 `runner type: none` 和 `reward type: none`。
 - **`project config export`**：将 config snapshot 写入文件。
   关键参数：必需 `--out <path>`；可选 `--overwrite`、`--project`、`--version`。
   注意点：用于 review 或受控编辑；export 永不写出 raw secret values。
 - **`project config import`**：导入 config file，并按需运行 baseline validation。
   关键参数：必需 `--config <path>`；可选 `--project`、`--dry-run`、`--skip-baseline-test`；`--dry-run` 与 skip 冲突。
-  注意点：Dry-run 会 parse、canonicalize、diff 并检查 capabilities，不写 DB/file，也不执行 runner。
+  注意点：Dry-run 会 parse、canonicalize、diff 并检查 capabilities，不写 DB/file，也不执行 runner。Runtime-affecting free evaluation import 如果成对设置 `runner.type = "none"` 和 `reward.type = "none"`，会记录 `validation status: not_required`，不运行 baseline evaluator，并成为 active valid config。
 - **`project config set`**：修改一个 non-secret config field。
   关键参数：必需 `<field> <toml-literal>`；可选 `--project`、`--dry-run`、`--skip-baseline-test`。
-  注意点：Array/map 字段整体替换；secret fields 必须用 `project secret`。
+  注意点：Array/map 字段整体替换；secret fields 必须用 `project secret`。不要用单字段 `set` 切入或切出 free evaluation，因为 runner 和 reward 的 `none` 必须原子更新。
 - **`project env set|unset|list`**：管理 project config 中的 plain environment values。
   关键参数：`set <name> <value>`、`unset <name>` 或 `list`；可选 `--project`。名称必须符合 environment-variable 语法。
   注意点：`list` 会渲染 values；敏感值应使用 secrets。
@@ -72,7 +72,7 @@ alab audit list|show --project <project_id> ...
   注意点：Raw secret values 永不渲染；输入必须是非空 single-line UTF-8，且无 NUL bytes。
 - **`project validate`**：运行 active project baseline validation。
   关键参数：可选 `--project <project_id>`。
-  注意点：输出 validation id、status、reward、parse status、warning codes 和 project status。
+  注意点：输出 validation id、status、reward、parse status、warning codes 和 project status。Free evaluation configs 会记录 `validation status: not_required`，不运行 evaluator。
   注意点：对于 file 和 Harbor rewards，`reward.json` metrics 必须是 finite numbers。非 numeric details 应放入 artifacts 或 logs，而不是 reward metrics object。
 - **`project validation archive|unarchive|remove`**：维护 validation records 及其 dependent logs/artifacts。
   关键参数：必需 `<validation_id>`；remove 需要 `--dry-run` 或 `--force --confirm <validation_id>`，可选 `--cascade`、`--reason`、`--project`。
@@ -94,7 +94,7 @@ alab audit list|show --project <project_id> ...
   注意点：最多一个 source origin。Raw worktree token 写入 token path，永不打印。
 - **`exp list|search|show|best`**：查看并排序 project experiments。
   关键参数：Search 需要 `--query`；filters 包括 status、tags、source id、name query、reward bounds、config version、timestamps、archive flag、pagination，以及支持处的 sorting。
-  注意点：用于选择 predecessors、refs 和 worker targets。
+  注意点：用于选择 predecessors、refs 和 worker targets。Free evaluation submissions 没有 run/reward rows，不会进入 `best` ranking。
 - **`exp archive|unarchive|remove`**：维护 experiment lifecycle。
   关键参数：必需 `<exp_id>`；remove 需要 `--dry-run` 或 `--force --confirm <exp_id>`，可选 `--cascade`、`--reason`、`--project`。
   注意点：Remove 是 archive-first，可能把 worktrees、inspection paths、logs、artifacts 和 branch refs stage 到 trash。
@@ -197,5 +197,6 @@ Project controller 的最终报告应包含：
 - project id 与 active config version；
 - 创建或复用的 experiments；
 - best experiment、run id、reward、parse status 和 commit；
+- 对于 free evaluation projects，报告 final commits 和 `final run id: none` submissions，而不是 best reward evidence；
 - worker failures 与 skipped steps；
 - 可安全分享的 report 或 artifact paths。

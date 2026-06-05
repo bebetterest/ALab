@@ -626,6 +626,15 @@ def test_project_config_schema_maps_runner_reward_and_env_edges() -> None:
         }
     )
     assert aliased_platform.runner.platform == "linux/amd64"
+    free = ProjectConfig.model_validate(
+        {
+            **base,
+            "runner": {"type": "none"},
+            "reward": {"type": "none", "direction": "maximize", "primary_metric": "reward"},
+        }
+    )
+    assert free.runner.type == "none"
+    assert free.reward.type == "none"
 
     cases = [
         ({**base, "schema_version": 2}, "Input should be 1"),
@@ -651,8 +660,22 @@ def test_project_config_schema_maps_runner_reward_and_env_edges() -> None:
         ({**base, "runner": {**base["runner"], "type": "docker", "image": "example:latest", "build_args": {"COUNT": 1}}}, "Input should be a valid string"),
         ({**base, "runner": {**base["runner"], "type": "harbor", "command": None}, "reward": {"type": "harbor", "direction": "maximize", "primary_metric": "reward"}}, "harbor runner requires runner.harbor_task_ref"),
         ({**base, "runner": {**base["runner"], "type": "skydiscover_python", "command": None}, "reward": {"type": "skydiscover", "direction": "maximize", "primary_metric": "combined_score"}}, "skydiscover runner requires runner.skydiscover_task_ref"),
+        (
+            {**base, "runner": {"type": "none"}, "reward": {"type": "exit_code", "direction": "maximize", "primary_metric": "reward"}},
+            "runner.type none and reward.type none must be configured together",
+        ),
+        (
+            {**base, "runner": {**base["runner"], "type": "none"}, "reward": {"type": "none", "direction": "maximize", "primary_metric": "reward"}},
+            "runner.type none does not accept executable runner fields",
+        ),
+        (
+            {**base, "runner": {"type": "none", "network": "none"}, "reward": {"type": "none", "direction": "maximize", "primary_metric": "reward"}},
+            "runner.type none does not accept executable runner fields: runner.network",
+        ),
         ({**base, "reward": {"type": "exit_code", "direction": "minimize", "primary_metric": "reward"}}, "exit_code reward requires maximize direction"),
         ({**base, "reward": {"type": "file", "direction": "maximize", "primary_metric": "reward"}}, "file reward requires reward.path"),
+        ({**base, "reward": {"type": "none", "direction": "maximize", "primary_metric": "reward", "path": "workspace:score.txt"}}, "reward.path is not valid when reward.type is none"),
+        ({**base, "reward": {"type": "none", "direction": "maximize", "primary_metric": "reward", "pattern": "score=(.+)"}}, "reward.pattern is not valid when reward.type is none"),
         ({**base, "reward": {"type": "file", "direction": "maximize", "primary_metric": "reward", "path": "workspace:"}}, "reward.path path is required"),
         ({**base, "reward": {"type": "stdout_regex", "direction": "maximize", "primary_metric": "reward"}}, "stdout_regex reward requires reward.pattern"),
         ({**base, "artifacts": {"globs": ["workspace:"]}}, "artifacts.globs[0] path is required"),

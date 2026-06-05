@@ -5,6 +5,12 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-05
+
+### 新增
+
+- 新增 free evaluation projects，可通过 `runner.type = "none"` 和 `reward.type = "none"` 让 experiment 直接 submit，不执行 evaluator run，不产生 run/log/artifact rows，也不参与 best reward ranking。
+
 ## [0.1.4] - 2026-06-05
 
 ### 新增

@@ -49,6 +49,18 @@ Config-dependent path validation:
 - Schema validation does not require source-dependent paths such as `runner.working_directory`, `reward.path`, artifact globs, `runner.dockerfile`, or `runner.context` to exist in every future source snapshot.
 - Missing source-dependent paths are recorded as saved baseline/run failures when the runner operation has a validation or run record. They use `RUNNER_ERROR`, `REWARD_PARSE_ERROR`, or artifact capture statuses according to the failing subsystem instead of silently rewriting config.
 
+## 1.1 Free Evaluation
+
+`runner.type = "none"` paired with `reward.type = "none"` is free evaluation mode. It is not an executable runner and does not call the runner contract.
+
+Rules:
+
+- Project init and config import write a `not_required` validation record and make the config active valid without executing a baseline evaluator.
+- `alab run` is unavailable for experiments bound to free evaluation.
+- `alab submit` closes the experiment directly after normal state, secret, ref visibility, Git state, and mutable-scope checks.
+- Accepted free submissions create no run, log, artifact, reward, metric, or hidden-log rows and are not eligible for best-run ranking.
+- Dirty free submissions create an `ALab submit: <message>` commit before storing the submission.
+
 ## 2. Runtime Directories
 
 Temporary runtime directories:
@@ -180,6 +192,7 @@ Capture:
 
 Reward types:
 
+- `none`: no reward extraction; valid only with `runner.type = "none"`.
 - `exit_code`: exit code `0` maps to `1.0`; non-zero maps to `0.0`.
 - `file`: read reward from configured `workspace:` or `run:` path.
 - `stdout_regex`: extract reward from stdout capture.

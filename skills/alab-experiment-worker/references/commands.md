@@ -50,10 +50,11 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`alab run`**: Evaluate the current candidate and save run evidence.
   Parameters: Required `--message <text>`; keep it short and specific.
   Use the output for: Run id, status, reward, parse status, warnings, previews, artifact count, and next action.
-  Notes: Reward files should contain only parseable numeric metrics expected by the configured reward parser. Keep explanatory details in separate artifacts or visible logs; worker tokens cannot inspect hidden verifier logs.
+  Notes: Reward files should contain only parseable numeric metrics expected by the configured reward parser. Keep explanatory details in separate artifacts or visible logs; worker tokens cannot inspect hidden verifier logs. In free evaluation projects, `alab run` returns `COMMAND_UNAVAILABLE`; use direct submit instead.
 - **`alab submit`**: Close the experiment with final summary and feedback after a supporting passed run.
   Parameters: Required `--message`, one of `--summary`/`--summary-file`, one of `--feedback`/`--feedback-file`, and at least one `--ref`; optional `--rerun`.
   Use the output for: Final run id, final commit, stored summary/feedback, experiment status, and submitted refs.
+  Notes: Standard evaluation projects require a supporting passed run or `--rerun` to create one. Free evaluation projects do not have an evaluator; omit `--rerun`, submit directly, and expect `final run id: none`.
 - **`alab exp checkout`**: Create an inspection checkout of a visible historical experiment at a selected commit.
   Parameters: Required `<exp_id>` and `--path <dir>`; optional `--commit final|latest|best|<sha>`. Use an empty path outside the current worktree and other ALab contexts.
   Use the output for: A read-only comparison workspace with source code from a visible prior experiment. Read it for implementation ideas, then copy only genuinely useful task-relevant source files or snippets into the current worktree. Do not copy `.alab/`, raw tokens, hidden assets, or project control files. Record any inspection path you create so a controller can clean it up later; do not edit inside inspection checkouts.
@@ -107,9 +108,9 @@ alab run --message "try focused improvement"
 alab observe runs show <run_id>
 ```
 
-This is an example shape, not a required sequence. Start by understanding the current task, candidate, and context. Use visible history only when it can inform the change. Keep local checks cheap and task-specific. Run `alab run --message "<brief reason>"` when the candidate is ready for evaluation, diagnose weak or failed results from visible evidence, and keep iterating while there is a plausible improvement path. If `git status --short` shows unrelated generated files, remove or ignore them through normal project mechanisms before running or submitting.
+This is an example shape, not a required sequence. Start by understanding the current task, candidate, and context. Use visible history only when it can inform the change. Keep local checks cheap and task-specific. Run `alab run --message "<brief reason>"` when a standard evaluation candidate is ready, diagnose weak or failed results from visible evidence, and keep iterating while there is a plausible improvement path. In free evaluation projects, ALab points directly to submit and no run evidence is expected. If `git status --short` shows unrelated generated files, remove or ignore them through normal project mechanisms before running or submitting.
 
-Submit only when the work is complete or further useful optimization is exhausted and a passed run supports the final candidate. If no passed run supports the candidate, report the best run evidence and the reason no submit was performed.
+Submit only when the work is complete or further useful optimization is exhausted and either a passed run supports the final candidate in standard mode or free evaluation direct submit is the expected mode. If no passed run supports a standard evaluation candidate, report the best run evidence and the reason no submit was performed.
 
 ## Visible History
 
@@ -212,12 +213,13 @@ alab submit \
 ```
 
 The summary should describe the final change and supporting passed run. The feedback should include useful operational notes: key metrics, failure modes avoided, why each ref matters, and remaining risks. Clear ref explanations make it easier for later workers to inspect the lineage and continue optimization. Do not include raw tokens, hidden-log content, or inaccessible experiment ids.
+In free evaluation mode, state that there is no evaluator run and that `final run id` is `none`.
 
 The final worker response should include:
 
 - changed strategy or implementation area,
-- final run id and status,
-- reward and key metrics,
+- final run id and status, or `final run id: none` for free evaluation,
+- reward and key metrics when present,
 - submit refs used, or `ref none` with a reason,
 - final commit if ALab rendered one,
 - tags added, if any,

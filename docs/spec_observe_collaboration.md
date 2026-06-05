@@ -216,6 +216,7 @@ Rules:
 
 - Each visible experiment contributes at most one qualifying run.
 - Qualifying run must have parsed numeric reward.
+- Free evaluation submissions have `final_run_id = NULL`, create no run or reward rows, and never qualify for best ranking.
 - Default excludes failed, error, timeout, running, and interrupted runs.
 - Default excludes archived runs.
 - Ranking uses the reward direction of the comparable reward policy set.
@@ -404,10 +405,10 @@ Public safe status may include:
 - default source id/name/content hash
 - mutable summary
 - visibility summary
-- runner type
+- runner type, including `none` for free evaluation projects
 - timeout
 - working directory
-- reward type
+- reward type, including `none` for free evaluation projects
 - reward direction
 - primary metric
 - artifact/log limits

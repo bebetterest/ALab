@@ -216,6 +216,7 @@ Annotation list filters：
 
 - 每个 visible experiment 最多贡献一个 qualifying run。
 - Qualifying run 必须有 parsed numeric reward。
+- Free evaluation submissions 使用 `final_run_id = NULL`，不会创建 run 或 reward rows，也永远不会进入 best ranking。
 - 默认排除 failed、error、timeout、running、interrupted runs。
 - 默认排除 archived runs。
 - Ranking 使用 comparable reward policy set 的 reward direction。
@@ -403,10 +404,10 @@ Public safe status 可包含：
 - default source id/name/content hash
 - mutable summary
 - visibility summary
-- runner type
+- runner type，包括 free evaluation projects 的 `none`
 - timeout
 - working directory
-- reward type
+- reward type，包括 free evaluation projects 的 `none`
 - reward direction
 - primary metric
 - artifact/log limits

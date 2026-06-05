@@ -37,6 +37,7 @@ def test_migrate_records_exact_file_checksum(tmp_path) -> None:
 
     first_migration = db_module.MIGRATIONS_DIR / "1_initial.sql"
     second_migration = db_module.MIGRATIONS_DIR / "2_annotation_titles_targetless.sql"
+    third_migration = db_module.MIGRATIONS_DIR / "3_free_evaluation.sql"
     with sqlite3.connect(home.db_path) as conn:
         rows = conn.execute(
             "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
@@ -44,6 +45,7 @@ def test_migrate_records_exact_file_checksum(tmp_path) -> None:
     assert rows == [
         (1, "initial", _sha256(first_migration.read_bytes())),
         (2, "annotation_titles_targetless", _sha256(second_migration.read_bytes())),
+        (3, "free_evaluation", _sha256(third_migration.read_bytes())),
     ]
 
 
@@ -206,6 +208,12 @@ def test_representative_ddl_enum_checks_are_enforced(tmp_path) -> None:
                 VALUES ('val-ended-AAAAAAAAAAAAAAAAAAAAAA', 'proj-x-AAAAAAAAAAAAAAAAAAAAAA', 1, 'alab/source/main', 'abc', 'skipped', 'not_attempted', 'active', '2026-05-19T00:00:00Z', NULL, '{}')
                 """
             )
+        conn.execute(
+            """
+            INSERT INTO project_validations(validation_id, project_id, config_version, source_ref, source_commit, status, reward_parse_status, archive_status, started_at, ended_at, record_json)
+            VALUES ('val-free-AAAAAAAAAAAAAAAAAAAAAA', 'proj-x-AAAAAAAAAAAAAAAAAAAAAA', 1, 'alab/source/main', 'abc', 'not_required', 'not_attempted', 'active', '2026-05-19T00:00:00Z', '2026-05-19T00:00:00Z', '{}')
+            """
+        )
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
                 """
@@ -318,6 +326,14 @@ def test_project_source_and_experiment_lifecycle_ddl_contract_checks_are_enforce
                   'val-x-AAAAAAAAAAAAAAAAAAAAAA', '2026-05-19T00:00:00Z')
                 """
             )
+        conn.execute(
+            """
+            INSERT INTO project_config_versions(project_id, version, canonical_config_json, config_hash,
+              baseline_required, validation_status, inherited_from_validation_id, created_at)
+            VALUES ('proj-free-AAAAAAAAAAAAAAAAAAAAAA', 1, '{}', 'sha256:free', 0, 'not_required',
+              NULL, '2026-05-19T00:00:00Z')
+            """
+        )
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
                 """
@@ -443,6 +459,15 @@ def test_audit_secret_submission_and_tag_ddl_contract_checks_are_enforced(tmp_pa
             values[index] = bad_value
             with pytest.raises(sqlite3.IntegrityError):
                 conn.execute(submission_sql, values)
+        conn.execute(
+            """
+            INSERT INTO experiment_submissions(submission_id, project_id, exp_id, final_run_id, final_commit,
+              message, summary, feedback, refs_json, created_at, created_by_credential_id)
+            VALUES ('sub-free-AAAAAAAAAAAAAAAAAAAAAA', 'proj-x-AAAAAAAAAAAAAAAAAAAAAA', 'exp-free-AAAAAAAAAAAAAAAAAAAAAA',
+              NULL, 'abc123', 'ok', 'summary', 'feedback', ?, '2026-05-19T00:00:00Z', 'cred-root-AAAAAAAAAAAAAAAAAAAAAA')
+            """,
+            (refs_json,),
+        )
 
         tag_sql = """
             INSERT INTO experiment_tags(project_id, exp_id, tag_slug, created_by_type, created_by_id, created_at)

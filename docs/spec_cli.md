@@ -331,8 +331,8 @@ Command error matrix:
 | `exp worktree remove|restore` | invalid path/confirmation `CONFIG_INVALID` exit `2`; cleanup failure or context nesting `RESOURCE_BUSY` or `CONTEXT_CONFLICT` exit `4`; auth failures exit `3` |
 | `exp token list|revoke|regenerate` | invalid selector `CONFIG_INVALID` exit `2`; `EXPERIMENT_NOT_FOUND` or `CREDENTIAL_NOT_FOUND` exit `2`; auth failures exit `3` |
 | `exp tag add|remove|list` | invalid tag `CONFIG_INVALID` exit `2`; scope failures `SCOPE_VIOLATION` exit `4`; auth failures exit `3` |
-| `run` | failed/error/timeout run `RUNNER_FAILED`, `RUNNER_ERROR`, `RUNNER_TIMEOUT`, or `REWARD_PARSE_ERROR` exit `1`; mutable violations `SCOPE_VIOLATION` exit `4`; invalid Git state `GIT_STATE_INVALID` exit `4`; busy experiment `EXPERIMENT_BUSY` exit `4` |
-| `submit` | final run not accepted `RUNNER_FAILED`, `RUNNER_ERROR`, `RUNNER_TIMEOUT`, `REWARD_PARSE_ERROR`, or missing reusable run exit `1`; invalid refs/inputs `CONFIG_INVALID` exit `2`; closed/scope failures exit `4` |
+| `run` | failed/error/timeout run `RUNNER_FAILED`, `RUNNER_ERROR`, `RUNNER_TIMEOUT`, or `REWARD_PARSE_ERROR` exit `1`; free evaluation `COMMAND_UNAVAILABLE` exit `4`; mutable violations `SCOPE_VIOLATION` exit `4`; invalid Git state `GIT_STATE_INVALID` exit `4`; busy experiment `EXPERIMENT_BUSY` exit `4` |
+| `submit` | final run not accepted `RUNNER_FAILED`, `RUNNER_ERROR`, `RUNNER_TIMEOUT`, `REWARD_PARSE_ERROR`, or missing reusable run exit `1`; invalid refs/inputs/free `--rerun` `CONFIG_INVALID` exit `2`; closed/scope failures exit `4` |
 | `observe experiments|runs|artifacts|logs|annotations` | invalid filters/sort/selector `CONFIG_INVALID` exit `2`; object not found with the matching `EXPERIMENT_NOT_FOUND`, `RUN_NOT_FOUND`, `ARTIFACT_NOT_FOUND`, `LOG_NOT_FOUND`, or `ANNOTATION_NOT_FOUND` exit `2` for root/admin; token/public not-visible-or-not-found selectors `SCOPE_VIOLATION` exit `4`; export target `OUTPUT_EXISTS` exit `2`; auth failures exit `3`; archive/unarchive already matching state exits `0` |
 | `annotate add|edit|archive|unarchive|remove` | invalid target/body/confirmation `CONFIG_INVALID` exit `2`; `ANNOTATION_NOT_FOUND` exit `2` for root/admin; token/public not-visible-or-not-found selectors and other visibility/scope failures `SCOPE_VIOLATION` exit `4`; auth failures exit `3`; archive/unarchive already matching state exits `0` |
 
@@ -770,7 +770,7 @@ Lifecycle command rules:
 - Runtime config rule: runner, reward, artifact, log, env, secret, Docker, Harbor, and SkyDiscover fields are read from config only. Init exposes no runtime flags in V1.
 - Success fields: `project id`, `project name`, `project status`, `source id`, `source ref`, `config version`, `validation id`, `validation status`, `admin key`, repeated `warning code`, `next`.
 - Secret rule: always creates one project admin key when the project record is written and prints the raw admin key exactly once, including when baseline validation later fails.
-- Exit: `0` when validation passes or is skipped by request; `1` when project is created but baseline fails; `2` on invalid config/source; `3` on auth failure.
+- Exit: `0` when validation passes, is skipped by request, or is not required by free evaluation; `1` when project is created but baseline fails; `2` on invalid config/source; `3` on auth failure.
 
 `alab project config show [--project <project_id>] [--version latest-attempted|active-valid|<n>]`
 
@@ -804,7 +804,7 @@ Lifecycle command rules:
 - Conflicts: `--dry-run` with `--skip-baseline-test`.
 - Dry-run rule: parses and canonicalizes input, computes the config diff, reports whether baseline would be required, and runs runtime capability checks. It does not write DB rows, create audit rows, mutate files, or execute a baseline runner.
 - Success fields: `project id`, `previous active config version`, `latest attempted config version`, `runtime affecting`, `validation status`, `project status`, repeated `warning code`, `next`.
-- Exit: `0` on non-runtime change or passed/skipped baseline; `1` on failed baseline with record; `2` on schema invalid.
+- Exit: `0` on non-runtime change, passed/skipped baseline, or free evaluation `not_required` validation; `1` on failed baseline with record; `2` on schema invalid.
 
 `alab project config set <field> <value> [--project <project_id>] [--dry-run] [--skip-baseline-test]`
 
@@ -1098,7 +1098,8 @@ Lifecycle command rules:
 - Required args: `--message`.
 - Success fields: `run id`, `exp id`, `commit`, `created commit`, `run status`, `exit code`, `reward`, `reward parse status`, `stdout preview`, `stderr preview`, `artifact count`, `warning code`, `next`.
 - `created commit` is rendered as a boolean. `stdout preview`, `stderr preview`, `artifact count`, and repeated `warning code` reflect the saved run record and match observe run output for the same run.
-- Exit: `0` on passed run; `1` on failed/error/timeout run with saved record; `4` on scope or state failure.
+- Free evaluation rule: experiments bound to `runner.type = "none"` and `reward.type = "none"` reject `alab run` with `COMMAND_UNAVAILABLE` and do not create a run record.
+- Exit: `0` on passed run; `1` on failed/error/timeout run with saved record; `4` on scope, free evaluation, or state failure.
 
 `alab submit --message <message> --summary <text>|--summary-file <path> --feedback <text>|--feedback-file <path> --ref <exp_id|none> [--ref <exp_id> ...] [--rerun]`
 
@@ -1109,8 +1110,9 @@ Lifecycle command rules:
 - State rule: project must not be archived, experiment must be open, and experiment worktree state must be active.
 - Path rule: summary and feedback files resolve relative to the current command cwd.
 - Ref rule: refs are deduplicated preserving first-seen order.
+- Free evaluation rule: experiments bound to `runner.type = "none"` and `reward.type = "none"` reject `--rerun`; accepted submissions create no run/log/artifact/reward rows, store `final run id: none`, and close the experiment at the current final commit.
 - Success fields: `exp id`, `submit accepted`, `final run id`, `final commit`, `experiment status`, `summary stored`, `feedback stored`, repeated `ref`.
-- Exit: `0` when accepted; `1` when final run is not passed or reusable run is missing; `4` on scope/state failure.
+- Exit: `0` when accepted; `1` when final run is not passed or reusable run is missing; `2` on invalid refs/inputs/free `--rerun`; `4` on scope/state failure.
 
 ### Observe And Aliases
 

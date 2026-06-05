@@ -300,7 +300,7 @@ Dashboard security cases：
 - Submit summary/feedback file 相对 current cwd resolve。
 - Submit stdin options rejected。
 - Submit refs dedupe preserving first-seen order。
-- Submit 只在 passed final run 后存一条 `experiment_submissions` row。
+- Submit 只在 passed final run 后存一条 `experiment_submissions` row；free evaluation submissions 例外，它们存一条 `final_run_id = NULL` 的 row，且不产生 run/log/artifact side effects。
 - Summary、feedback 和 annotation bodies 拒绝 exact active secret values。
 - Submit reuse 和缺少 reusable passed run 时要求 explicit `--rerun`。
 - Submit reuse 只允许 current HEAD 且 experiment bound config version 相同的最近 passed run。

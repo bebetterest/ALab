@@ -309,7 +309,7 @@ Cover:
 - Submit summary/feedback files resolve relative to current cwd.
 - Submit stdin options are rejected.
 - Submit refs are deduplicated preserving first-seen order.
-- Submit stores exactly one `experiment_submissions` row only after a passed final run.
+- Submit stores exactly one `experiment_submissions` row only after a passed final run, except free evaluation submissions, which store one row with `final_run_id = NULL` and no run/log/artifact side effects.
 - Summary, feedback, and annotation bodies reject exact active secret values.
 - Run/submit messages, summaries, feedback, annotation bodies, display names, and tags enforce documented UTF-8 byte limits.
 - Submit reuse and explicit `--rerun` requirement when no reusable passed run exists.

@@ -26,8 +26,8 @@ Core objects:
 - Project: task definition, canonical Git repository, source versions, runner configuration, reward policy, mutable path policy, visibility policy, validation records, credentials, and experiments.
 - Source: immutable code snapshot imported into a project repository and addressed by `alab/source/<source_id>`.
 - Experiment: named attempt with a Git branch, worktree, scoped token, tags, run records, artifacts, annotations, and optional final submission.
-- Run: evaluation of a commit with logs, status, reward, metrics, artifacts, runner metadata, and config version.
-- Project validation: baseline project-level run proving that the selected source, runner, reward, artifact, environment, timeout, and policy configuration is executable.
+- Run: evaluation of a commit with logs, status, reward, metrics, artifacts, runner metadata, and config version. Free evaluation projects create no run rows.
+- Project validation: baseline project-level run proving that the selected source, runner, reward, artifact, environment, timeout, and policy configuration is executable, or `not_required` for paired `runner.type = "none"` and `reward.type = "none"` free evaluation configs.
 - Annotation: revisioned note attached to an experiment, run, artifact, repo path, or repo line range.
 
 V1 is successful when a local user can initialize ALab, create a project, validate the baseline, create experiments from reusable source versions, let agents run and submit without repeatedly entering project keys, and later inspect local history according to explicit collaboration visibility rules.
@@ -186,6 +186,7 @@ Core V1 is implemented first with local/Git/empty sources and the local runner. 
 
 Adapter decisions:
 
+- Paired `runner.type = "none"` and `reward.type = "none"` define free evaluation mode for local/Git/empty projects. It skips baseline evaluator execution, rejects `alab run`, allows direct `alab submit`, stores `final_run_id = NULL`, and excludes the submission from best reward ranking.
 - Docker runner uses an explicit whitelisted configuration surface: image or dockerfile plus context, network `default|none`, build args, build target, platform, container user, CPU limit, and memory limit. Host networking is not supported in V1 and is not part of the planned Docker surface. Docker rejects Docker Compose, raw Docker argument passthrough, privileged mode, and extra host mounts in V1. Docker-backed runners do not inherit host environment variables; they receive only `[env]`, `[secret_env]`, and ALab internal variables. Missing `runner.image` images are pulled automatically. Dockerfile build contexts follow `.dockerignore`, and cache keys include Dockerfile content, `.dockerignore`, and the effective filtered build context.
 - Harbor supports single-step Linux tasks, shared verifier, separate verifier, and safe task-relative `source` imports. It rejects Windows tasks, multi-step tasks, Docker Compose, GPU, MCP, external services, raw Docker passthrough, task-declared host mounts, and placeholder values.
 - Harbor separate verifier supports an image or `tests/Dockerfile`; the verifier workspace mount is temporary and writable; hidden verifier logs are admin-only.

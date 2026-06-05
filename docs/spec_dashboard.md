@@ -111,7 +111,7 @@ The dashboard read model should expose:
 - Projects: sortable/filterable project summaries with status, source count, experiment count, latest activity, run health, artifact/log volume, active config/validation, and project-local best summary.
 - Project detail: overview, bounded recent experiments, runs, sources/config, validations, logs/artifacts, annotations, and audit records with related-record page totals. Overview must include project-level aggregate statistics and a reward trend chart that plots each loaded run reward and connects each new best point according to the project's reward direction.
 - Run detail: overview, bounded recent logs/artifacts, related-record page totals, parsed metrics, runner/failure metadata, safe log preview/download links, and safe artifact preview/download links.
-- Experiments: status, tags, source binding, config binding, worktree state, latest/final run, submission, and reward trend.
+- Experiments: status, tags, source binding, config binding, worktree state, latest/final run, submission, and reward trend. Free evaluation experiments expose their submission and final commit with no final run detail or reward trend because `final_run_id` is `NULL`.
 - Runs: status, reward, warnings, runner metadata, stdout/stderr/hidden log references, artifact references, commit/config context, and failure reasons.
 - Logs and artifacts: paginated global/project-scoped metadata lists, chunked full log reads, text/image previews, binary metadata, and raw downloads.
 - Audit, feedback, and system: searchable audit rows, searchable and paginated HOME feedback entries, global config, locks, runtime capabilities, catalogs, and paginated cache entries.

@@ -253,7 +253,7 @@ Primary key：
 
 Checks：
 
-- `validation_status IN ('running','passed','failed','error','timeout','skipped','inherited','interrupted')`
+- `validation_status IN ('running','passed','failed','error','timeout','skipped','inherited','interrupted','not_required')`
 - `baseline_required IN (0,1)`
 - `validation_status='inherited'` 时必须有 `inherited_from_validation_id`，其他状态下必须为 null。
 
@@ -379,7 +379,7 @@ Columns：
 - `submission_id TEXT PRIMARY KEY`
 - `project_id TEXT NOT NULL`
 - `exp_id TEXT NOT NULL`
-- `final_run_id TEXT NOT NULL`
+- `final_run_id TEXT NULL`
 - `final_commit TEXT NOT NULL`
 - `message TEXT NOT NULL`
 - `summary TEXT NOT NULL`
@@ -495,7 +495,7 @@ Columns：
 - `ended_at TEXT NULL`
 - `record_json TEXT NOT NULL`
 
-Checks and indexes 在适用处 mirror `runs`。
+Checks and indexes 在适用处 mirror `runs`，但 validation status 还接受 `skipped` 和 `not_required`。
 
 Additional lifecycle rules：
 

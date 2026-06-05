@@ -7,7 +7,7 @@ description: Use when operating inside an ALab experiment worktree with a worktr
 
 ## Overview
 
-Use this skill when Codex is working inside one ALab experiment worktree. The worker improves the candidate source, can inspect visible historical experiment evidence for ideas, runs ALab evaluation from the worktree token context, and submits the final result when a passed run supports the finished work.
+Use this skill when Codex is working inside one ALab experiment worktree. The worker improves the candidate source, can inspect visible historical experiment evidence for ideas, runs ALab evaluation from the worktree token context for standard projects, and submits the final result when the project mode allows it.
 
 This skill is not a project manager or global administrator. It must not use project admin keys, root keys, catalog commands, cache commands, project configuration mutation, or lifecycle removal commands.
 
@@ -28,11 +28,11 @@ This skill is not a project manager or global administrator. It must not use pro
 
 Do not treat this as a fixed checklist. First understand the current worktree task, local instructions, existing candidate, and ALab context. When useful, inspect visible prior experiments, runs, artifacts, logs, annotations, or inspection checkouts for reference and inspiration.
 
-Iterate on the candidate with focused edits and cheap local checks. When the candidate is ready for evaluation, run `alab run --message "<brief reason>"`. Use visible evidence from stdout/stderr previews, warning codes, artifacts, logs, metrics, annotations, and prior runs to diagnose weak or failed results, then keep improving while there is a plausible path forward.
+Iterate on the candidate with focused edits and cheap local checks. In standard evaluation projects, when the candidate is ready for evaluation, run `alab run --message "<brief reason>"`. In free evaluation projects where ALab's next action points directly to submit, or `alab run` returns `COMMAND_UNAVAILABLE` because no evaluator exists, skip run evidence and prepare a direct submit instead. Use visible evidence from stdout/stderr previews, warning codes, artifacts, logs, metrics, annotations, and prior runs when those records exist to diagnose weak or failed results, then keep improving while there is a plausible path forward.
 
 When you discover important context that later workers should not lose, add an annotation during the iteration instead of relying only on final memory. Good annotation content includes decision rationale, failed approaches, remaining risks, next-step context, and similar durable notes. If an annotation is no longer needed, no longer valid, or likely to mislead later workers, archive and remove it promptly.
 
-When the mission is complete, or no useful optimization path remains, submit only if a passed run supports the final candidate. If there is no supporting passed run, do not submit; report the best available evidence and the reason further progress or submission is blocked.
+When the mission is complete, or no useful optimization path remains, submit only if a passed run supports the final candidate in standard evaluation mode, or if the project is in free evaluation mode and direct submit is the documented next action. If there is no supporting passed run in standard mode, do not submit; report the best available evidence and the reason further progress or submission is blocked.
 
 ## Capabilities
 
@@ -46,18 +46,18 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Change task-relevant source files in the worktree and keep the implementation understandable for later workers.
 - Add or list tags on the current experiment when tags are useful evidence for later controllers or workers; tags do not grant visibility.
 - Keep runner outputs machine-parseable. If the task writes a reward file, put only the configured numeric metrics in that reward file; put case details, traces, or explanations in separate visible artifacts/logs when allowed.
-- Run local cheap checks when they exist, then run `alab run --message "<brief reason>"`.
+- Run local cheap checks when they exist, then run `alab run --message "<brief reason>"` for standard evaluation projects. For free evaluation projects, do not force a run; direct submit is expected.
 - Diagnose failed or weak runs using visible stdout/stderr previews, warning codes, artifacts, logs, metrics, and annotations.
-- When the intended changes are complete and the current worktree has a passed run supporting them, submit the result with a factual message, summary, feedback, and refs.
+- When the intended changes are complete and the current worktree has the required support for its mode, submit the result with a factual message, summary, feedback, and refs.
 
 ## Submit Guidance
 
-- Submit only after a passed run for the current candidate, unless the user or controller explicitly asks for a non-passed closeout.
+- Submit only after a passed run for the current candidate in standard evaluation mode. In free evaluation mode, direct submit is allowed and the final run id will render as `none`.
 - Treat submit refs as provenance links for later review and optimization, not as decoration.
 - Actively add `--ref <exp_id>` for visible experiments that informed the strategy, code, comparison baseline, failure avoidance, or continuation path.
 - Use `--ref none` only when the result does not depend on or intentionally reference any prior experiment.
 - Do not invent refs, cite inaccessible experiment ids, or cite a visible experiment only because it exists.
-- Keep `--message` short. Put the substantive record in `--summary`/`--summary-file` and `--feedback`/`--feedback-file`: what changed, which passed run supports it, key metrics, which refs mattered, and remaining risks.
+- Keep `--message` short. Put the substantive record in `--summary`/`--summary-file` and `--feedback`/`--feedback-file`: what changed, which passed run supports it or why free evaluation has no run, key metrics when present, which refs mattered, and remaining risks.
 - If no submit is performed, clearly state the blocking reason and the best run evidence available.
 
 ## Command Reference

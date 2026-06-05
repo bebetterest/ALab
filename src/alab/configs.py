@@ -224,7 +224,7 @@ class VisibilitySection(BaseModel):
 class RunnerSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["local", "docker", "harbor", "skydiscover_docker", "skydiscover_python"] = "local"
+    type: Literal["none", "local", "docker", "harbor", "skydiscover_docker", "skydiscover_python"] = "local"
     timeout_seconds: int = 600
     working_directory: str = "."
     env_mode: Literal["sanitized", "full", "none"] = "sanitized"
@@ -295,6 +295,30 @@ class RunnerSection(BaseModel):
         _validate_relative_runtime_path(self.program_path, "runner.program_path", escape_target="repository")
         if self.command and self.shell:
             raise ValueError("runner.command conflicts with runner.shell")
+        if self.type == "none":
+            disallowed = {
+                "runner.timeout_seconds": self.timeout_seconds != 600,
+                "runner.working_directory": self.working_directory != ".",
+                "runner.env_mode": self.env_mode != "sanitized",
+                "runner.command": self.command is not None,
+                "runner.shell": self.shell is not None,
+                "runner.image": self.image is not None,
+                "runner.dockerfile": self.dockerfile is not None,
+                "runner.context": self.context is not None,
+                "runner.network": self.network != "default",
+                "runner.build_args": bool(self.build_args),
+                "runner.target": self.target is not None,
+                "runner.platform": self.platform is not None,
+                "runner.user": self.user is not None,
+                "runner.cpus": self.cpus is not None,
+                "runner.memory_mb": self.memory_mb is not None,
+                "runner.harbor_task_ref": self.harbor_task_ref is not None,
+                "runner.skydiscover_task_ref": self.skydiscover_task_ref is not None,
+                "runner.program_path": self.program_path != ".",
+            }
+            invalid = [field for field, present in disallowed.items() if present]
+            if invalid:
+                raise ValueError(f"runner.type none does not accept executable runner fields: {', '.join(sorted(invalid))}")
         if self.type in {"harbor", "skydiscover_docker", "skydiscover_python"} and self.shell:
             raise ValueError("runner.shell is not valid for adapter runners")
         if self.type == "docker":
@@ -316,7 +340,7 @@ class RunnerSection(BaseModel):
 class RewardSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["exit_code", "file", "stdout_regex", "harbor", "skydiscover"]
+    type: Literal["none", "exit_code", "file", "stdout_regex", "harbor", "skydiscover"]
     direction: Literal["maximize", "minimize"] = "maximize"
     primary_metric: str = "reward"
     path: str | None = None
@@ -324,6 +348,11 @@ class RewardSection(BaseModel):
 
     @model_validator(mode="after")
     def check_reward(self) -> RewardSection:
+        if self.type == "none":
+            if self.path:
+                raise ValueError("reward.path is not valid when reward.type is none")
+            if self.pattern:
+                raise ValueError("reward.pattern is not valid when reward.type is none")
         if self.type == "exit_code" and self.direction != "maximize":
             raise ValueError("exit_code reward requires maximize direction")
         if self.type == "file" and not self.path:
@@ -412,6 +441,14 @@ class ProjectConfig(BaseModel):
             _validate_secret_env_value(name, secret_value)
         return value
 
+    @model_validator(mode="after")
+    def check_free_evaluation_pairing(self) -> ProjectConfig:
+        runner_none = self.runner.type == "none"
+        reward_none = self.reward.type == "none"
+        if runner_none != reward_none:
+            raise ValueError("runner.type none and reward.type none must be configured together")
+        return self
+
     def canonical_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
 
@@ -479,6 +516,12 @@ def config_hash(config: ProjectConfig | dict[str, Any]) -> str:
     data = config.canonical_dict() if isinstance(config, ProjectConfig) else config
     digest = hashlib.sha256(canonical_json(data).encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
+
+
+def is_free_evaluation_config(config: ProjectConfig | dict[str, Any]) -> bool:
+    if isinstance(config, ProjectConfig):
+        return config.runner.type == "none" and config.reward.type == "none"
+    return (config.get("runner") or {}).get("type") == "none" and (config.get("reward") or {}).get("type") == "none"
 
 
 def write_project_config(path: Path, config_json: dict[str, Any]) -> None:

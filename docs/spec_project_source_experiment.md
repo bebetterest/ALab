@@ -87,7 +87,8 @@ Field rules:
 - `mutable.include` defaults to `["**"]` and must contain at least one non-empty single-line pattern; `mutable.exclude` defaults to `[]` and, when set, contains non-empty single-line patterns.
 - `visibility.scope` is `none`, `same_project`, or `explicit`.
 - `visibility.experiment_ids` is required and non-empty only when `scope = "explicit"`; entries must be complete experiment ids and are normalized to a sorted unique list.
-- `runner.type` is `local`, `docker`, `harbor`, `skydiscover_docker`, or `skydiscover_python`.
+- `runner.type` is `none`, `local`, `docker`, `harbor`, `skydiscover_docker`, or `skydiscover_python`.
+- `runner.type = "none"` enables free evaluation mode and must be paired with `reward.type = "none"`. It rejects executable runner fields such as commands, shell, Docker fields, Harbor refs, and SkyDiscover refs.
 - `runner.timeout_seconds` defaults to `600` and must be an integer between `1` and `86400`.
 - `runner.working_directory` is repo-relative and must not escape the repository.
 - `runner.env_mode` is valid only for local runner and is `sanitized`, `full`, or `none`.
@@ -102,7 +103,8 @@ Field rules:
 - Harbor runner requires `runner.harbor_task_ref`.
 - SkyDiscover runners require `runner.skydiscover_task_ref`.
 - SkyDiscover Python runner may set `runner.program_path`, default `"."`.
-- `reward.type` is `exit_code`, `file`, `stdout_regex`, `harbor`, or `skydiscover`.
+- `reward.type` is `none`, `exit_code`, `file`, `stdout_regex`, `harbor`, or `skydiscover`.
+- `reward.type = "none"` is valid only with `runner.type = "none"` and rejects reward extractor fields such as `reward.path` and `reward.pattern`.
 - `reward.direction` is `maximize` or `minimize`.
 - `reward.primary_metric` defaults to `reward`, except SkyDiscover defaults to `combined_score`.
 - `reward.type = "exit_code"` requires `reward.direction = "maximize"`.
@@ -198,11 +200,11 @@ Input precedence:
 8. Validate the full canonical config.
 9. Write project, source, config, path registry, and initial admin credential verifier rows in one short SQLite transaction after filesystem staging succeeds.
 10. Render the raw admin key exactly once.
-11. Run baseline unless skipped.
+11. Run baseline unless skipped or not required by free evaluation.
 
 Runtime config rules:
 
-- A project must have a complete runner and reward policy before baseline validation.
+- A project must have a complete runner and reward policy before baseline validation, except free evaluation projects where `runner.type = "none"` and `reward.type = "none"` make baseline validation `not_required`.
 - `--config` is required for every project init mode in V1.
 - Runner, reward, artifact, log, env, secret, Docker, Harbor, and SkyDiscover runtime fields are read from project config, not from init flags.
 - ALab must not silently default reward type. The config must provide a complete reward policy.
@@ -211,6 +213,7 @@ Runtime config rules:
 - Remote Git source selection uses `--git-ref <branch|tag|sha>`.
 - `--source-ref` always means an existing ALab source id or `alab/source/<source_id>` and must not be used for remote Git refs.
 - `project init harbor` and `project init skydiscover` do not accept `--source-ref` in V1. A new adapter project must bootstrap its initial editable source from `--source-path`, `--source-git`, `--source-empty`, or an adapter-derived editable source. Existing ALab sources are project-scoped reproducibility records, not cross-project init inputs.
+- Free evaluation projects support `project init local|git|empty`; adapter init modes `harbor|skydiscover` require their adapter runner refs and do not accept `runner.type = "none"`.
 
 ## 4. Source Model
 
@@ -561,10 +564,13 @@ Rules:
 - Invisible refs fail without disclosing additional record details.
 - Submit message, summary, and feedback inputs are limited to 300, 65536, and 65536 bytes respectively after UTF-8 encoding.
 - Summary and feedback must not contain exact active `secret_env` values for the experiment's bound config version. If an exact secret value is found, submit fails without storing final submission text.
-- If `--rerun` is present, always execute the run flow.
-- If worktree changes exist, execute the run flow.
+- In free evaluation mode, `--rerun` fails with `CONFIG_INVALID`; free submissions do not execute the run flow and do not create run, log, artifact, or reward rows.
+- In free evaluation mode, dirty worktrees are committed directly with subject `ALab submit: <message>` and metadata including submission id, experiment id, config version, and `ALab-Evaluation: none`; mutable scope checks still apply, and a violating automatic commit is rolled back before failure.
+- In standard evaluation mode, if `--rerun` is present, always execute the run flow.
+- In standard evaluation mode, if worktree changes exist, execute the run flow.
 - When submit executes the run flow, it reuses `submit --message` as the run message. Any automatic commit created by that run still uses the normal `ALab run: <message>` subject, and the submission row separately stores the same submit message.
 - If no worktree changes exist, reuse the most recent run for current HEAD and the experiment's bound config version only when that run is `passed`.
 - If no worktree changes exist and no reusable passed run exists, submit fails with exit code `1` and a next action to use `--rerun`.
 - If final run status is `passed`, store one `experiment_submissions` row with message, summary, feedback, refs, final commit, and final run id, then close the experiment.
+- In free evaluation mode, store one `experiment_submissions` row with `final_run_id = NULL`, final commit, message, summary, feedback, and refs, then close the experiment.
 - If final run status is not `passed`, keep experiment open and do not store final summary, feedback, refs, final commit, or final run id. The run record remains stored.

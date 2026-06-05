@@ -184,6 +184,11 @@ ALAB_HOME="/absolute/path/to/ALab/.alab-demo/home" alab submit \
   --ref none
 ```
 
+For projects configured with `runner.type = "none"` and `reward.type = "none"`,
+there is no evaluator. In that free evaluation mode, skip `alab run` and submit
+directly; the submission records `final run id: none` and is excluded from best
+reward ranking.
+
 Useful next commands:
 
 ```sh
@@ -204,7 +209,7 @@ alab observe experiments best
 - **Source**: immutable snapshot imported from a local path, Git repo, empty source, Harbor task source, or SkyDiscover initial program.
 - **Experiment**: isolated Git branch/worktree bound to exactly one source and one config version.
 - **Run**: one evaluator execution for an experiment commit, with status, reward, logs, artifacts, and warning codes.
-- **Submit**: closes an experiment with final summary, feedback, final run, final commit, and explicit refs.
+- **Submit**: closes an experiment with final summary, feedback, final commit, explicit refs, and either a final run or `final run id: none` for free evaluation projects.
 - **Feedback**: HOME-level plaintext notes for suggestions, questions, bugs, or other agent observations, stored as one directory per entry under `feedback/`. Any initialized-home role can submit feedback; root can list, show, and archive records without creating SQLite or audit rows.
 - **Dashboard**: root-only local browser panel for read-only inspection. It binds to `127.0.0.1`, uses a random browser session token, serves bounded paginated read models for large homes, and writes no ALab records.
 - **Reports**: Markdown evidence exports for project-level owner handoffs or visible experiment contexts, without raw secrets, hidden log contents, or artifact bytes.
@@ -214,8 +219,8 @@ alab observe experiments best
 
 Project behavior is controlled by TOML config:
 
-- `[runner]`: runner type, command/shell, working directory, timeout, Docker fields, Harbor task refs, or SkyDiscover task refs.
-- `[reward]`: reward type and primary metric. Supported reward families include `exit_code`, `file`, `stdout_regex`, `harbor`, and `skydiscover`.
+- `[runner]`: runner type, command/shell, working directory, timeout, Docker fields, Harbor task refs, SkyDiscover task refs, or `type = "none"` for free evaluation.
+- `[reward]`: reward type and primary metric. Supported reward families include `exit_code`, `file`, `stdout_regex`, `harbor`, `skydiscover`, and `none`. `reward.type = "none"` must be paired with `runner.type = "none"`.
 - `[artifacts]` and `[logs]`: captured output roots, glob patterns, and byte limits.
 - `[env]` and `[secret_env]`: explicit environment injection. Secret values are local plaintext but are not rendered or exported.
 - `[mutable]`: paths the experiment may change when running or submitting.

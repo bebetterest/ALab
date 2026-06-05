@@ -30,6 +30,7 @@ from .configs import (
     ProjectConfig,
     config_hash,
     dumps_toml,
+    is_free_evaluation_config,
     load_global_config,
     load_project_config,
     project_config_json_obj,
@@ -152,7 +153,7 @@ def _failure_fields(code: str, reason: str, next_action: str) -> list[tuple[str,
 
 
 def _baseline_failure_fields(status: str, next_action: str) -> list[tuple[str, Any]]:
-    if status in {"passed", "skipped", "inherited", "dry-run"}:
+    if status in {"passed", "skipped", "inherited", "not_required", "dry-run"}:
         return []
     return _failure_fields("BASELINE_VALIDATION_FAILED", f"baseline validation status is {status}", next_action)
 
@@ -1837,6 +1838,8 @@ def cmd_project_init(args: list[str], req: Request) -> list[ResultBlock]:
     if goal_override is not None:
         raw_config.project.goal = goal_override
     if mode in {"harbor", "skydiscover"}:
+        if is_free_evaluation_config(raw_config):
+            raise AlabError("CONFIG_INVALID", "free evaluation project init supports local, git, or empty modes")
         if command_arg(args, "--source-ref"):
             raise AlabError("SOURCE_INVALID", "adapter project init does not accept --source-ref")
     home = req.globals.home
@@ -1888,6 +1891,7 @@ def cmd_project_init(args: list[str], req: Request) -> list[ResultBlock]:
             home_id = home_row["home_id"]
             config_json, raw_secrets = _store_secret_values(conn, project_id, fingerprint_key, raw_config, actor)
             cfg_hash = config_hash(config_json)
+            free_evaluation = is_free_evaluation_config(raw_config)
             control_path.mkdir(parents=True, exist_ok=True)
             write_marker(
                 control_path,
@@ -1907,9 +1911,19 @@ def cmd_project_init(args: list[str], req: Request) -> list[ResultBlock]:
                 INSERT INTO projects(project_id, status, pre_archive_status, canonical_repo_path, control_path,
                   secret_fingerprint_key, latest_attempted_config_version, active_valid_config_version,
                   active_validation_id, created_at, updated_at, archived_at)
-                VALUES (?, 'invalid', NULL, ?, ?, ?, 1, NULL, NULL, ?, ?, NULL)
+                VALUES (?, ?, NULL, ?, ?, ?, 1, ?, ?, ?, ?, NULL)
                 """,
-                (project_id, str(repo_git), str(control_path), fingerprint_key, now, now),
+                (
+                    project_id,
+                    "valid" if free_evaluation else "invalid",
+                    str(repo_git),
+                    str(control_path),
+                    fingerprint_key,
+                    1 if free_evaluation else None,
+                    validation_id if free_evaluation else None,
+                    now,
+                    now,
+                ),
             )
             conn.execute(
                 """
@@ -1952,22 +1966,32 @@ def cmd_project_init(args: list[str], req: Request) -> list[ResultBlock]:
                 """
                 INSERT INTO project_config_versions(project_id, version, canonical_config_json, config_hash,
                   baseline_required, validation_status, inherited_from_validation_id, created_at, created_by_credential_id)
-                VALUES (?, 1, ?, ?, 1, 'running', NULL, ?, ?)
+                VALUES (?, 1, ?, ?, ?, ?, NULL, ?, ?)
                 """,
-                (project_id, canonical_json(project_config_json_obj(canonical_json(config_json))), cfg_hash, now, actor.credential_id),
+                (
+                    project_id,
+                    canonical_json(project_config_json_obj(canonical_json(config_json))),
+                    cfg_hash,
+                    0 if free_evaluation else 1,
+                    "not_required" if free_evaluation else "running",
+                    now,
+                    actor.credential_id,
+                ),
             )
             conn.execute(
                 """
                 INSERT INTO project_validations(validation_id, project_id, config_version, source_ref, source_commit,
                   status, exit_code, reward_value, reward_parse_status, archive_status, started_at, ended_at, record_json)
-                VALUES (?, ?, 1, ?, ?, 'running', NULL, NULL, 'not_attempted', 'active', ?, NULL, ?)
+                VALUES (?, ?, 1, ?, ?, ?, NULL, NULL, 'not_attempted', 'active', ?, ?, ?)
                 """,
                 (
                     validation_id,
                     project_id,
                     source_ref,
                     source_commit,
+                    "not_required" if free_evaluation else "running",
                     now,
+                    now if free_evaluation else None,
                     _execution_record_object_json(
                         config_hash_value=cfg_hash,
                         runner_type=raw_config.runner.type,
@@ -1978,7 +2002,9 @@ def cmd_project_init(args: list[str], req: Request) -> list[ResultBlock]:
             admin_id, admin_key = create_credential(conn, credential_type="admin", project_id=project_id, metadata={"schema_version": 1, "role": "admin"})
             audit(conn, action="add", object_type="project", object_id=project_id, actor=actor, project_id=project_id)
         project_rows_written = True
-        if flag(args, "--skip-baseline-test"):
+        if is_free_evaluation_config(raw_config):
+            validation_status, exit_code, reward, reward_parse_status, warning_codes = "not_required", None, None, "not_attempted", []
+        elif flag(args, "--skip-baseline-test"):
             with db.tx() as conn:
                 conn.execute("UPDATE project_validations SET status = 'skipped', ended_at = ?, reward_parse_status = 'not_attempted' WHERE validation_id = ?", (utc_now(), validation_id))
                 conn.execute("UPDATE project_config_versions SET validation_status = 'skipped' WHERE project_id = ? AND version = 1", (project_id,))
@@ -1994,7 +2020,7 @@ def cmd_project_init(args: list[str], req: Request) -> list[ResultBlock]:
                     (project_status, active_version, active_validation, utc_now(), project_id),
                 )
                 conn.execute("UPDATE project_config_versions SET validation_status = ? WHERE project_id = ? AND version = 1", (validation_status, project_id))
-        project_status = "valid" if validation_status == "passed" else "invalid"
+        project_status = "valid" if validation_status in {"passed", "not_required"} else "invalid"
         next_action = (
             f"alab exp create --project {project_id} --name <name>"
             if project_status == "valid"
@@ -3029,7 +3055,12 @@ def cmd_exp_create(args: list[str], req: Request) -> list[ResultBlock]:
                     ("token path", str(worktree_path / ".alab" / "token")),
                     ("config version", project["active_valid_config_version"]),
                     ("warning", inline_warnings),
-                    ("next", f"cd {worktree_path} && alab run --message <message>"),
+                    (
+                        "next",
+                        f"cd {worktree_path} && alab submit --message <message> --summary <text> --feedback <text> --ref none"
+                        if is_free_evaluation_config(cfg)
+                        else f"cd {worktree_path} && alab run --message <message>",
+                    ),
                 ],
             )
         ]
@@ -3142,8 +3173,71 @@ def _insert_running_run_record(req: Request, project: Any, exp: Any, cfg: Projec
         )
 
 
+def _free_submit_commit(
+    *,
+    worktree: Path,
+    exp: Any,
+    cfg: ProjectConfig,
+    message: str,
+    submission_id: str,
+) -> str:
+    _assert_experiment_git_state(exp, worktree)
+    head_before = run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.decode().strip()
+    committed_paths = _changed_paths(worktree, "diff", f"{exp['baseline_commit']}..{head_before}")
+    blocked_committed = _mutable_blocked_paths(exp, committed_paths)
+    if blocked_committed:
+        raise AlabError(
+            "SCOPE_VIOLATION",
+            _mutable_scope_reason(blocked_committed, "committed changes"),
+            "change only files allowed by the experiment mutable policy",
+        )
+    dirty_paths = _dirty_paths(worktree)
+    _assert_mutable_paths_allowed(exp, dirty_paths, "worktree changes")
+    created_commit = bool(dirty_paths)
+    if created_commit:
+        run_cmd(["git", "config", "user.name", cfg.git.author_name], cwd=worktree)
+        run_cmd(["git", "config", "user.email", cfg.git.author_email], cwd=worktree)
+        run_cmd(["git", "config", "commit.gpgsign", "false"], cwd=worktree)
+        run_cmd(["git", "add", "-A"], cwd=worktree)
+        run_cmd(
+            [
+                "git",
+                "commit",
+                "-m",
+                f"ALab submit: {message}",
+                "-m",
+                (
+                    f"ALab-Submission: {submission_id}\n"
+                    f"ALab-Experiment: {exp['exp_id']}\n"
+                    f"ALab-Config-Version: {exp['bound_config_version']}\n"
+                    "ALab-Evaluation: none"
+                ),
+            ],
+            cwd=worktree,
+            env=_git_commit_identity_env(cfg.git.author_name, cfg.git.author_email),
+        )
+    commit = run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.decode().strip()
+    committed_paths_after = _changed_paths(worktree, "diff", f"{exp['baseline_commit']}..{commit}")
+    blocked_committed_after = _mutable_blocked_paths(exp, committed_paths_after)
+    if blocked_committed_after:
+        if created_commit:
+            run_cmd(["git", "reset", "--mixed", "HEAD^"], cwd=worktree, check=False)
+        raise AlabError(
+            "SCOPE_VIOLATION",
+            _mutable_scope_reason(blocked_committed_after, "committed changes"),
+            "change only files allowed by the experiment mutable policy",
+        )
+    return commit
+
+
 def _run_experiment(req: Request, message: str) -> RunExecutionSummary:
     project, exp, actor, cfg, secrets_map = _require_experiment_context(req)
+    if is_free_evaluation_config(cfg):
+        raise AlabError(
+            "COMMAND_UNAVAILABLE",
+            "free evaluation experiments do not support alab run",
+            "use alab submit --message <message> --summary <text> --feedback <text> --ref none",
+        )
     with Database(req.globals.home).tx() as conn:
         _interrupt_stale_running_records(conn, project_id=project["project_id"], exp_id=exp["exp_id"])
     if project["status"] == "archived":
@@ -3349,13 +3443,19 @@ def cmd_run(args: list[str], req: Request) -> list[ResultBlock]:
     message = command_arg(args, "--message", required=True)
     _assert_utf8_max_bytes("run message", message, 300)
     require_positional_count(args, 0, "run accepts no positional arguments")
-    project, exp, _actor, _cfg, _secrets_map = _require_experiment_context(req)
+    project, exp, _actor, cfg, _secrets_map = _require_experiment_context(req)
     if project["status"] == "archived":
         raise AlabError("PROJECT_ARCHIVED", "project is archived")
     if exp["status"] != "open":
         raise AlabError("EXPERIMENT_CLOSED", "experiment is not open")
     if exp["worktree_state"] != "active":
         raise AlabError("SCOPE_VIOLATION", "experiment worktree is removed")
+    if is_free_evaluation_config(cfg):
+        raise AlabError(
+            "COMMAND_UNAVAILABLE",
+            "free evaluation experiments do not support alab run",
+            "use alab submit --message <message> --summary <text> --feedback <text> --ref none",
+        )
     operation_lock = _acquire_experiment_run_submit_lock(req.globals.home, project_id=project["project_id"], exp_id=exp["exp_id"])
     try:
         summary = _run_experiment(req, message)
@@ -3432,13 +3532,15 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
     feedback = _read_text_input_file(feedback_file, "submit feedback") if feedback_file else feedback_arg or ""
     _assert_utf8_max_bytes("submit summary", summary, 65536)
     _assert_utf8_max_bytes("submit feedback", feedback, 65536)
-    project, exp, actor, _cfg, _secrets_map = _require_experiment_context(req)
+    project, exp, actor, cfg, _secrets_map = _require_experiment_context(req)
     if project["status"] == "archived":
         raise AlabError("PROJECT_ARCHIVED", "project is archived")
     if exp["status"] != "open":
         raise AlabError("EXPERIMENT_CLOSED", "experiment is not open")
     if exp["worktree_state"] != "active":
         raise AlabError("SCOPE_VIOLATION", "experiment worktree is removed")
+    if is_free_evaluation_config(cfg) and flag(args, "--rerun"):
+        raise AlabError("CONFIG_INVALID", "free evaluation experiments do not support --rerun")
     operation_lock = _acquire_experiment_run_submit_lock(req.globals.home, project_id=project["project_id"], exp_id=exp["exp_id"])
     try:
         with Database(req.globals.home).tx() as conn:
@@ -3452,12 +3554,23 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
                 ref_row = one(conn, "SELECT exp_id FROM experiments WHERE project_id = ? AND exp_id = ?", (project["project_id"], ref_id))
                 if ref_row is None or not _exp_visible(conn, project["project_id"], actor, ref_id):
                     raise AlabError("SCOPE_VIOLATION", "ref experiment is not visible or not found")
-        worktree = Path(exp["worktree_path"])
-        dirty_paths = _dirty_paths(worktree)
-        head = run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.decode().strip()
         final_run_id: str | None = None
-        final_commit = head
-        if dirty_paths or flag(args, "--rerun"):
+        free_evaluation = is_free_evaluation_config(cfg)
+        worktree = Path(exp["worktree_path"])
+        if free_evaluation:
+            submission_id = new_id("sub", "submission")
+            final_commit = _free_submit_commit(
+                worktree=worktree,
+                exp=exp,
+                cfg=cfg,
+                message=message,
+                submission_id=submission_id,
+            )
+        else:
+            dirty_paths = _dirty_paths(worktree)
+            head = run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.decode().strip()
+            final_commit = head
+        if not free_evaluation and (dirty_paths or flag(args, "--rerun")):
             run_summary = _run_experiment(req, message)
             final_run_id = run_summary.run_id
             final_commit = run_summary.commit
@@ -3467,7 +3580,7 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
                 if failure.get("reason"):
                     reason = f"{reason}: {failure['reason']}"
                 return [_submission_failure_block(exp["exp_id"], refs, str(failure["error code"]), reason, str(failure["next"]))]
-        else:
+        elif not free_evaluation:
             conn = require_home(req.globals.home)
             try:
                 row = one(
@@ -3491,7 +3604,8 @@ def cmd_submit(args: list[str], req: Request) -> list[ResultBlock]:
         db = Database(req.globals.home)
         with db.tx() as conn:
             now = utc_now()
-            submission_id = new_id("sub", "submission")
+            if not free_evaluation:
+                submission_id = new_id("sub", "submission")
             conn.execute(
                 """
                 INSERT INTO experiment_submissions(submission_id, project_id, exp_id, final_run_id, final_commit,

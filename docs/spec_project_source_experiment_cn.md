@@ -87,7 +87,8 @@ PYTHONUNBUFFERED = "1"
 - `mutable.include` 默认 `["**"]`，且必须至少包含一个 non-empty single-line pattern；`mutable.exclude` 默认 `[]`，设置时包含 non-empty single-line patterns。
 - `visibility.scope` 是 `none`、`same_project` 或 `explicit`。
 - 只有 `scope = "explicit"` 时，`visibility.experiment_ids` required 且 non-empty；entries 必须是 complete experiment ids，并会 normalized 为 sorted unique list。
-- `runner.type` 是 `local`、`docker`、`harbor`、`skydiscover_docker` 或 `skydiscover_python`。
+- `runner.type` 是 `none`、`local`、`docker`、`harbor`、`skydiscover_docker` 或 `skydiscover_python`。
+- `runner.type = "none"` 启用 free evaluation mode，必须与 `reward.type = "none"` 成对使用，并拒绝 command、shell、Docker fields、Harbor refs 和 SkyDiscover refs 等 executable runner fields。
 - `runner.timeout_seconds` 默认 `600`，必须是 `1` 到 `86400` 之间的 integer。
 - `runner.working_directory` 是 repo-relative，不能 escape repository。
 - `runner.env_mode` 仅 local runner 有效，取值 `sanitized`、`full`、`none`。
@@ -102,7 +103,8 @@ PYTHONUNBUFFERED = "1"
 - Harbor runner 需要 `runner.harbor_task_ref`。
 - SkyDiscover runner 需要 `runner.skydiscover_task_ref`。
 - SkyDiscover Python runner 可设置 `runner.program_path`，默认 `"."`。
-- `reward.type` 是 `exit_code`、`file`、`stdout_regex`、`harbor`、`skydiscover`。
+- `reward.type` 是 `none`、`exit_code`、`file`、`stdout_regex`、`harbor`、`skydiscover`。
+- `reward.type = "none"` 仅在 `runner.type = "none"` 时有效，并拒绝 `reward.path`、`reward.pattern` 等 reward extractor fields。
 - `reward.direction` 是 `maximize` 或 `minimize`。
 - `reward.primary_metric` 默认 `reward`，SkyDiscover 默认 `combined_score`。
 - `reward.type = "exit_code"` 要求 `reward.direction = "maximize"`。
@@ -198,11 +200,11 @@ Input precedence：
 8. Validate full canonical config。
 9. Filesystem staging 成功后，在一个短 SQLite transaction 中写入 project、source、config、path registry 和 initial admin credential verifier rows。
 10. Render raw admin key exactly once。
-11. Run baseline unless skipped。
+11. 除非 skipped 或 free evaluation 下 not required，否则运行 baseline。
 
 Runtime config：
 
-- Baseline validation 前 project 必须有完整 runner 和 reward policy。
+- Baseline validation 前 project 必须有完整 runner 和 reward policy；但 free evaluation project 例外，此时 `runner.type = "none"` 且 `reward.type = "none"` 会使 baseline validation 为 `not_required`。
 - V1 每种 project init mode 都要求 `--config`。
 - Runner、reward、artifact、log、env、secret、Docker、Harbor 和 SkyDiscover runtime fields 都从 project config 读取，而不是 init flags。
 - ALab 不得 silently default reward type。Config 必须提供完整 reward policy。
@@ -211,6 +213,7 @@ Runtime config：
 - Remote Git source 用 `--git-ref <branch|tag|sha>`。
 - `--source-ref` 始终表示 existing ALab source id 或 `alab/source/<source_id>`，不得用作 remote Git ref。
 - `project init harbor` 和 `project init skydiscover` 在 V1 不接受 `--source-ref`。新的 adapter project 必须从 `--source-path`、`--source-git`、`--source-empty` 或 adapter-derived editable source bootstrap initial editable source。Existing ALab source 是 project-scoped reproducibility record，不是 cross-project init input。
+- Free evaluation projects 支持 `project init local|git|empty`；adapter init modes `harbor|skydiscover` 需要对应 adapter runner refs，不能使用 `runner.type = "none"`。
 
 ## 4. Source Model
 
@@ -554,10 +557,13 @@ alab submit --message <message> --summary <text>|--summary-file <path> --feedbac
 - Invisible refs 失败时不泄露额外 record details。
 - Submit message、summary 和 feedback UTF-8 编码后分别最多 300、65536 和 65536 bytes。
 - Summary 和 feedback 不得包含 experiment bound config version 下 active `secret_env` values 的 exact match。发现 exact secret value 时，submit fail，且不存 final submission text。
-- `--rerun` 存在时始终执行 run flow。
-- Worktree 有 changes 时执行 run flow。
+- Free evaluation mode 中，`--rerun` 以 `CONFIG_INVALID` 失败；free submissions 不执行 run flow，也不创建 run、log、artifact 或 reward rows。
+- Free evaluation mode 中，dirty worktree 会直接以 subject `ALab submit: <message>` 提交，并在 commit metadata 中记录 submission id、experiment id、config version 和 `ALab-Evaluation: none`；mutable scope checks 仍然适用，违规的 automatic commit 会在失败前回滚。
+- Standard evaluation mode 中，`--rerun` 存在时始终执行 run flow。
+- Standard evaluation mode 中，worktree 有 changes 时执行 run flow。
 - 当 submit 执行 run flow 时，复用 `submit --message` 作为 run message。该 run 创建的 automatic commit 仍使用正常的 `ALab run: <message>` subject，submission row 也单独保存同一个 submit message。
 - 无 changes 时，仅当 current HEAD 和 experiment bound config version 的 most recent run 为 `passed` 时复用。
 - 无 changes 且无 reusable passed run 时，submit exit `1` 并提示用 `--rerun`。
 - Final run `passed` 时创建一条 `experiment_submissions` row，保存 message、summary、feedback、refs、final commit、final run id，并关闭 experiment。
+- Free evaluation mode 中创建一条 `experiment_submissions` row，其中 `final_run_id = NULL`，并保存 final commit、message、summary、feedback 和 refs，然后关闭 experiment。
 - Final run 非 `passed` 时保持 experiment open，不存 final summary/feedback/refs/final commit/final run id；run record 保留。

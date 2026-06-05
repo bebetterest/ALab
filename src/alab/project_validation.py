@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import services as _core
-from .configs import config_hash
+from .configs import config_hash, is_free_evaluation_config
 from .db import Database, all_rows, one
 from .errors import AlabError
 from .rendering import ResultBlock
@@ -59,11 +59,12 @@ def cmd_project_validate(args: list[str], req: Request) -> list[ResultBlock]:
         source = _source_for_ref(conn, project["project_id"], cfg.source.default_source_ref)
         validation_id = new_id("val", "manual")
         now = utc_now()
+        free_evaluation = is_free_evaluation_config(cfg)
         conn.execute(
             """
             INSERT INTO project_validations(validation_id, project_id, config_version, source_ref, source_commit,
               status, exit_code, reward_value, reward_parse_status, archive_status, started_at, ended_at, record_json)
-            VALUES (?, ?, ?, ?, ?, 'running', NULL, NULL, 'not_attempted', 'active', ?, NULL, ?)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'not_attempted', 'active', ?, ?, ?)
             """,
             (
                 validation_id,
@@ -71,7 +72,9 @@ def cmd_project_validate(args: list[str], req: Request) -> list[ResultBlock]:
                 version,
                 source["source_ref"],
                 source["source_commit"],
+                "not_required" if free_evaluation else "running",
                 now,
+                now if free_evaluation else None,
                 _execution_record_object_json(
                     config_hash_value=config_hash(cfg_json),
                     runner_type=cfg.runner.type,
@@ -80,32 +83,46 @@ def cmd_project_validate(args: list[str], req: Request) -> list[ResultBlock]:
             ),
         )
         conn.execute(
-            "UPDATE project_config_versions SET baseline_required = 1, validation_status = 'running' WHERE project_id = ? AND version = ?",
-            (project["project_id"], version),
+            "UPDATE project_config_versions SET baseline_required = ?, validation_status = ?, inherited_from_validation_id = NULL WHERE project_id = ? AND version = ?",
+            (
+                0 if free_evaluation else 1,
+                "not_required" if free_evaluation else "running",
+                project["project_id"],
+                version,
+            ),
         )
-    with db.tx() as conn:
-        status, exit_code, reward, reward_parse_status, warning_codes = _run_validation(
-            conn,
-            req.globals.home,
-            project["project_id"],
-            validation_id,
-            source["source_ref"],
-            source["source_commit"],
-            version,
-            cfg,
-            secrets_map,
-        )
-        project_status = "valid" if status == "passed" else "invalid"
-        active_version = version if status == "passed" else project["active_valid_config_version"]
-        active_validation = validation_id if status == "passed" else project["active_validation_id"]
-        conn.execute(
-            "UPDATE projects SET status = ?, active_valid_config_version = ?, active_validation_id = ?, updated_at = ? WHERE project_id = ?",
-            (project_status, active_version, active_validation, utc_now(), project["project_id"]),
-        )
-        conn.execute(
-            "UPDATE project_config_versions SET validation_status = ? WHERE project_id = ? AND version = ?",
-            (status, project["project_id"], version),
-        )
+    if free_evaluation:
+        status, exit_code, reward, reward_parse_status, warning_codes = "not_required", None, None, "not_attempted", []
+        project_status = "valid"
+        with db.tx() as conn:
+            conn.execute(
+                "UPDATE projects SET status = 'valid', active_valid_config_version = ?, active_validation_id = ?, updated_at = ? WHERE project_id = ?",
+                (version, validation_id, utc_now(), project["project_id"]),
+            )
+    else:
+        with db.tx() as conn:
+            status, exit_code, reward, reward_parse_status, warning_codes = _run_validation(
+                conn,
+                req.globals.home,
+                project["project_id"],
+                validation_id,
+                source["source_ref"],
+                source["source_commit"],
+                version,
+                cfg,
+                secrets_map,
+            )
+            project_status = "valid" if status == "passed" else "invalid"
+            active_version = version if status == "passed" else project["active_valid_config_version"]
+            active_validation = validation_id if status == "passed" else project["active_validation_id"]
+            conn.execute(
+                "UPDATE projects SET status = ?, active_valid_config_version = ?, active_validation_id = ?, updated_at = ? WHERE project_id = ?",
+                (project_status, active_version, active_validation, utc_now(), project["project_id"]),
+            )
+            conn.execute(
+                "UPDATE project_config_versions SET validation_status = ? WHERE project_id = ? AND version = ?",
+                (status, project["project_id"], version),
+            )
     next_action = (
         "alab exp create --name <name>"
         if project_status == "valid"

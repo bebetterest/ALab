@@ -17,7 +17,7 @@ from typing import Any
 from .errors import AlabError
 from .home import Home, ensure_layout
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
 MIGRATION_FILE_RE = re.compile(r"^(\d+)_([a-z0-9_]+)\.sql$")
 DEFAULT_MIGRATION_LOCK_TIMEOUT_MS = 30000

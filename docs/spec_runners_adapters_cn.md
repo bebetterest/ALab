@@ -49,6 +49,18 @@ Config-dependent path validation：
 - Schema validation 不要求 `runner.working_directory`、`reward.path`、artifact globs、`runner.dockerfile` 或 `runner.context` 等 source-dependent paths 存在于每个未来 source snapshot。
 - Missing source-dependent paths 在存在 validation 或 run record 时记录为 saved baseline/run failures。它们按失败子系统使用 `RUNNER_ERROR`、`REWARD_PARSE_ERROR` 或 artifact capture statuses，而不是静默改写 config。
 
+## 1.1 Free Evaluation
+
+`runner.type = "none"` 搭配 `reward.type = "none"` 是 free evaluation mode。它不是 executable runner，也不会调用 runner contract。
+
+规则：
+
+- Project init 和 config import 会写入 `not_required` validation record，并在不执行 baseline evaluator 的情况下把 config 设为 active valid。
+- 绑定 free evaluation 的 experiments 不可使用 `alab run`。
+- `alab submit` 在通过正常 state、secret、ref visibility、Git state 和 mutable-scope checks 后直接关闭 experiment。
+- Accepted free submissions 不创建 run、log、artifact、reward、metric 或 hidden-log rows，也不参与 best-run ranking。
+- Dirty free submissions 在存储 submission 前创建一个 `ALab submit: <message>` commit。
+
 ## 2. Runtime Directories
 
 Temporary runtime directories：
@@ -180,6 +192,7 @@ Capture：
 
 Reward types：
 
+- `none`：不执行 reward extraction；仅在 `runner.type = "none"` 时有效。
 - `exit_code`：exit code `0` 映射 `1.0`；non-zero 映射 `0.0`。
 - `file`：从 configured `workspace:` 或 `run:` path 读取 reward。
 - `stdout_regex`：从 stdout capture 提取 reward。

@@ -50,10 +50,11 @@ Worker lifecycle 权限有意保持很窄：
 - **`alab run`**：评估当前 candidate，并保存 run evidence。
   关键参数：必需 `--message <text>`；保持简短且具体。
   输出用途：获取 run id、status、reward、parse status、warnings、previews、artifact count 和 next action。
-  注意点：Reward files 应只包含 configured reward parser 期望的可解析 numeric metrics。解释性 details 应放在单独 artifacts 或可见 logs；worker tokens 不能查看 hidden verifier logs。
+  注意点：Reward files 应只包含 configured reward parser 期望的可解析 numeric metrics。解释性 details 应放在单独 artifacts 或可见 logs；worker tokens 不能查看 hidden verifier logs。Free evaluation projects 中 `alab run` 会返回 `COMMAND_UNAVAILABLE`；应改用 direct submit。
 - **`alab submit`**：在有 passed run 支撑后，提交最终 summary 和 feedback 并关闭 experiment。
   关键参数：必需 `--message`、`--summary`/`--summary-file` 二选一、`--feedback`/`--feedback-file` 二选一，以及至少一个 `--ref`；可选 `--rerun`。
   输出用途：获取 final run id、final commit、stored summary/feedback、experiment status 和 submitted refs。
+  注意点：Standard evaluation projects 需要 supporting passed run，或用 `--rerun` 创建一个。Free evaluation projects 没有 evaluator；省略 `--rerun`，直接 submit，并预期输出 `final run id: none`。
 - **`alab exp checkout`**：在选定 commit 上为一个可见历史 experiment 创建 inspection checkout。
   关键参数：必需 `<exp_id>` 和 `--path <dir>`；可选 `--commit final|latest|best|<sha>`。使用当前 worktree 和其他 ALab contexts 之外的空路径。
   输出用途：得到一个用于只读比较的 workspace，其中包含可见 prior experiment 的源码。阅读代码以寻找实现思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。记录自己创建的 inspection path，方便 controller 后续清理；不要在 inspection checkouts 内编辑。
@@ -107,9 +108,9 @@ alab run --message "try focused improvement"
 alab observe runs show <run_id>
 ```
 
-这只是一个示例形态，不是必需顺序。先理解当前任务、candidate 和 context。只有当可见历史能指导改动时才使用它。本地检查应保持轻量且与任务相关。当 candidate 准备好接受 evaluation 时，运行 `alab run --message "<brief reason>"`；根据可见证据诊断 weak 或 failed results；只要还有合理优化路径，就继续迭代。如果 `git status --short` 显示无关 generated files，应通过项目正常机制删除或忽略后再 run 或 submit。
+这只是一个示例形态，不是必需顺序。先理解当前任务、candidate 和 context。只有当可见历史能指导改动时才使用它。本地检查应保持轻量且与任务相关。Standard evaluation candidate 准备好时运行 `alab run --message "<brief reason>"`；根据可见证据诊断 weak 或 failed results；只要还有合理优化路径，就继续迭代。Free evaluation projects 中 ALab 会直接指向 submit，且不需要 run evidence。如果 `git status --short` 显示无关 generated files，应通过项目正常机制删除或忽略后再 run 或 submit。
 
-只有当工作完成或已经没有有价值的继续优化路径，并且 passed run 支撑 final candidate 时才 submit。如果没有 passed run 支撑 candidate，应报告最好的 run evidence 和没有 submit 的原因。
+只有当工作完成或已经没有有价值的继续优化路径，并且 standard mode 有 passed run 支撑 final candidate，或 free evaluation direct submit 是预期模式时才 submit。如果 standard evaluation candidate 没有 passed run 支撑，应报告最好的 run evidence 和没有 submit 的原因。
 
 ## 可见历史
 
@@ -212,12 +213,13 @@ alab submit \
 ```
 
 summary 应描述最终改动和支撑它的 passed run。feedback 应包含有用的操作备注：关键 metrics、避开的 failure modes、每个 ref 为什么相关，以及剩余风险。清楚解释 refs 可以让后续 workers 更容易检查 lineage 并继续优化。不要包含 raw tokens、hidden-log content 或不可访问的 experiment ids。
+Free evaluation mode 中，应说明没有 evaluator run，且 `final run id` 为 `none`。
 
 Worker 的最终回复应包含：
 
 - 调整过的策略或实现区域；
-- final run id 和 status；
-- reward 与关键 metrics；
+- final run id 和 status，或 free evaluation 的 `final run id: none`；
+- 存在时的 reward 与关键 metrics；
 - 使用的 submit refs，或说明为什么是 `ref none`；
 - 如果 ALab 渲染了 final commit，则记录它；
 - 添加的 tags（如果有）；

@@ -546,11 +546,11 @@ def infer_result_exit_code(blocks: list[ResultBlock]) -> int:
         saved_failure = "error code" in fields
         if block.object_type == "run" and saved_failure and fields.get("run status") not in {None, "passed"}:
             return 1
-        if block.object_type == "validation" and saved_failure and fields.get("validation status") not in {None, "passed"}:
+        if block.object_type == "validation" and saved_failure and fields.get("validation status") not in {None, "passed", "not_required"}:
             return 1
-        if block.object_type in {"project_config", "project_env", "project_secret"} and saved_failure and fields.get("validation status") not in {None, "passed", "skipped", "inherited", "dry-run"}:
+        if block.object_type in {"project_config", "project_env", "project_secret"} and saved_failure and fields.get("validation status") not in {None, "passed", "skipped", "inherited", "not_required", "dry-run"}:
             return 1
-        if block.object_type == "project" and saved_failure and fields.get("validation status") not in {None, "passed", "skipped"}:
+        if block.object_type == "project" and saved_failure and fields.get("validation status") not in {None, "passed", "skipped", "not_required"}:
             return 1
         if block.object_type == "submission" and fields.get("submit accepted") is False:
             return 1

@@ -329,8 +329,8 @@ Command error matrix：
 | `exp worktree remove|restore` | invalid path/confirmation `CONFIG_INVALID` exit `2`；cleanup failure 或 context nesting `RESOURCE_BUSY`/`CONTEXT_CONFLICT` exit `4`；auth failures exit `3` |
 | `exp token list|revoke|regenerate` | invalid selector `CONFIG_INVALID` exit `2`；`EXPERIMENT_NOT_FOUND` 或 `CREDENTIAL_NOT_FOUND` exit `2`；auth failures exit `3` |
 | `exp tag add|remove|list` | invalid tag `CONFIG_INVALID` exit `2`；scope failures `SCOPE_VIOLATION` exit `4`；auth failures exit `3` |
-| `run` | failed/error/timeout run `RUNNER_FAILED`、`RUNNER_ERROR`、`RUNNER_TIMEOUT` 或 `REWARD_PARSE_ERROR` exit `1`；mutable violations `SCOPE_VIOLATION` exit `4`；invalid Git state `GIT_STATE_INVALID` exit `4`；busy experiment `EXPERIMENT_BUSY` exit `4` |
-| `submit` | final run not accepted `RUNNER_FAILED`、`RUNNER_ERROR`、`RUNNER_TIMEOUT`、`REWARD_PARSE_ERROR` 或 missing reusable run exit `1`；invalid refs/inputs `CONFIG_INVALID` exit `2`；closed/scope failures exit `4` |
+| `run` | failed/error/timeout run `RUNNER_FAILED`、`RUNNER_ERROR`、`RUNNER_TIMEOUT` 或 `REWARD_PARSE_ERROR` exit `1`；free evaluation `COMMAND_UNAVAILABLE` exit `4`；mutable violations `SCOPE_VIOLATION` exit `4`；invalid Git state `GIT_STATE_INVALID` exit `4`；busy experiment `EXPERIMENT_BUSY` exit `4` |
+| `submit` | final run not accepted `RUNNER_FAILED`、`RUNNER_ERROR`、`RUNNER_TIMEOUT`、`REWARD_PARSE_ERROR` 或 missing reusable run exit `1`；invalid refs/inputs/free `--rerun` `CONFIG_INVALID` exit `2`；closed/scope failures exit `4` |
 | `observe experiments|runs|artifacts|logs|annotations` | invalid filters/sort/selector `CONFIG_INVALID` exit `2`；root/admin 下 object not found 使用 matching `EXPERIMENT_NOT_FOUND`、`RUN_NOT_FOUND`、`ARTIFACT_NOT_FOUND`、`LOG_NOT_FOUND` 或 `ANNOTATION_NOT_FOUND` exit `2`；token/public not-visible-or-not-found selector `SCOPE_VIOLATION` exit `4`；export target `OUTPUT_EXISTS` exit `2`；auth failures exit `3`；archive/unarchive 已经处于目标状态时 exit `0` |
 | `annotate add|edit|archive|unarchive|remove` | invalid target/body/confirmation `CONFIG_INVALID` exit `2`；root/admin 下 `ANNOTATION_NOT_FOUND` exit `2`；token/public not-visible-or-not-found selector 和其他 visibility/scope failures `SCOPE_VIOLATION` exit `4`；auth failures exit `3`；archive/unarchive 已经处于目标状态时 exit `0` |
 
@@ -750,7 +750,7 @@ Lifecycle command rules：
 - Runtime config rule：runner、reward、artifact、log、env、secret、Docker、Harbor 和 SkyDiscover fields 只从 config 读取。V1 init 不暴露 runtime flags。
 - Success fields：`project id`、`project name`、`project status`、`source id`、`source ref`、`config version`、`validation id`、`validation status`、`admin key`、repeated `warning code`、`next`。
 - Secret rule：project record 写入时始终创建一个 project admin key，并只打印一次 raw admin key，包括随后 baseline failed 而保留 invalid project 的情况。
-- Exit：validation passed 或 skipped 为 `0`；project 已创建但 baseline failed 为 `1`；invalid config/source 为 `2`；auth failure 为 `3`。
+- Exit：validation passed、skipped 或 free evaluation 下 not required 为 `0`；project 已创建但 baseline failed 为 `1`；invalid config/source 为 `2`；auth failure 为 `3`。
 
 `alab project config show [--project <project_id>] [--version latest-attempted|active-valid|<n>]`
 
@@ -776,7 +776,7 @@ Lifecycle command rules：
 - Conflicts：`--dry-run` 与 `--skip-baseline-test` 冲突。
 - Dry-run 只 parse/canonicalize config、计算 diff、报告是否需要 baseline，并运行 runtime capability checks；不写 DB、不创建 audit row、不改文件、不执行 baseline runner。
 - Success fields：`project id`、`previous active config version`、`latest attempted config version`、`runtime affecting`、`validation status`、`project status`、repeated `warning code`、`next`。
-- Runtime change 的 exit 行为跟 baseline result 一致。
+- Runtime change 的 exit 行为跟 baseline result 一致；free evaluation 的 `not_required` validation 是成功结果。
 
 `alab project config set <field> <value> [--project <project_id>] [--dry-run] [--skip-baseline-test]`
 
@@ -1044,6 +1044,7 @@ Lifecycle command rules：
 - Success fields：`run id`、`exp id`、`commit`、`created commit`、`run status`、`exit code`、`reward`、`reward parse status`、`stdout preview`、`stderr preview`、`artifact count`、repeated `warning code`、`next`。
 - `created commit` 渲染为 boolean。`stdout preview`、`stderr preview`、`artifact count` 和 repeated `warning code` 来自已保存的 run record，并与同一 run 的 observe output 保持一致。
 - Auto commit rule：`run` 会 stage 所有 mutable-allowed 的 staged、unstaged、deleted、renamed、copied 和 untracked non-ignored changes，并创建一个 ALab auto commit；pre-existing staged set 不单独保留。
+- Free evaluation rule：绑定 `runner.type = "none"` 和 `reward.type = "none"` 的 experiments 会以 `COMMAND_UNAVAILABLE` 拒绝 `alab run`，并且不创建 run record。
 - Passed run exit `0`；saved failed/error/timeout run exit `1`。
 - Manual commit 导致 full-diff mutable scope 失败时，ALab 记录 run `error`，返回 actionable `SCOPE_VIOLATION` details，并保持 HEAD/worktree 不变。
 
@@ -1057,6 +1058,7 @@ Lifecycle command rules：
 - Conflicts：`--ref none` 与任何 experiment ref 互斥。
 - Refs 按 first-seen order 去重。
 - Reuse rule：未提供 `--rerun` 时，`submit` 只复用 current HEAD 且 bound config version 相同的最近 passed run；没有可复用 run 时以 result failure 退出并提示 `--rerun`。
+- Free evaluation rule：绑定 `runner.type = "none"` 和 `reward.type = "none"` 的 experiments 拒绝 `--rerun`；accepted submissions 不创建 run/log/artifact/reward rows，存储 `final run id: none`，并以当前 final commit 关闭 experiment。
 - Success fields：`exp id`、`submit accepted`、`final run id`、`final commit`、`experiment status`、`summary stored`、`feedback stored`、repeated `ref`。
 
 `alab observe experiments list|search|show|best ...`

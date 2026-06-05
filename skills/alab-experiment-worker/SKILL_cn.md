@@ -7,7 +7,7 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 
 ## 概览
 
-当 Codex 在一个 ALab experiment worktree 内工作时使用本 skill。Worker 负责改进候选源码，可以查看可见范围内的历史 experiment 证据来寻找思路，在 worktree token context 中运行 ALab evaluation，并在 finished work 有 passed run 支撑时提交最终结果。
+当 Codex 在一个 ALab experiment worktree 内工作时使用本 skill。Worker 负责改进候选源码，可以查看可见范围内的历史 experiment 证据来寻找思路，在 standard projects 中通过 worktree token context 运行 ALab evaluation，并在当前 project mode 允许时提交最终结果。
 
 本 skill 不是 project manager 或 global administrator。不得使用 project admin key、root key、catalog command、cache command、project config mutation 或 lifecycle removal command。
 
@@ -28,11 +28,11 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 
 不要把这里当成固定 checklist。先主动理解当前 worktree 的任务、本地说明、已有 candidate 和 ALab context。需要时查看可见 prior experiments、runs、artifacts、logs、annotations 或 inspection checkouts，从中获得参考和灵感。
 
-围绕 candidate 做聚焦修改和轻量本地检查。当 candidate 准备好接受 evaluation 时，运行 `alab run --message "<brief reason>"`。根据可见 stdout/stderr previews、warning codes、artifacts、logs、metrics、annotations 和 prior runs 诊断 weak 或 failed results；只要还有合理优化路径，就继续改进和迭代。
+围绕 candidate 做聚焦修改和轻量本地检查。在 standard evaluation projects 中，当 candidate 准备好接受 evaluation 时，运行 `alab run --message "<brief reason>"`。如果 ALab 的 next action 直接指向 submit，或 `alab run` 因没有 evaluator 返回 `COMMAND_UNAVAILABLE`，说明这是 free evaluation project，应跳过 run evidence 并准备直接 submit。根据已有的可见 stdout/stderr previews、warning codes、artifacts、logs、metrics、annotations 和 prior runs 诊断 weak 或 failed results；只要还有合理优化路径，就继续改进和迭代。
 
 当发现后续 worker 不应遗忘的重要上下文时，在 iteration 过程中添加 annotation，不要只依赖最终记忆。适合记录的内容包括决策依据、失败路径、剩余风险或下一步上下文等。如果 annotation 已不再需要、不再有效，或可能误导后续 worker，应及时 archive 和 remove。
 
-当使命完成，或已经没有有价值的继续优化路径时，只有 passed run 支撑 final candidate 才 submit。如果没有支撑的 passed run，不要 submit；报告当前最好的 evidence，以及无法继续推进或无法提交的原因。
+当使命完成，或已经没有有价值的继续优化路径时，在 standard evaluation mode 下只有 passed run 支撑 final candidate 才 submit；在 free evaluation mode 下，如果 direct submit 是 documented next action，则可以直接 submit。如果 standard mode 没有支撑的 passed run，不要 submit；报告当前最好的 evidence，以及无法继续推进或无法提交的原因。
 
 ## 能力说明
 
@@ -46,18 +46,18 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 - 修改 worktree 内与任务相关的 source files，并保持实现足够清晰，方便后续 worker 延续。
 - 当 tags 对后续 controller 或 worker 有证据价值时，可以为当前 experiment 添加或列出 tags；tags 不授予 visibility。
 - 保持 runner outputs 可被机器解析。若任务写 reward file，只把配置要求的 numeric metrics 放入该 reward file；case details、trace 或 explanation 应在允许时放到单独的可见 artifact/log。
-- 若存在本地轻量检查，先运行这些检查，再用 `alab run --message "<brief reason>"` 运行 evaluation。
+- 若存在本地轻量检查，先运行这些检查；standard evaluation projects 再用 `alab run --message "<brief reason>"` 运行 evaluation。Free evaluation projects 不要强行 run，direct submit 是预期流程。
 - 使用可见 stdout/stderr preview、warning code、artifact、log、metric 和 annotation 诊断 failed 或 weak runs。
-- 当预期修改已经完成，并且当前 worktree 有一个 passed run 支撑结果时，使用事实性的 message、summary、feedback 和 refs 提交。
+- 当预期修改已经完成，并且当前 worktree 满足其 project mode 所需的支撑条件时，使用事实性的 message、summary、feedback 和 refs 提交。
 
 ## Submit Guidance
 
-- 只有当前 candidate 有 passed run 支撑时才 submit，除非用户或 controller 明确要求 non-passed closeout。
+- Standard evaluation mode 下，只有当前 candidate 有 passed run 支撑时才 submit。Free evaluation mode 下允许 direct submit，final run id 会渲染为 `none`。
 - 把 submit refs 当成便于后续 review 和继续优化的 provenance links，而不是装饰性字段。
 - 对于影响了策略、代码、comparison baseline、failure avoidance 或 continuation path 的可见 experiments，应积极添加 `--ref <exp_id>`。
 - 只有结果没有依赖或有意引用任何历史 experiment 时，才使用 `--ref none`。
 - 不要编造 refs，不要引用不可访问的 experiment ids，也不要只因为某个 visible experiment 存在就引用它。
-- `--message` 保持简短。实质记录写入 `--summary`/`--summary-file` 和 `--feedback`/`--feedback-file`：改了什么、哪个 passed run 支撑、关键 metrics、哪些 refs 有意义，以及剩余风险。
+- `--message` 保持简短。实质记录写入 `--summary`/`--summary-file` 和 `--feedback`/`--feedback-file`：改了什么、哪个 passed run 支撑或为什么 free evaluation 没有 run、存在时的关键 metrics、哪些 refs 有意义，以及剩余风险。
 - 如果没有 submit，应明确说明阻塞原因和当前最好的 run evidence。
 
 ## Command Reference

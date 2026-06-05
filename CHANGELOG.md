@@ -5,6 +5,12 @@ All notable ALab changes are recorded here. Keep this file in sync with
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-05
+
+### Added
+
+- Added free evaluation projects via `runner.type = "none"` and `reward.type = "none"`, allowing direct experiment submission without evaluator runs, run/log/artifact rows, or best-reward ranking.
+
 ## [0.1.4] - 2026-06-05
 
 ### Added
