@@ -480,9 +480,11 @@ def annotation_target_json_obj(text: str) -> dict[str, Any]:
     target_type = target["target_type"]
     if target_type not in ANNOTATION_TARGET_TYPES:
         raise AlabError("STORAGE_ERROR", "annotations.target_json target_type is invalid")
-    if not isinstance(target["target_id"], str) or not target["target_id"]:
-        raise AlabError("STORAGE_ERROR", "annotations.target_json target_id must be a non-empty string")
+    if not isinstance(target["target_id"], str):
+        raise AlabError("STORAGE_ERROR", "annotations.target_json target_id must be a string")
     target_id = target["target_id"]
+    if target_type != "none" and not target_id:
+        raise AlabError("STORAGE_ERROR", "annotations.target_json target_id must be a non-empty string")
     exp_id = target.get("exp_id")
     if exp_id is not None:
         if not isinstance(exp_id, str):
@@ -526,6 +528,13 @@ def annotation_target_json_obj(text: str) -> dict[str, Any]:
             raise AlabError("STORAGE_ERROR", "annotations.target_json lines target requires line_range")
         if target_type == "path" and line_range is not None:
             raise AlabError("STORAGE_ERROR", "annotations.target_json path target must not include line_range")
+    elif target_type == "none":
+        if not exp_id:
+            raise AlabError("STORAGE_ERROR", "annotations.target_json targetless annotations require exp_id")
+        if target_id != "":
+            raise AlabError("STORAGE_ERROR", "annotations.target_json targetless target_id must be empty")
+        if repo_path is not None or line_range is not None:
+            raise AlabError("STORAGE_ERROR", "annotations.target_json targetless annotation must not include repo_path or line_range")
     else:
         prefix = ANNOTATION_TARGET_ID_PREFIXES[target_type]
         try:

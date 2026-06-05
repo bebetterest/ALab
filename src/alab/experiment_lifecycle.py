@@ -306,8 +306,8 @@ def cmd_exp_remove(args: list[str], req: Request) -> list[ResultBlock]:
             )["c"],
             "annotations": one(
                 conn,
-                "SELECT count(*) AS c FROM annotations WHERE project_id = ? AND target_id = ?",
-                (project["project_id"], exp["exp_id"]),
+                "SELECT count(*) AS c FROM annotations WHERE project_id = ? AND (target_id = ? OR json_extract(target_json, '$.exp_id') = ?)",
+                (project["project_id"], exp["exp_id"], exp["exp_id"]),
             )["c"],
             "tags": one(
                 conn, "SELECT count(*) AS c FROM experiment_tags WHERE exp_id = ?", (exp["exp_id"],)
@@ -420,12 +420,12 @@ def cmd_exp_remove(args: list[str], req: Request) -> list[ResultBlock]:
                 },
             )
             tx.execute(
-                "DELETE FROM annotation_revisions WHERE annotation_id IN (SELECT annotation_id FROM annotations WHERE project_id = ? AND target_id = ?)",
-                (project["project_id"], exp["exp_id"]),
+                "DELETE FROM annotation_revisions WHERE annotation_id IN (SELECT annotation_id FROM annotations WHERE project_id = ? AND (target_id = ? OR json_extract(target_json, '$.exp_id') = ?))",
+                (project["project_id"], exp["exp_id"], exp["exp_id"]),
             )
             tx.execute(
-                "DELETE FROM annotations WHERE project_id = ? AND target_id = ?",
-                (project["project_id"], exp["exp_id"]),
+                "DELETE FROM annotations WHERE project_id = ? AND (target_id = ? OR json_extract(target_json, '$.exp_id') = ?)",
+                (project["project_id"], exp["exp_id"], exp["exp_id"]),
             )
             for table in [
                 "experiment_tags",

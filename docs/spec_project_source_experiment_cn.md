@@ -74,7 +74,7 @@ PYTHONUNBUFFERED = "1"
 - `project.allow_public_exp_create` 默认 `true`。
 - Project、source、experiment display name UTF-8 编码后最长 120 bytes。
 - Name uniqueness 按 normalized slug 判定，不按 exact string。
-- Task、goal、summary、feedback、annotation body 各自 UTF-8 编码后最多 65536 bytes。
+- Task、goal、summary、feedback、annotation body 各自 UTF-8 编码后最多 65536 bytes。Annotation title UTF-8 编码后最多 256 bytes。
 - 一个 project 可以包含多个 source records。Stored canonical project config 包含一个 `source.default_source_ref`，且它在创建新 experiment 前必须 resolve 到 active source。
 - 每个 experiment 创建时只绑定一个 source。如果 `exp create` 没有选择 source 或 `--from-exp`，ALab 使用 active config 的 `source.default_source_ref`。
 - 当 init 命令提供一个 effective default source origin 时，project init 的输入 config 可以省略 `source.default_source_ref`。ALab 先 staging 该 source，把 canonical `alab/source/<source_id>` ref 注入 stored config，然后验证完整 canonical config。

@@ -117,8 +117,8 @@ alab audit list|show --project <project_id> ...
   关键参数：使用对应 observe filters：experiment/runs/artifacts/logs/annotations list filters、`show <id>`、export `--out`、archive/unarchive，以及 admin-only remove dry-run/confirm。
   注意点：Hidden logs 需要 root/admin 和显式 `--include-hidden`；observe outputs 是决策证据。
 - **`annotate add|edit|archive|unarchive|remove`**：添加或维护 project notes。
-  关键参数：`add` 需要 `--target` 和一个 body input；可选 `--author`、`--private`、`--private-to-exp`；edit 需要 annotation id 和 body；remove 需要 dry-run 或 force/confirm。
-  注意点：用于 decision records、review notes 和 project-visible guidance。
+  关键参数：`add` 接受可选 `--target` 和一个 body input。Project context 中 targetless notes 必须提供 `--title <title>` 和 `--exp <exp_id>`；targeted notes 也可以使用 `--title`。可选 `--author`、`--private`、`--private-to-exp`。Edit 需要 annotation id 和 body；remove 需要 dry-run 或 force/confirm。
+  注意点：用于 decision records、review notes 和 project-visible guidance。只有当 note 不绑定单个 object 或 path、而是归属某个 experiment 时，才省略 `--target`。
 - **`audit list|show --project`**：查看 project-scoped audit evidence。
   关键参数：Filters 包括 `--object-type`、`--object-id`、`--action`、`--actor`、time bounds、`--limit`、`--offset`；show 需要 `<audit_id>`。
   注意点：用于验证 lifecycle、credential、config、source、validation 和 cleanup actions。

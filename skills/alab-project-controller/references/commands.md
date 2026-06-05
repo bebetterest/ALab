@@ -117,8 +117,8 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Parameters: See observe filters: experiment/runs/artifacts/logs/annotations list filters, `show <id>`, export `--out`, archive/unarchive, and admin-only remove with dry-run/confirm.
   Notes: Hidden logs require root/admin and explicit `--include-hidden`; use observe outputs as evidence for decisions.
 - **`annotate add|edit|archive|unarchive|remove`**: Add or maintain project notes.
-  Parameters: `add` requires `--target` and one body input; optional `--author`, `--private`, `--private-to-exp`; edit requires annotation id and body; remove requires dry-run or force/confirm.
-  Notes: Use for decision records, review notes, and project-visible guidance.
+  Parameters: `add` accepts optional `--target` and one body input. Targetless notes require `--title <title>` plus `--exp <exp_id>` from project context; targeted notes may also use `--title`. Optional `--author`, `--private`, and `--private-to-exp` are available. Edit requires annotation id and body; remove requires dry-run or force/confirm.
+  Notes: Use for decision records, review notes, and project-visible guidance. Omit `--target` only for experiment-scoped notes that are not tied to one object or path.
 - **`audit list|show --project`**: Inspect project-scoped audit evidence.
   Parameters: Filters include `--object-type`, `--object-id`, `--action`, `--actor`, time bounds, `--limit`, and `--offset`; show requires `<audit_id>`.
   Notes: Use to verify lifecycle, credential, config, source, validation, and cleanup actions.

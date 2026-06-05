@@ -1119,16 +1119,16 @@ Lifecycle command rules：
 - Required args：`show <annotation_id>`。
 - List filters：见 [spec_observe_collaboration.md](spec_observe_collaboration.md)。
 - Options：`--history`。
-- Success fields per annotation：`annotation id`、`target type`、`target id`、`resolved commit`、`status`、`current revision`、`visibility`、`author`、`body`、`created at`、`updated at`、repeated `revision`。
+- Success fields per annotation：`annotation id`、`title`、`target type`、`target id`、`resolved commit`、`status`、`current revision`、`visibility`、`author`、`body`、`created at`、`updated at`、repeated `revision`。
 
-`alab annotate add --target <target> --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]`
+`alab annotate add [--target <target>] [--exp <exp_id>] [--title <title>] --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]`
 
 - Context：Experiment 或 Project。
 - Credential：visible token/creating token，或 Root/admin。
-- Required args：target 和 exactly one body input。
-- Conflicts：`--body` 与 `--body-file` 互斥；token context 与 `--private-to-exp` 互斥。
+- Required args：exactly one body input。Targetless annotations 必须提供 `--title`；root/admin project-context targetless annotations 必须提供 `--exp <exp_id>`。
+- Conflicts：`--body` 与 `--body-file` 互斥；token context 与 `--private-to-exp` 互斥；`--exp` 与 `--target` 互斥。
 - Project-context add/edit 在 target annotation 不能精确 resolve 到一个 experiment 时，必须在 body storage 前以 `CONFIG_INVALID` 失败。
-- Success fields：`annotation id`、`target type`、`target id`、`resolved commit`、`revision`、`visibility`、`created at`。
+- Success fields：`annotation id`、`title`、`target type`、`target id`、`resolved commit`、`revision`、`visibility`、`created at`。
 
 `alab annotate edit <annotation_id> --body <text>|--body-file <path> [--author <label>]`
 

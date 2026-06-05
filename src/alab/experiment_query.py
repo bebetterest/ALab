@@ -390,12 +390,15 @@ def _append_experiment_search_clause(
             AND a.status = 'active'
             AND (a.target_id = {prefix}exp_id OR json_extract(a.target_json, '$.exp_id') = {prefix}exp_id)
             AND {annotation_visibility_sql}
-            AND alab_casefold_contains(ar.body, ?) = 1
+            AND (
+              alab_casefold_contains(COALESCE(a.title, ''), ?) = 1
+              OR alab_casefold_contains(ar.body, ?) = 1
+            )
         )
         """
     )
     params.extend(annotation_params)
-    params.append(query)
+    params.extend([query, query])
     clauses.append(f"({' OR '.join(search_clauses)})")
 
 

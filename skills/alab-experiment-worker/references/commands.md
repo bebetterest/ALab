@@ -68,7 +68,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Use the output for: Find prior attempts, similar tags, source lineage, closed experiments, and possible refs.
 - **`observe experiments search`**: Search visible experiment corpus for ideas or prior failures.
   Parameters: Required `--query <text>` plus the same main experiment filters as list.
-  Use the output for: Locate relevant summaries, feedback, task text, names, goals, tags, and latest annotation bodies.
+  Use the output for: Locate relevant summaries, feedback, task text, names, goals, tags, latest annotation titles, and latest annotation bodies.
 - **`observe experiments show`**: Inspect one visible experiment.
   Parameters: Required `<exp_id>`.
   Use the output for: Confirm source ref, latest/final/best commits, tags, status, and whether it should be cited as a ref.
@@ -88,11 +88,11 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Parameters: List filters include `--exp`, `--run`, `--validation`, `--stream stdout|stderr|hidden_stdout|hidden_stderr`, `--truncated`, timestamps, and archive flags. Worker tokens cannot use hidden logs.
   Use the output for: Diagnose failures using visible stdout/stderr content and previews. Quote only short, relevant visible snippets in summaries; never request or reproduce hidden-log content in the worker role.
 - **`observe annotations list/show`**: Read visible notes and review comments.
-  Parameters: List filters include `--target-type`, `--target-id`, `--author`, `--created-by`, `--private`, `--query`, timestamps, and `--include-archived`; show accepts `<annotation_id>` and optional `--history`.
+  Parameters: List filters include `--target-type`, `--target-id`, `--author`, `--created-by`, `--private`, `--query`, timestamps, and `--include-archived`; show accepts `<annotation_id>` and optional `--history`. Use `--target-type none` to find targetless notes.
   Use the output for: Capture prior guidance, known issues, and rationale attached to experiments, runs, or artifacts.
 - **`annotate add/edit/archive/unarchive`**: Add or maintain worker-visible notes.
-  Parameters: `add` requires `--target <target>` and one of `--body`/`--body-file`; optional `--author`, `--private`. `edit` requires `<annotation_id>` and one body input. Archive/unarchive require `<annotation_id>`.
-  Use the output for: Leave useful evidence for later workers without changing project configuration. Common targets are `exp:<exp_id>`, `run:<run_id>`, `artifact:<artifact_id>`, `path:<repo_path>`, `lines:<repo_path>:<start>-<end>`, `path:<exp_id>@<commitish>:<repo_path>`, and `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`. In experiment context, path/line shorthand requires a clean worktree.
+  Parameters: `add` accepts an optional `--target <target>` and one of `--body`/`--body-file`; targetless notes require `--title <title>` and bind to the current experiment. Targeted notes may also use `--title`. Optional `--author` and `--private` are available. `edit` requires `<annotation_id>` and one body input. Archive/unarchive require `<annotation_id>`.
+  Use the output for: Leave useful evidence for later workers without changing project configuration. Common targets are `exp:<exp_id>`, `run:<run_id>`, `artifact:<artifact_id>`, `path:<repo_path>`, `lines:<repo_path>:<start>-<end>`, `path:<exp_id>@<commitish>:<repo_path>`, and `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`. Omit `--target` and provide `--title` for a current-experiment note that is not tied to one object or path. In experiment context, path/line shorthand requires a clean worktree. Do not use admin/root-only `--exp` from the worker role.
 
 ## Working Flow
 

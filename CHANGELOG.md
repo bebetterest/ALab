@@ -3,6 +3,14 @@
 All notable ALab changes are recorded here. Keep this file in sync with
 `CHANGELOG_cn.md` whenever a release changes user-visible behavior.
 
+## [Unreleased]
+
+## [0.1.4] - 2026-06-05
+
+### Added
+
+- Added annotation titles and targetless current-experiment annotations with `alab annotate add --title ...`, including title search and visible experiment evidence/report coverage.
+
 ## [0.1.3] - 2026-06-04
 
 ### Changed

@@ -17,7 +17,7 @@ from typing import Any
 from .errors import AlabError
 from .home import Home, ensure_layout
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
 MIGRATION_FILE_RE = re.compile(r"^(\d+)_([a-z0-9_]+)\.sql$")
 DEFAULT_MIGRATION_LOCK_TIMEOUT_MS = 30000
@@ -246,10 +246,12 @@ class Database:
                     if migration.name != name or migration.checksum != checksum:
                         raise AlabError("STORAGE_ERROR", f"migration checksum mismatch for version {version}")
                 current_version = max(applied, default=0)
+                initial_version = current_version
                 for migration in migrations:
                     if migration.version <= current_version:
                         continue
-                    _backup_database(self.home, conn, current_version, migration.version)
+                    if initial_version > 0:
+                        _backup_database(self.home, conn, current_version, migration.version)
                     _apply_migration(conn, migration)
                     current_version = migration.version
 

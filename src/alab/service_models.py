@@ -224,7 +224,7 @@ ANNOTATION_TARGET_ID_PREFIXES = {
     "experiment": "exp",
     "run": "run",
 }
-ANNOTATION_TARGET_TYPES = {"artifact", "experiment", "run", "path", "lines"}
+ANNOTATION_TARGET_TYPES = {"none", "artifact", "experiment", "run", "path", "lines"}
 
 AUDIT_OBJECT_ID_PREFIXES = {
     "annotation": "ann",

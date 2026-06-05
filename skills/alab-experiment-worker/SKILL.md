@@ -30,6 +30,8 @@ Do not treat this as a fixed checklist. First understand the current worktree ta
 
 Iterate on the candidate with focused edits and cheap local checks. When the candidate is ready for evaluation, run `alab run --message "<brief reason>"`. Use visible evidence from stdout/stderr previews, warning codes, artifacts, logs, metrics, annotations, and prior runs to diagnose weak or failed results, then keep improving while there is a plausible path forward.
 
+When you discover important context that later workers should not lose, add an annotation during the iteration instead of relying only on final memory. Good annotation content includes decision rationale, failed approaches, remaining risks, next-step context, and similar durable notes. If an annotation is no longer needed, no longer valid, or likely to mislead later workers, archive and remove it promptly.
+
 When the mission is complete, or no useful optimization path remains, submit only if a passed run supports the final candidate. If there is no supporting passed run, do not submit; report the best available evidence and the reason further progress or submission is blocked.
 
 ## Capabilities

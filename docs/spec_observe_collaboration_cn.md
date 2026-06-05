@@ -96,7 +96,7 @@ Search：
 
 - V1 使用 plaintext local records，在 process 内扫描 SQLite/file-backed records。
 - `--query` 是 case-insensitive substring matching。
-- Search corpus 包括 caller 可见的 project/experiment names/goals、task text、tags、final summaries、feedback、latest annotation bodies。
+- Search corpus 包括 caller 可见的 project/experiment names/goals、task text、tags、final summaries、feedback、latest annotation titles 和 latest annotation bodies。
 - V1 search 不扫描 run stdout/stderr logs、hidden logs、artifact bytes、historical annotation revisions。
 
 Pagination：
@@ -117,7 +117,7 @@ Sorting：
 - Run list sort fields：`started`、`ended`、`reward`、`status`、`config-version`、`exit-code`。
 - Artifact list sort fields：`created`、`path`、`size`、`status`、`content-hash`。
 - Log list sort fields：`created`、`stream`、`size`、`stored-bytes`、`hidden`、`truncated`。
-- Annotation list sort fields：`created`、`updated`、`target-type`、`target-id`、`status`、`created-by`。
+- Annotation list sort fields：`created`、`updated`、`title`、`target-type`、`target-id`、`status`、`created-by`。
 - Sort value 为 nullable 的 rows 始终排在有具体值的 rows 之后。
 
 ## 4. Filters
@@ -303,7 +303,7 @@ Permissions：
 Commands：
 
 ```text
-alab annotate add --target <target> --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]
+alab annotate add [--target <target>] [--exp <exp_id>] [--title <title>] --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]
 alab annotate edit <annotation_id> --body <text>|--body-file <path> [--author <label>]
 alab annotate archive <annotation_id>
 alab annotate unarchive <annotation_id>
@@ -323,6 +323,14 @@ lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>
 path:<repo_path>
 lines:<repo_path>:<start>-<end>
 ```
+
+Targetless notes：
+
+- 省略 `--target` 会创建 targetless annotation，并绑定到一个 concrete experiment id。
+- 在 experiment worktree 中，targetless annotation 绑定当前 experiment。
+- 在 root/admin project context 中创建 targetless annotation 时必须提供 `--exp <exp_id>`。
+- Targetless annotations 必须提供 `--title`；targeted annotations 也可以提供 `--title`。
+- Stored targetless annotations 使用 `target_type = none`、empty `target_id`，并在 `annotations.target_json` 中保存 bound experiment id。
 
 Commitish：
 
@@ -346,6 +354,7 @@ Path 和 line rules：
 Visibility：
 
 - Annotation 可 target visible records。
+- Targetless annotations 按其 bound experiment 和 annotation visibility 判断可见性。
 - Annotation 默认 project visibility。
 - Annotation visibility 绝不会扩大 target visibility。Caller 只有在 normal visibility rules 下也能看到 target record 时，才能看到 project-visible annotation。
 - `--private` 限制为 creating experiment 和 root/admin 可见，即使 target 属于另一个 visible experiment。
@@ -356,13 +365,17 @@ Visibility：
 - Inspection tokens 不可 add/edit annotations。
 - Validation-owned artifact rows 不携带 experiment id，因此作为 annotation target 会以 `CONFIG_INVALID` rejected；annotation 需要绑定到具体 experiment 时，应使用 experiment/path/line target 或 run-owned artifact target。
 
-Body input：
+Title 和 body input：
 
 - Annotation body 是 UTF-8 text。
+- Annotation title 是 UTF-8 text，storage 前 trim；提供时不得为空，编码后最多 256 bytes。
 - 编码后最多 65536 bytes。
 - Body input 只接受 direct text 或 file input 二选一。
 - V1 不支持 `--body-stdin`。
+- Targetless annotation creation 在缺少 `--title` 或 title 为空白时以 `CONFIG_INVALID` 失败。
+- `--target ""` 非法；targetless annotations 必须完全省略 `--target`。
 - Annotation body 不得包含 authoring experiment bound config version 下 active `secret_env` values 的 exact match。发现 exact secret value 时，creation/edit fail，且不存 revision。
+- Annotation title 不得包含 authoring experiment bound config version 下 active `secret_env` values 的 exact match。
 - Root/admin 从 project context 创建或编辑 annotation 时，authoring secret check 使用 target experiment 的 bound config version。无法 resolve 到唯一 experiment 的 target 在 body storage 前以 `CONFIG_INVALID` rejected，必须改写为带有 concrete experiment identity 的 target；需要 experiment-private visibility 时，root/admin 再使用 `--private-to-exp <exp_id>`。
 
 Revision 和 archive：

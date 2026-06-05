@@ -30,6 +30,8 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 
 围绕 candidate 做聚焦修改和轻量本地检查。当 candidate 准备好接受 evaluation 时，运行 `alab run --message "<brief reason>"`。根据可见 stdout/stderr previews、warning codes、artifacts、logs、metrics、annotations 和 prior runs 诊断 weak 或 failed results；只要还有合理优化路径，就继续改进和迭代。
 
+当发现后续 worker 不应遗忘的重要上下文时，在 iteration 过程中添加 annotation，不要只依赖最终记忆。适合记录的内容包括决策依据、失败路径、剩余风险或下一步上下文等。如果 annotation 已不再需要、不再有效，或可能误导后续 worker，应及时 archive 和 remove。
+
 当使命完成，或已经没有有价值的继续优化路径时，只有 passed run 支撑 final candidate 才 submit。如果没有支撑的 passed run，不要 submit；报告当前最好的 evidence，以及无法继续推进或无法提交的原因。
 
 ## 能力说明

@@ -541,13 +541,14 @@ def _annotation_edit_field_labels() -> list[str]:
 
 
 def _annotation_add_field_labels() -> list[str]:
-    return ["object", "annotation id", "target type", "target id", "resolved commit", "revision", "visibility", "created at"]
+    return ["object", "annotation id", "title", "target type", "target id", "resolved commit", "revision", "visibility", "created at"]
 
 
 def _annotation_field_labels(*, history_revision_count: int = 0) -> list[str]:
     labels = [
         "object",
         "annotation id",
+        "title",
         "target type",
         "target id",
         "resolved commit",
@@ -15440,6 +15441,7 @@ globs = ["run:artifact.txt"]
             (project_id,),
         ).fetchone()[0]
         branch_name = conn.execute("SELECT branch_name FROM experiments WHERE exp_id = ?", (exp_id,)).fetchone()[0]
+        artifact_id = conn.execute("SELECT artifact_id FROM artifacts WHERE exp_id = ? AND blob_path IS NOT NULL", (exp_id,)).fetchone()[0]
         log_rel = conn.execute("SELECT file_path FROM log_streams WHERE exp_id = ? AND stream = 'stdout'", (exp_id,)).fetchone()[0]
         blob_rel = conn.execute("SELECT blob_path FROM artifacts WHERE exp_id = ? AND blob_path IS NOT NULL", (exp_id,)).fetchone()[0]
         active_path_token_ids = {
@@ -15457,10 +15459,18 @@ globs = ["run:artifact.txt"]
     assert log_path.exists()
     assert blob_path.exists()
 
+    monkeypatch.chdir(worktree)
+    assert run(["--home", str(home), "annotate", "add", "--title", "Cascade targetless", "--body", "targetless cascade note"]) == 0
+    capsys.readouterr()
+    assert run(["--home", str(home), "annotate", "add", "--target", f"artifact:{artifact_id}", "--title", "Cascade artifact", "--body", "artifact cascade note"]) == 0
+    capsys.readouterr()
+    monkeypatch.chdir(tmp_path)
+
     assert run(["--home", str(home), "--key", admin_key, "exp", "remove", exp_id, "--project", project_id, "--dry-run", "--cascade"]) == 0
     active_exp_remove_dry_run = capsys.readouterr().out
     assert _field_labels(active_exp_remove_dry_run) == _experiment_remove_field_labels(dry_run=True, has_blocker=True, filesystem_path_count=5)
     assert "blocker: target_not_archived" in active_exp_remove_dry_run
+    assert "deleted annotations: 2" in active_exp_remove_dry_run
     _assert_duplicate_option_error(["--home", str(home), "--key", admin_key, "exp", "remove", exp_id, "--project", project_id, "--dry-run", "--dry-run", "--cascade"], "--dry-run", capsys)
     _assert_duplicate_option_error(["--home", str(home), "--key", admin_key, "exp", "remove", exp_id, "--project", project_id, "--dry-run", "--cascade", "--cascade"], "--cascade", capsys)
     _assert_remove_dry_run_preserved(home, "experiment", exp_id, "experiments", "exp_id")
@@ -15527,6 +15537,7 @@ globs = ["run:artifact.txt"]
     dry_run_out = capsys.readouterr().out
     assert _field_labels(dry_run_out) == _experiment_remove_field_labels(dry_run=True, filesystem_path_count=5)
     assert "deleted filesystem paths: 5" in dry_run_out
+    assert "deleted annotations: 2" in dry_run_out
     assert f"branch ref: {branch_ref}" in dry_run_out
     assert "branch ref exists: true" in dry_run_out
     assert "planned trash move:" in dry_run_out
@@ -15563,6 +15574,7 @@ globs = ["run:artifact.txt"]
     assert _field_labels(remove_out) == _experiment_remove_field_labels(dry_run=False)
     audit_id = _field(remove_out, "audit id")
     assert "removed: true" in remove_out
+    assert "deleted annotations: 2" in remove_out
     assert "deleted filesystem paths: 5" in remove_out
     assert "deleted branch ref: true" in remove_out
     assert "trash cleanup pending: false" in remove_out
@@ -15577,6 +15589,8 @@ globs = ["run:artifact.txt"]
         assert conn.execute("SELECT COUNT(*) FROM runs WHERE exp_id = ?", (exp_id,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM log_streams WHERE exp_id = ?", (exp_id,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM artifacts WHERE exp_id = ?", (exp_id,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM annotations WHERE json_extract(target_json, '$.exp_id') = ?", (exp_id,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM annotation_revisions").fetchone()[0] == 0
         path_rows = conn.execute(
             """
             SELECT context_type, token_id, status, removed_at, removed_by_credential_id

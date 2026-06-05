@@ -168,6 +168,35 @@ def _experiment_report_markdown(conn, *, project: Any, exp_id: str, actor: Actor
     if actor.actor_type == "token":
         log_clauses.append("hidden = 0")
     logs = all_rows(conn, f"SELECT * FROM log_streams WHERE {' AND '.join(log_clauses)} ORDER BY created_at DESC LIMIT 25", tuple(log_params))
+    annotation_visibility_sql = "1 = 1"
+    annotation_params: list[Any] = []
+    if actor.actor_type == "token":
+        annotation_visibility_sql = """
+        (
+          json_extract(a.visibility_json, '$.scope') = 'project'
+          OR (
+            json_extract(a.visibility_json, '$.scope') = 'private'
+            AND json_extract(a.visibility_json, '$.creator_exp_id') = ?
+          )
+        )
+        """
+        annotation_params.append(actor.exp_id)
+    annotations = all_rows(
+        conn,
+        f"""
+        SELECT a.*, ar.body, ar.author_label
+        FROM annotations a
+        JOIN annotation_revisions ar
+          ON ar.annotation_id = a.annotation_id
+         AND ar.revision = a.current_revision
+        WHERE a.project_id = ?
+          AND (a.target_id = ? OR json_extract(a.target_json, '$.exp_id') = ?)
+          AND {annotation_visibility_sql}
+        ORDER BY a.updated_at DESC
+        LIMIT 25
+        """,
+        (project_id, exp_id, exp_id, *annotation_params),
+    )
     lines = [
         "# ALab Experiment Report",
         "",
@@ -220,6 +249,26 @@ def _experiment_report_markdown(conn, *, project: Any, exp_id: str, actor: Actor
         _report_table(
             ["Log", "Run", "Validation", "Stream", "Hidden", "Stored bytes", "Created"],
             [[row["log_id"], row["run_id"], row["validation_id"], row["stream"], bool(row["hidden"]), row["stored_bytes"], row["created_at"]] for row in logs],
+        ),
+        "",
+        "## Annotations",
+        "",
+        _report_table(
+            ["Annotation", "Title", "Target type", "Target", "Visibility", "Status", "Author", "Body", "Updated"],
+            [
+                [
+                    row["annotation_id"],
+                    row["title"],
+                    row["target_type"],
+                    row["target_id"],
+                    _report_json_obj(row["visibility_json"]).get("scope"),
+                    row["status"],
+                    row["author_label"],
+                    row["body"],
+                    row["updated_at"],
+                ]
+                for row in annotations
+            ],
         ),
         "",
     ]

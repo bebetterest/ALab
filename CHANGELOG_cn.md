@@ -3,6 +3,14 @@
 ALab 的重要变更记录在这里。每次发布改变用户可见行为时，都要与
 `CHANGELOG.md` 保持同步。
 
+## [Unreleased]
+
+## [0.1.4] - 2026-06-05
+
+### 新增
+
+- 新增 annotation titles 和 targetless current-experiment annotations，可通过 `alab annotate add --title ...` 创建，并覆盖 title search、可见 experiment evidence/report。
+
 ## [0.1.3] - 2026-06-04
 
 ### 变更

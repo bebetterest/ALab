@@ -53,6 +53,8 @@ from .timeutil import utc_now
 def _annotation_target_id_filter(target_type: str | None, target_id: str | None) -> str | None:
     if not target_id:
         return None
+    if target_type == "none":
+        raise AlabError("CONFIG_INVALID", "--target-id is not valid for target-type none")
     if target_type in ANNOTATION_TARGET_ID_PREFIXES:
         return require_complete_id(target_id, ANNOTATION_TARGET_ID_PREFIXES[target_type])
     if ":" not in target_id:
@@ -80,6 +82,19 @@ def _read_annotation_body(args: list[str]) -> str:
     text = _read_text_input_file(body_file, "annotation body") if body_file else body or ""
     _assert_utf8_max_bytes("annotation body", text, 65536)
     return text
+
+
+def _read_annotation_title(args: list[str], *, required: bool) -> str | None:
+    title = command_arg(args, "--title")
+    if title is None:
+        if required:
+            raise AlabError("CONFIG_INVALID", "targetless annotation requires --title")
+        return None
+    normalized = title.strip()
+    if not normalized:
+        raise AlabError("CONFIG_INVALID", "annotation title must be non-empty")
+    _assert_utf8_max_bytes("annotation title", normalized, 256)
+    return normalized
 
 
 def _authorize_annotation_actor(req: Request, project_id: str) -> Actor:
@@ -114,7 +129,16 @@ def _annotation_private_exp_selector(args: list[str], actor: Actor) -> str | Non
 
 
 def _validate_annotation_target_selector_ids(args: list[str]) -> None:
-    raw_target = command_arg(args, "--target", required=True)
+    raw_target = command_arg(args, "--target")
+    if raw_target is None:
+        raw_exp = command_arg(args, "--exp")
+        if raw_exp:
+            require_complete_id(raw_exp, "exp")
+        return
+    if raw_target == "":
+        raise AlabError("CONFIG_INVALID", "annotation target must be non-empty")
+    if command_arg(args, "--exp"):
+        raise AlabError("CONFIG_INVALID", "--exp is only valid for targetless annotations")
     if raw_target.startswith("exp:"):
         require_complete_id(raw_target[4:], "exp")
         return
@@ -184,8 +208,27 @@ def _assert_annotation_repo_path(value: Any, *, label: str, code: str) -> None:
 
 
 def _resolve_annotation_target(args: list[str], req: Request, conn, project_id: str, actor: Actor) -> dict[str, Any]:
-    require_options_at_most_once(args, ("--target",))
-    raw_target = command_arg(args, "--target", required=True)
+    require_options_at_most_once(args, ("--target", "--exp"))
+    raw_target = command_arg(args, "--target")
+    if raw_target is None:
+        if actor.actor_type == "token":
+            if command_arg(args, "--exp"):
+                raise AlabError("CONFIG_INVALID", "--exp is only valid with admin/root")
+            exp_id = actor.exp_id
+        else:
+            exp_option = command_arg(args, "--exp")
+            if exp_option:
+                exp_id = require_complete_id(exp_option, "exp")
+            elif req.context and req.context.context_type == "experiment" and req.context.project_id == project_id:
+                exp_id = req.context.exp_id
+            else:
+                raise AlabError("CONFIG_INVALID", "targetless annotation requires --exp outside experiment context")
+        exp = _exp_row(conn, project_id, exp_id)
+        if actor.actor_type == "token" and not _exp_visible(conn, project_id, actor, exp_id):
+            raise AlabError("SCOPE_VIOLATION", "target experiment is not visible to this token")
+        return {"schema_version": 1, "target_type": "none", "target_id": "", "exp_id": exp["exp_id"], "commit": None}
+    if raw_target == "":
+        raise AlabError("CONFIG_INVALID", "annotation target must be non-empty")
     if raw_target.startswith("exp:"):
         exp_id = require_complete_id(raw_target[4:], "exp")
         exp = _exp_row(conn, project_id, exp_id)
@@ -317,6 +360,7 @@ def _annotation_block(conn, row: Any, *, history: bool = False) -> ResultBlock:
         "annotation",
         [
             ("annotation id", row["annotation_id"]),
+            ("title", row["title"]),
             ("target type", row["target_type"]),
             ("target id", row["target_id"]),
             ("resolved commit", row["resolved_commit"]),
@@ -333,13 +377,23 @@ def _annotation_block(conn, row: Any, *, history: bool = False) -> ResultBlock:
 
 
 def cmd_annotate_add(args: list[str], req: Request) -> list[ResultBlock]:
-    require_known_options(args, ("--project", "--target", "--body", "--body-file", "--body-stdin", "--author", "--private", "--private-to-exp"))
-    require_options_at_most_once(args, ("--target", "--body", "--body-file", "--body-stdin", "--author", "--private", "--private-to-exp"))
+    require_known_options(args, ("--project", "--target", "--exp", "--title", "--body", "--body-file", "--body-stdin", "--author", "--private", "--private-to-exp"))
+    require_options_at_most_once(args, ("--target", "--exp", "--title", "--body", "--body-file", "--body-stdin", "--author", "--private", "--private-to-exp"))
     project_id = _project_id_from_request(args, req)
     actor = _authorize_annotation_actor(req, project_id)
     private_exp = _annotation_private_exp_selector(args, actor)
     require_positional_count(args, 0, "annotate add accepts no positional arguments")
     _validate_annotation_target_selector_ids(args)
+    if command_arg(args, "--target") is None:
+        if actor.actor_type == "token" and command_arg(args, "--exp"):
+            raise AlabError("CONFIG_INVALID", "--exp is only valid with admin/root")
+        if (
+            actor.actor_type in {"root", "admin"}
+            and not command_arg(args, "--exp")
+            and not (req.context and req.context.context_type == "experiment" and req.context.project_id == project_id)
+        ):
+            raise AlabError("CONFIG_INVALID", "targetless annotation requires --exp outside experiment context")
+    title = _read_annotation_title(args, required=command_arg(args, "--target") is None)
     body = _read_annotation_body(args)
     conn = require_home(req.globals.home)
     try:
@@ -349,6 +403,8 @@ def cmd_annotate_add(args: list[str], req: Request) -> list[ResultBlock]:
             _exp_row(conn, project_id, private_exp)
         target_exp_id = _annotation_target_exp_id(target)
         _assert_text_has_no_secret(conn, project_id, target_exp_id, body, "annotation body")
+        if title is not None:
+            _assert_text_has_no_secret(conn, project_id, target_exp_id, title, "annotation title")
     finally:
         conn.close()
     visibility = {"schema_version": 1, "scope": "private" if private_exp else "project", "constraints": {}}
@@ -362,13 +418,14 @@ def cmd_annotate_add(args: list[str], req: Request) -> list[ResultBlock]:
         creator_id = actor.exp_id if actor.actor_type == "token" else actor.credential_id
         tx.execute(
             """
-            INSERT INTO annotations(annotation_id, project_id, target_type, target_id, target_json,
+            INSERT INTO annotations(annotation_id, project_id, title, target_type, target_id, target_json,
               resolved_commit, current_revision, visibility_json, status, created_by_type, created_by_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, 'active', ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, 'active', ?, ?, ?, ?)
             """,
             (
                 annotation_id,
                 project_id,
+                title,
                 target["target_type"],
                 target["target_id"],
                 target_json,
@@ -392,6 +449,7 @@ def cmd_annotate_add(args: list[str], req: Request) -> list[ResultBlock]:
             "annotation",
             [
                 ("annotation id", annotation_id),
+                ("title", title),
                 ("target type", target["target_type"]),
                 ("target id", target["target_id"]),
                 ("resolved commit", target.get("commit")),
@@ -660,8 +718,8 @@ def cmd_observe_annotations_list(args: list[str], req: Request) -> list[ResultBl
                 params.append(author)
             if query:
                 _register_observe_text_predicates(conn)
-                clauses.append("alab_casefold_contains(ar.body, ?) = 1")
-                params.append(query)
+                clauses.append("(alab_casefold_contains(COALESCE(a.title, ''), ?) = 1 OR alab_casefold_contains(ar.body, ?) = 1)")
+                params.extend([query, query])
         order_sql, order_params = _sql_order_limit_clause(
             args,
             default="updated:desc",
@@ -669,6 +727,7 @@ def cmd_observe_annotations_list(args: list[str], req: Request) -> list[ResultBl
             allowed={
                 "created": "a.created_at",
                 "updated": "a.updated_at",
+                "title": "LOWER(a.title)",
                 "target-type": "LOWER(a.target_type)",
                 "target-id": "a.target_id",
                 "status": "LOWER(a.status)",

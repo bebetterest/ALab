@@ -576,13 +576,28 @@ def read_experiment_detail(home: Home, exp_id: str) -> dict[str, Any]:
             "tags": [row["tag_slug"] for row in all_rows(conn, "SELECT tag_slug FROM experiment_tags WHERE exp_id = ? ORDER BY tag_slug", (exp_id,))],
             "artifacts": [_artifact_summary(row) for row in all_rows(conn, "SELECT * FROM artifacts WHERE exp_id = ? ORDER BY created_at DESC LIMIT ?", (exp_id, list_limit))],
             "logs": [_log_summary(row) for row in all_rows(conn, "SELECT * FROM log_streams WHERE exp_id = ? ORDER BY created_at DESC LIMIT ?", (exp_id, list_limit))],
-            "annotations": [_annotation_summary(row) for row in all_rows(conn, "SELECT * FROM annotations WHERE project_id = ? AND target_id = ? ORDER BY updated_at DESC LIMIT ?", (exp["project_id"], exp_id, list_limit))],
+            "annotations": [
+                _annotation_summary(row)
+                for row in all_rows(
+                    conn,
+                    "SELECT * FROM annotations WHERE project_id = ? AND (target_id = ? OR json_extract(target_json, '$.exp_id') = ?) ORDER BY updated_at DESC LIMIT ?",
+                    (exp["project_id"], exp_id, exp_id, list_limit),
+                )
+            ],
             "audit": [_audit_summary(row) for row in all_rows(conn, "SELECT * FROM audit_events WHERE exp_id = ? ORDER BY created_at DESC LIMIT ?", (exp_id, list_limit))],
             "pages": {
                 "runs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM runs WHERE exp_id = ?", (exp_id,)), list_limit, 0),
                 "artifacts": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM artifacts WHERE exp_id = ?", (exp_id,)), list_limit, 0),
                 "logs": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM log_streams WHERE exp_id = ?", (exp_id,)), list_limit, 0),
-                "annotations": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM annotations WHERE project_id = ? AND target_id = ?", (exp["project_id"], exp_id)), list_limit, 0),
+                "annotations": _page_meta(
+                    _scalar_count(
+                        conn,
+                        "SELECT COUNT(*) FROM annotations WHERE project_id = ? AND (target_id = ? OR json_extract(target_json, '$.exp_id') = ?)",
+                        (exp["project_id"], exp_id, exp_id),
+                    ),
+                    list_limit,
+                    0,
+                ),
                 "audit": _page_meta(_scalar_count(conn, "SELECT COUNT(*) FROM audit_events WHERE exp_id = ?", (exp_id,)), list_limit, 0),
             },
         }

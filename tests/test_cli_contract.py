@@ -4608,7 +4608,7 @@ def test_annotate_add_rejects_incomplete_target_ids_before_body_file_reads(tmp_p
         (
             "missing target",
             [*admin_args, "annotate", "add", "--project", project_id, "--body-file", str(missing_body_path)],
-            "missing required option --target",
+            "targetless annotation requires --exp outside experiment context",
         ),
         (
             "experiment target id",
@@ -13800,6 +13800,8 @@ def test_annotation_success_fields_follow_cli_spec(tmp_path: Path, capsys) -> No
                 project_id,
                 "--target",
                 f"exp:{exp_id}",
+                "--title",
+                "Targeted note",
                 "--body",
                 "first note",
                 "--author",
@@ -13964,6 +13966,7 @@ def test_annotation_success_fields_follow_cli_spec(tmp_path: Path, capsys) -> No
             _output_field_labels(add_out.out),
             add_fields.get("target type"),
             add_fields.get("target id"),
+            add_fields.get("title"),
             add_fields.get("revision"),
             add_fields.get("visibility"),
         ),
@@ -14015,6 +14018,7 @@ def test_annotation_success_fields_follow_cli_spec(tmp_path: Path, capsys) -> No
             _documented_success_labels("annotate add"),
             "experiment",
             exp_id,
+            "Targeted note",
             "1",
             "project",
         ),
@@ -14067,6 +14071,176 @@ def test_annotation_success_fields_follow_cli_spec(tmp_path: Path, capsys) -> No
             "false",
         ),
     }
+
+
+def test_targetless_annotations_require_title_and_bind_to_experiment(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    home = tmp_path / "home"
+    source = tmp_path / "targetless-source"
+    source.mkdir()
+    (source / "main.py").write_text("print('targetless annotation')\n", encoding="utf-8")
+    config = tmp_path / "alab.project.toml"
+    config.write_text(
+        f"""
+schema_version = 1
+
+[project]
+name = "Targetless Annotation Project"
+task = "Exercise targetless annotations"
+allow_public_exp_create = true
+
+[runner]
+type = "local"
+timeout_seconds = 30
+working_directory = "."
+env_mode = "none"
+command = [{json.dumps(sys.executable)}, "main.py"]
+
+[reward]
+type = "exit_code"
+direction = "maximize"
+primary_metric = "reward"
+
+[secret_env]
+API_TOKEN = "targetless-title-secret"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert cli.run(["--home", str(home), "auth", "init"]) == 0
+    root_key = _output_field_map(capsys.readouterr().out)["root key"]
+    assert cli.run(["--home", str(home), "--key", root_key, "project", "init", "local", "--config", str(config), "--source-path", str(source)]) == 0
+    project_fields = _output_field_map(capsys.readouterr().out)
+    project_id = project_fields["project id"]
+    admin_key = project_fields["admin key"]
+    admin_args = ["--home", str(home), "--key", admin_key]
+    worktree = tmp_path / "targetless-exp"
+    peer_worktree = tmp_path / "targetless-peer"
+
+    assert cli.run([*admin_args, "exp", "create", "--project", project_id, "--name", "targetless", "--path", str(worktree)]) == 0
+    exp_id = _output_field_map(capsys.readouterr().out)["exp id"]
+    assert cli.run([*admin_args, "exp", "create", "--project", project_id, "--name", "peer", "--path", str(peer_worktree)]) == 0
+    capsys.readouterr()
+
+    before_counts = _database_table_counts(home)
+    monkeypatch.chdir(worktree)
+    failures = [
+        (
+            ["--home", str(home), "annotate", "add", "--body", "missing title"],
+            "targetless annotation requires --title",
+        ),
+        (
+            ["--home", str(home), "annotate", "add", "--title", "   ", "--body", "blank title"],
+            "annotation title must be non-empty",
+        ),
+        (
+            ["--home", str(home), "annotate", "add", "--target", "", "--title", "Bad target", "--body", "bad target"],
+            "--target requires a non-empty value",
+        ),
+        (
+            ["--home", str(home), "annotate", "add", "--target", f"exp:{exp_id}", "--exp", exp_id, "--title", "Conflicting exp", "--body", "conflicting exp"],
+            "--exp is only valid for targetless annotations",
+        ),
+        (
+            ["--home", str(home), "annotate", "add", "--exp", exp_id, "--title", "Token exp", "--body", "token exp"],
+            "--exp is only valid with admin/root",
+        ),
+        (
+            ["--home", str(home), "annotate", "add", "--title", "x" * 257, "--body", "long title"],
+            "annotation title exceeds 256 bytes",
+        ),
+        (
+            ["--home", str(home), "annotate", "add", "--title", "targetless-title-secret", "--body", "secret title"],
+            "annotation title contains an active secret value",
+        ),
+    ]
+    for args, reason in failures:
+        assert cli.run(args) == 2
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert _output_field_labels(captured.err) == _error_field_labels()
+        assert "error code: CONFIG_INVALID" in captured.err
+        assert reason in captured.err
+        assert _database_table_counts(home)["annotations"] == before_counts["annotations"]
+        assert _database_table_counts(home)["annotation_revisions"] == before_counts["annotation_revisions"]
+
+    monkeypatch.chdir(tmp_path)
+    assert cli.run([*admin_args, "annotate", "add", "--project", project_id, "--title", "Admin targetless", "--body", "missing exp"]) == 2
+    missing_exp_err = capsys.readouterr().err
+    assert "error code: CONFIG_INVALID" in missing_exp_err
+    assert "targetless annotation requires --exp outside experiment context" in missing_exp_err
+    assert _database_table_counts(home)["annotations"] == before_counts["annotations"]
+
+    monkeypatch.chdir(worktree)
+    assert cli.run(["--home", str(home), "annotate", "add", "--title", "  Worker targetless note  ", "--body", "private targetless body", "--private"]) == 0
+    add_out = capsys.readouterr()
+    add_fields = _output_field_map(add_out.out)
+    annotation_id = add_fields["annotation id"]
+    assert {
+        "labels": _output_field_labels(add_out.out),
+        "title": add_fields["title"],
+        "target type": add_fields["target type"],
+        "target id": add_fields["target id"],
+        "resolved commit": add_fields["resolved commit"],
+        "visibility": add_fields["visibility"],
+    } == {
+        "labels": _documented_success_labels("annotate add"),
+        "title": "Worker targetless note",
+        "target type": "none",
+        "target id": "",
+        "resolved commit": "none",
+        "visibility": "private",
+    }
+
+    assert cli.run(["--home", str(home), "observe", "annotations", "show", annotation_id, "--history"]) == 0
+    show_out = capsys.readouterr().out
+    assert _output_field_labels(show_out) == _documented_success_labels_with_repeats("observe annotations show", repeats={"revision": 1})
+    assert "title: Worker targetless note" in show_out
+    assert "target type: none" in show_out
+    assert "body:\n  private targetless body" in show_out
+    assert cli.run(["--home", str(home), "observe", "annotations", "list", "--target-type", "none", "--query", "Worker targetless", "--sort", "title:asc"]) == 0
+    list_out = capsys.readouterr().out
+    assert annotation_id in list_out
+    assert "title: Worker targetless note" in list_out
+    assert cli.run(["--home", str(home), "observe", "experiments", "search", "--query", "Worker targetless"]) == 0
+    search_out = capsys.readouterr().out
+    assert f"exp id: {exp_id}" in search_out
+
+    monkeypatch.chdir(peer_worktree)
+    assert cli.run(["--home", str(home), "observe", "annotations", "show", annotation_id]) == 4
+    peer_err = capsys.readouterr().err
+    assert "error code: SCOPE_VIOLATION" in peer_err
+    assert "annotation is not visible or not found" in peer_err
+
+    monkeypatch.chdir(worktree)
+    assert cli.run(["--home", str(home), "annotate", "edit", annotation_id, "--body", "updated private targetless body"]) == 0
+    edit_out = capsys.readouterr().out
+    assert _output_field_map(edit_out)["revision"] == "2"
+    assert cli.run(["--home", str(home), "annotate", "archive", annotation_id]) == 0
+    capsys.readouterr()
+    assert cli.run(["--home", str(home), "annotate", "remove", annotation_id, "--dry-run"]) == 0
+    dry_run_out = capsys.readouterr().out
+    assert "deleted revisions: 2" in dry_run_out
+    assert "blocker:" not in dry_run_out
+    assert cli.run(["--home", str(home), "annotate", "remove", annotation_id, "--force", "--confirm", annotation_id]) == 0
+    remove_out = capsys.readouterr().out
+    assert "removed: true" in remove_out
+
+    monkeypatch.chdir(tmp_path)
+    assert cli.run([*admin_args, "annotate", "add", "--project", project_id, "--exp", exp_id, "--title", "Admin targetless", "--body", "admin targetless body"]) == 0
+    admin_add_fields = _output_field_map(capsys.readouterr().out)
+    assert admin_add_fields["target type"] == "none"
+    assert admin_add_fields["title"] == "Admin targetless"
+    with sqlite3.connect(home / "alab.db") as conn:
+        row = conn.execute(
+            "SELECT title, target_type, target_id, json_extract(target_json, '$.exp_id') FROM annotations WHERE annotation_id = ?",
+            (admin_add_fields["annotation id"],),
+        ).fetchone()
+    assert row == ("Admin targetless", "none", "", exp_id)
 
 
 def test_capability_surfaces_reference_registered_commands_with_expected_credentials() -> None:
@@ -18173,7 +18347,7 @@ primary_metric = "reward"
     assert (
         "--target-type",
         "not-a-choice",
-        "--target-type must be one of artifact, experiment, lines, path, run",
+        "--target-type must be one of artifact, experiment, lines, none, path, run",
     ) in typed_value_options[("observe", "annotations", "list")]
     assert ("--actor", "cred-short", "object ids must be complete") in typed_value_options[("audit", "list")]
     assert ("--object-id", "src-short", "object ids must be complete") in typed_value_options[("audit", "list")]

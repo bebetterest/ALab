@@ -35,12 +35,16 @@ def test_migrate_records_exact_file_checksum(tmp_path) -> None:
 
     Database(home).migrate()
 
-    migration = db_module.MIGRATIONS_DIR / "1_initial.sql"
+    first_migration = db_module.MIGRATIONS_DIR / "1_initial.sql"
+    second_migration = db_module.MIGRATIONS_DIR / "2_annotation_titles_targetless.sql"
     with sqlite3.connect(home.db_path) as conn:
-        row = conn.execute(
-            "SELECT version, name, checksum FROM schema_migrations WHERE version = 1"
-        ).fetchone()
-    assert row == (1, "initial", _sha256(migration.read_bytes()))
+        rows = conn.execute(
+            "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
+        ).fetchall()
+    assert rows == [
+        (1, "initial", _sha256(first_migration.read_bytes())),
+        (2, "annotation_titles_targetless", _sha256(second_migration.read_bytes())),
+    ]
 
 
 def test_database_connections_use_wal_mode(tmp_path) -> None:
@@ -148,7 +152,7 @@ def test_required_storage_tables_and_columns_are_created(tmp_path) -> None:
     assert {"refs_json", "final_run_id", "final_commit"} <= columns["experiment_submissions"]
     assert {"tag_slug", "created_by_type", "created_by_id"} <= columns["experiment_tags"]
     assert {"archive_status", "archived_at", "unarchived_at"} <= columns["project_validations"]
-    assert {"target_json", "visibility_json", "current_revision"} <= columns["annotations"]
+    assert {"title", "target_json", "visibility_json", "current_revision"} <= columns["annotations"]
     assert {"capability_key", "fingerprint", "details_json"} <= columns["runtime_capabilities"]
     assert {"catalog_key", "catalog_type", "metadata_json", "removed_at"} <= columns["catalogs"]
     assert {"cache_kind", "cache_key", "metadata_json", "removed_at"} <= columns["cache_entries"]
@@ -238,6 +242,24 @@ def test_representative_ddl_enum_checks_are_enforced(tmp_path) -> None:
         bad_path_values[2] = "path"
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(annotation_sql, bad_path_values)
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                """
+                INSERT INTO annotations(annotation_id, project_id, target_type, target_id, target_json,
+                  resolved_commit, current_revision, visibility_json, status, created_by_type, created_by_id, created_at, updated_at)
+                VALUES ('ann-none-title-AAAAAAAAAAAAAAAAAAAAAA', 'proj-x-AAAAAAAAAAAAAAAAAAAAAA', 'none', '', '{}',
+                  NULL, 1, '{}', 'active', 'root', 'cred-root-AAAAAAAAAAAAAAAAAAAAAA', '2026-05-19T00:00:00Z', '2026-05-19T00:00:00Z')
+                """
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                """
+                INSERT INTO annotations(annotation_id, project_id, title, target_type, target_id, target_json,
+                  resolved_commit, current_revision, visibility_json, status, created_by_type, created_by_id, created_at, updated_at)
+                VALUES ('ann-none-target-AAAAAAAAAAAAAAAAAAAAAA', 'proj-x-AAAAAAAAAAAAAAAAAAAAAA', 'Standalone', 'none', 'note', '{}',
+                  NULL, 1, '{}', 'active', 'root', 'cred-root-AAAAAAAAAAAAAAAAAAAAAA', '2026-05-19T00:00:00Z', '2026-05-19T00:00:00Z')
+                """
+            )
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
                 """
@@ -855,6 +877,9 @@ def test_annotation_target_and_visibility_json_contracts() -> None:
     assert annotation_services.annotation_target_json_obj(
         canonical_json({"schema_version": 1, "target_type": "artifact", "target_id": artifact_id, "exp_id": exp_id, "commit": None})
     ) == {"schema_version": 1, "target_type": "artifact", "target_id": artifact_id, "exp_id": exp_id, "commit": None}
+    assert annotation_services.annotation_target_json_obj(
+        canonical_json({"schema_version": 1, "target_type": "none", "target_id": "", "exp_id": exp_id, "commit": None})
+    ) == {"schema_version": 1, "target_type": "none", "target_id": "", "exp_id": exp_id, "commit": None}
     assert annotation_services.annotation_visibility_json_obj(canonical_json(visibility)) == visibility
     private_peer_row = {
         "target_json": canonical_json(
@@ -873,6 +898,24 @@ def test_annotation_target_and_visibility_json_contracts() -> None:
     creator_actor = annotation_services.Actor(actor_type="token", credential_id="cred-alpha", project_id="proj-alpha", exp_id=exp_id, token_mode="worktree")
     assert annotation_services._annotation_visible(private_peer_row, creator_actor, {exp_id, peer_exp_id})
     assert not annotation_services._annotation_visible(private_peer_row, creator_actor, {exp_id})
+    for invalid_target, message in [
+        (
+            {"schema_version": 1, "target_type": "none", "target_id": "note", "exp_id": exp_id},
+            "targetless target_id must be empty",
+        ),
+        (
+            {"schema_version": 1, "target_type": "none", "target_id": ""},
+            "targetless annotations require exp_id",
+        ),
+        (
+            {"schema_version": 1, "target_type": "none", "target_id": "", "exp_id": exp_id, "repo_path": "src/main.py"},
+            "targetless annotation must not include repo_path or line_range",
+        ),
+    ]:
+        with pytest.raises(AlabError) as excinfo:
+            annotation_services.annotation_target_json_obj(canonical_json(invalid_target))
+        assert excinfo.value.code == "STORAGE_ERROR"
+        assert message in excinfo.value.reason
     assert annotation_services._annotation_editable(private_peer_row, creator_actor, {exp_id, peer_exp_id})
     assert not annotation_services._annotation_editable(private_peer_row, creator_actor, {exp_id})
 

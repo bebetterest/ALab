@@ -1174,17 +1174,17 @@ Lifecycle command rules:
 - Required args: `show <annotation_id>`.
 - List filters: see [spec_observe_collaboration.md](spec_observe_collaboration.md).
 - Options: `--history`.
-- Success fields per annotation: `annotation id`, `target type`, `target id`, `resolved commit`, `status`, `current revision`, `visibility`, `author`, `body`, `created at`, `updated at`, repeated `revision`.
+- Success fields per annotation: `annotation id`, `title`, `target type`, `target id`, `resolved commit`, `status`, `current revision`, `visibility`, `author`, `body`, `created at`, `updated at`, repeated `revision`.
 
 ### Annotation Mutation
 
-`alab annotate add --target <target> --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]`
+`alab annotate add [--target <target>] [--exp <exp_id>] [--title <title>] --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]`
 
 - Context: Experiment or Project.
 - Credential: visible token, or Root/admin.
-- Required args: target and exactly one body input.
-- Conflicts: `--body` with `--body-file`; token context with `--private-to-exp`.
-- Success fields: `annotation id`, `target type`, `target id`, `resolved commit`, `revision`, `visibility`, `created at`.
+- Required args: exactly one body input. Targetless annotations require `--title`; root/admin project-context targetless annotations require `--exp <exp_id>`.
+- Conflicts: `--body` with `--body-file`; token context with `--private-to-exp`; `--exp` with `--target`.
+- Success fields: `annotation id`, `title`, `target type`, `target id`, `resolved commit`, `revision`, `visibility`, `created at`.
 - Exit: `0`; `2` on invalid target; `3` on auth failure; `4` on visibility failure.
 
 `alab annotate edit <annotation_id> --body <text>|--body-file <path> [--author <label>]`

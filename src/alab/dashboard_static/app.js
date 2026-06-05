@@ -3537,13 +3537,14 @@ function wireAuditCards(container, rows) {
 function annotationCardsHtml(rows) {
   if (!rows.length) return emptyHtml();
   return rows.map((row, index) => {
-    const label = openCardLabel(L("annotation detail", "标注详情"), row.annotation_id, `${objectTypeLabel(row.target_type)} · ${valueOrNone(row.target_id)}`);
+    const label = openCardLabel(L("annotation detail", "标注详情"), row.annotation_id, row.title || `${objectTypeLabel(row.target_type)} · ${valueOrNone(row.target_id)}`);
     return `
       <button class="annotation-card" type="button" data-annotation-index="${index}" ${cardLabelAttrs(label)}>
         <span class="annotation-card-top">
           <strong>${idChip(row.annotation_id)}</strong>
           ${statusBadge(row.status)}
         </span>
+        ${row.title ? `<span class="annotation-card-target">${escapeHtml(row.title)}</span>` : ""}
         <span class="annotation-card-target">${objectChip(row.target_type, row.target_id)}</span>
         <span class="annotation-card-facts">
           <span><b>${escapeHtml(valueOrNone(row.visibility && row.visibility.scope))}</b>${escapeHtml(L("visibility", "可见性"))}</span>

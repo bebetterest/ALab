@@ -68,7 +68,7 @@ Worker lifecycle 权限有意保持很窄：
   输出用途：查找 prior attempts、similar tags、source lineage、closed experiments 和可能的 refs。
 - **`observe experiments search`**：搜索可见 experiment corpus，寻找思路或历史失败。
   关键参数：必需 `--query <text>`，并可加主要 experiment filters。
-  输出用途：定位相关 summary、feedback、task text、name、goal、tags 和 latest annotation bodies。
+  输出用途：定位相关 summary、feedback、task text、name、goal、tags、latest annotation titles 和 latest annotation bodies。
 - **`observe experiments show`**：查看一个可见 experiment。
   关键参数：必需 `<exp_id>`。
   输出用途：确认 source ref、latest/final/best commits、tags、status，以及是否应作为 ref 引用。
@@ -88,11 +88,11 @@ Worker lifecycle 权限有意保持很窄：
   关键参数：List filters 包括 `--exp`、`--run`、`--validation`、`--stream stdout|stderr|hidden_stdout|hidden_stderr`、`--truncated`、timestamps 和 archive flags。Worker tokens 不能使用 hidden logs。
   输出用途：用可见 stdout/stderr content 和 previews 诊断失败。Summary 中只引用短小、相关的可见片段；worker role 下绝不请求或复述 hidden-log content。
 - **`observe annotations list/show`**：读取可见 notes 和 review comments。
-  关键参数：List filters 包括 `--target-type`、`--target-id`、`--author`、`--created-by`、`--private`、`--query`、timestamps 和 `--include-archived`；show 接受 `<annotation_id>` 和可选 `--history`。
+  关键参数：List filters 包括 `--target-type`、`--target-id`、`--author`、`--created-by`、`--private`、`--query`、timestamps 和 `--include-archived`；show 接受 `<annotation_id>` 和可选 `--history`。使用 `--target-type none` 可查找 targetless notes。
   输出用途：捕获 prior guidance、known issues，以及挂在 experiments、runs、artifacts 上的 rationale。
 - **`annotate add/edit/archive/unarchive`**：添加或维护 worker-visible notes。
-  关键参数：`add` 需要 `--target <target>` 和 `--body`/`--body-file` 二选一；可选 `--author`、`--private`。`edit` 需要 `<annotation_id>` 和一个 body input。Archive/unarchive 需要 `<annotation_id>`。
-  输出用途：给后续 workers 留下有用证据，不改变 project configuration。常用 targets 包括 `exp:<exp_id>`、`run:<run_id>`、`artifact:<artifact_id>`、`path:<repo_path>`、`lines:<repo_path>:<start>-<end>`、`path:<exp_id>@<commitish>:<repo_path>` 和 `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`。在 experiment context 中，path/line shorthand 要求 clean worktree。
+  关键参数：`add` 接受可选 `--target <target>` 和 `--body`/`--body-file` 二选一；targetless notes 必须提供 `--title <title>`，并绑定当前 experiment。Targeted notes 也可使用 `--title`。可选 `--author`、`--private`。`edit` 需要 `<annotation_id>` 和一个 body input。Archive/unarchive 需要 `<annotation_id>`。
+  输出用途：给后续 workers 留下有用证据，不改变 project configuration。常用 targets 包括 `exp:<exp_id>`、`run:<run_id>`、`artifact:<artifact_id>`、`path:<repo_path>`、`lines:<repo_path>:<start>-<end>`、`path:<exp_id>@<commitish>:<repo_path>` 和 `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`。如果 note 不绑定单个 object 或 path，可省略 `--target` 并提供 `--title`，作为当前 experiment note。在 experiment context 中，path/line shorthand 要求 clean worktree。Worker role 不要使用 admin/root-only 的 `--exp`。
 
 ## 工作流程
 

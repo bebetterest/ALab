@@ -74,7 +74,7 @@ Field rules:
 - `project.allow_public_exp_create` defaults to `true`.
 - Project, source, and experiment display names are limited to 120 bytes after UTF-8 encoding.
 - Names are unique within scope by normalized slug, not exact string.
-- Task, goal, summary, feedback, and annotation body values are each limited to 65536 bytes after UTF-8 encoding.
+- Task, goal, summary, feedback, and annotation body values are each limited to 65536 bytes after UTF-8 encoding. Annotation titles are limited to 256 bytes after UTF-8 encoding.
 - A project may contain many source records. Stored canonical project configs contain one `source.default_source_ref`, and it must resolve to an active source before new experiments are created.
 - Each experiment binds exactly one source at creation. If `exp create` does not select a source or `--from-exp`, ALab uses the active config's `source.default_source_ref`.
 - Project init input configs may omit `source.default_source_ref` when the init command supplies exactly one effective default source origin. ALab stages that source first, injects its canonical `alab/source/<source_id>` ref into the stored config, and then validates the full canonical config.

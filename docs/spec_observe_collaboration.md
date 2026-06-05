@@ -96,7 +96,7 @@ Search:
 
 - V1 uses plaintext local records and scans SQLite/file-backed records in process.
 - `--query` is case-insensitive substring matching.
-- Search corpus includes project/experiment names and goals, task text visible to the caller, tags, final summaries, feedback, and latest annotation bodies.
+- Search corpus includes project/experiment names and goals, task text visible to the caller, tags, final summaries, feedback, latest annotation titles, and latest annotation bodies.
 - Search does not scan run stdout/stderr logs, hidden logs, artifact bytes, or historical annotation revisions in V1.
 
 Pagination:
@@ -117,7 +117,7 @@ Sorting:
 - Run list sort fields: `started`, `ended`, `reward`, `status`, `config-version`, `exit-code`.
 - Artifact list sort fields: `created`, `path`, `size`, `status`, `content-hash`.
 - Log list sort fields: `created`, `stream`, `size`, `stored-bytes`, `hidden`, `truncated`.
-- Annotation list sort fields: `created`, `updated`, `target-type`, `target-id`, `status`, `created-by`.
+- Annotation list sort fields: `created`, `updated`, `title`, `target-type`, `target-id`, `status`, `created-by`.
 - Rows with nullable sort values are always placed after rows with concrete values.
 
 ## 4. Filters
@@ -304,7 +304,7 @@ Rules:
 Commands:
 
 ```text
-alab annotate add --target <target> --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]
+alab annotate add [--target <target>] [--exp <exp_id>] [--title <title>] --body <text>|--body-file <path> [--author <label>] [--private] [--private-to-exp <exp_id>]
 alab annotate edit <annotation_id> --body <text>|--body-file <path> [--author <label>]
 alab annotate archive <annotation_id>
 alab annotate unarchive <annotation_id>
@@ -324,6 +324,14 @@ lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>
 path:<repo_path>
 lines:<repo_path>:<start>-<end>
 ```
+
+Targetless notes:
+
+- Omitting `--target` creates a targetless annotation bound to one concrete experiment id.
+- In an experiment worktree, a targetless annotation binds to the current experiment.
+- In root/admin project context, targetless annotation creation requires `--exp <exp_id>`.
+- Targetless annotations require `--title`; targeted annotations may also include `--title`.
+- Stored targetless annotations use `target_type = none`, empty `target_id`, and the bound experiment id in `annotations.target_json`.
 
 Commitish:
 
@@ -347,6 +355,7 @@ Path and line rules:
 Visibility:
 
 - Annotation can target visible records.
+- Targetless annotations are visible according to their bound experiment and annotation visibility.
 - Annotation defaults to project visibility.
 - Annotation visibility never expands target visibility. A caller can see a project-visible annotation only when the caller can also see the target record under the normal visibility rules.
 - `--private` restricts visibility to the creating experiment and root/admin, even when the target belongs to another visible experiment.
@@ -357,13 +366,17 @@ Visibility:
 - Inspection tokens cannot add or edit annotations.
 - Validation-owned artifact rows do not carry an experiment id and are rejected as annotation targets with `CONFIG_INVALID`; use an experiment/path/line target or a run-owned artifact target when the annotation must bind to a concrete experiment.
 
-Body input:
+Title and body input:
 
 - Annotation bodies are UTF-8 text.
+- Annotation titles are UTF-8 text, trimmed before storage, non-empty when provided, and limited to 256 bytes after encoding.
 - Body is limited to 65536 bytes after encoding.
 - Body input accepts exactly one of direct text or file input.
 - V1 does not support `--body-stdin`.
+- Targetless annotation creation fails with `CONFIG_INVALID` when `--title` is missing or blank.
+- `--target ""` is invalid; targetless annotations omit `--target` entirely.
 - Annotation bodies must not contain exact active `secret_env` values for the authoring experiment's bound config version. If an exact secret value is found, creation or edit fails without storing a revision.
+- Annotation titles must not contain exact active `secret_env` values for the authoring experiment's bound config version.
 - When root/admin creates or edits an annotation from project context, the authoring secret check uses the target experiment's bound config version. Targets that do not resolve to exactly one experiment are rejected with `CONFIG_INVALID` before body storage and must be rewritten to a target with a concrete experiment identity; root/admin can then use `--private-to-exp <exp_id>` when experiment-private visibility is needed.
 
 Revision and archive:
