@@ -230,10 +230,10 @@ Project behavior 由 TOML config 控制：
 ## Examples
 
 参见 [examples](examples/) 中的 runnable example matrix。当前 examples 覆盖
-local scoring loop、带 artifact export 的 Dockerized 诊所订单履约计划器、Harbor
-hidden-verifier incident classifier、协作式 incident triage lifecycle workflow，
-生成式 dashboard showcase home，以及 SkyDiscover circle-packing Codex
-single-worker protocol。同一区域还包含
+带 manual review 的 free-evaluation 静态介绍站、local scoring loop、带 artifact
+export 的 Dockerized 诊所订单履约计划器、Harbor hidden-verifier incident
+classifier、协作式 incident triage lifecycle workflow，生成式 dashboard
+showcase home，以及 SkyDiscover circle-packing Codex single-worker protocol。同一区域还包含
 `examples/templates/`，这是可复制的 multi-instance TSP template library，覆盖
 local、Docker、Harbor、SkyDiscover Python 和 SkyDiscover Docker runner
 projects。
@@ -305,6 +305,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 │   ├── collaboration_observe_lifecycle/
 │   ├── dashboard_showcase/
 │   ├── docker_file_reward_artifacts/
+│   ├── free_evaluation_intro_site/
 │   ├── harbor_verifier_minimal/
 │   ├── local_agent_scoreboard/
 │   ├── skydiscover_circle_packing_codex/

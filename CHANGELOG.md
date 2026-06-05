@@ -5,6 +5,12 @@ All notable ALab changes are recorded here. Keep this file in sync with
 
 ## [Unreleased]
 
+### Added
+
+- Added `examples/free_evaluation_intro_site`, a no-run free evaluation example
+  where workers complete a Chinese static introduction site and submit directly
+  for manual review.
+
 ## [0.1.5] - 2026-06-05
 
 ### Added

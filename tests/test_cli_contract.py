@@ -21326,6 +21326,7 @@ def test_chinese_only_potential_issues_note_is_the_only_markdown_pair_exception(
 def test_examples_matrix_paths_exist_and_document_current_examples() -> None:
     expected_examples = {
         "local_agent_scoreboard",
+        "free_evaluation_intro_site",
         "docker_file_reward_artifacts",
         "harbor_verifier_minimal",
         "collaboration_observe_lifecycle",
@@ -21360,6 +21361,17 @@ def test_examples_matrix_paths_exist_and_document_current_examples() -> None:
 def test_examples_are_task_shaped_demos() -> None:
     required_paths = {
         "local_agent_scoreboard": ["source/solution.py", "prompts/worker.md"],
+        "free_evaluation_intro_site": [
+            "alab.project.toml",
+            "source/index.html",
+            "source/styles.css",
+            "source/script.js",
+            "source/content-notes.md",
+            "source/assets/hero-scene.png",
+            "prompts/worker.md",
+            "scripts/setup_project.sh",
+            "scripts/run_demo.sh",
+        ],
         "docker_file_reward_artifacts": [
             "source/main.py",
             "source/data/orders.json",

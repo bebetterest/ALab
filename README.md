@@ -231,10 +231,11 @@ See [docs/spec_runners_adapters.md](docs/spec_runners_adapters.md), [docs/spec_p
 ## Examples
 
 See [examples](examples/) for the runnable example matrix. The current examples
-cover a local scoring loop, a Dockerized clinic-order fulfillment planner with
-artifact export, a Harbor hidden-verifier incident classifier, a collaborative
-incident triage lifecycle workflow, a generated dashboard showcase home, and
-the SkyDiscover circle-packing Codex single-worker protocol. The same examples area also includes
+cover a free-evaluation static introduction site with manual review, a local
+scoring loop, a Dockerized clinic-order fulfillment planner with artifact
+export, a Harbor hidden-verifier incident classifier, a collaborative incident
+triage lifecycle workflow, a generated dashboard showcase home, and the
+SkyDiscover circle-packing Codex single-worker protocol. The same examples area also includes
 `examples/templates/`, a copyable multi-instance TSP template library for
 local, Docker, Harbor, SkyDiscover Python, and SkyDiscover Docker runner
 projects.
@@ -306,6 +307,7 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 │   ├── collaboration_observe_lifecycle/
 │   ├── dashboard_showcase/
 │   ├── docker_file_reward_artifacts/
+│   ├── free_evaluation_intro_site/
 │   ├── harbor_verifier_minimal/
 │   ├── local_agent_scoreboard/
 │   ├── skydiscover_circle_packing_codex/

@@ -12,6 +12,9 @@ different task shape, runner boundary, and evidence workflow:
 - [local_agent_scoreboard](local_agent_scoreboard/) is the shortest local loop:
   edit one deterministic scorer, parse stdout reward, capture artifacts, and
   submit a result.
+- [free_evaluation_intro_site](free_evaluation_intro_site/) is the open-ended
+  manual-review loop: complete a Chinese static introduction site for a Korean
+  drama and submit without an evaluator run.
 - [docker_file_reward_artifacts](docker_file_reward_artifacts/) is a
   container-only operations task: assign clinic orders to warehouses under
   inventory, priority, cold-chain, and split-shipment constraints, then export
@@ -41,6 +44,7 @@ paths without mutating the example state.
 | Example | Demo task | Runner / adapter | Extra requirements | Main coverage | Commands |
 | --- | --- | --- | --- | --- | --- |
 | [local_agent_scoreboard](local_agent_scoreboard/) | Improve a deterministic scoring candidate and submit the best run. | local | optional Codex CLI | local runner, stdout reward, artifacts, submit, isolated worker launch | `scripts/setup_project.sh`, `scripts/run_manual_demo.sh`, `scripts/run_codex_worker.sh` |
+| [free_evaluation_intro_site](free_evaluation_intro_site/) | Complete a Simplified Chinese static introduction site for `모두가 자신의 무가치함과 싸우고 있다`. | none / free evaluation | none beyond ALab dev env | no evaluator, `not_required` validation, direct submit, manual review | `scripts/setup_project.sh`, `scripts/run_demo.sh` |
 | [docker_file_reward_artifacts](docker_file_reward_artifacts/) | Build a containerized clinic-order fulfillment planner over inventory and cold-chain constraints. | Docker | Docker daemon | Dockerfile runner, file reward, manifest/summary artifacts, artifact export | `scripts/setup_project.sh`, `scripts/run_demo.sh` |
 | [harbor_verifier_minimal](harbor_verifier_minimal/) | Improve an incident-ticket urgency classifier scored by hidden Harbor verifier cases. | Harbor | Docker daemon | Harbor source import, private verifier assets, hidden verifier logs, Harbor reward | `scripts/setup_project.sh`, `scripts/run_demo.sh` |
 | [collaboration_observe_lifecycle](collaboration_observe_lifecycle/) | Coordinate two public incident-triage experiments and continue from the best run. | local | none beyond ALab dev env | public create, from-exp best, tags, annotations, inspection, remove dry-run | `scripts/setup_project.sh`, `scripts/run_demo.sh` |
@@ -50,7 +54,8 @@ paths without mutating the example state.
 
 ## Suggested Path
 
-Start with `local_agent_scoreboard` to see the basic project/run/submit loop.
+Start with `free_evaluation_intro_site` when you want to see the no-run manual
+review path. Use `local_agent_scoreboard` for the basic project/run/submit loop.
 Then use `collaboration_observe_lifecycle` to understand experiment lineage and
 observe commands. Use `dashboard_showcase` when you want a populated local home
 for browser dashboard inspection. Use `docker_file_reward_artifacts` and

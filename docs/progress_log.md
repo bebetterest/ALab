@@ -8192,3 +8192,21 @@ Validation:
 - `git diff --check`
 - Sandbox full default suite `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv --no-config run --locked pytest -q` failed only on dashboard loopback bind `PermissionError` in `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` and `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`.
 - Elevated full default suite with loopback socket access: `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv --no-config run --locked pytest -q`
+
+## 2026-06-05 Free Evaluation Intro Site Example
+
+Implemented:
+
+- Added `examples/free_evaluation_intro_site/` as a runnable free evaluation example with `runner.type = "none"` and `reward.type = "none"`.
+- Added a no-run manual-review task for completing a Simplified Chinese static introduction website for `모두가 자신의 무가치함과 싸우고 있다`.
+- Added starter site source, content notes, worker prompt, setup/demo scripts, and synchronized English/Chinese example README files.
+- Updated the examples matrix, root README/README_cn examples summary and repository tree, changelogs, focused example contract tests, progress dashboard, pipeline, closed guardrails, and completion audit.
+
+Validation:
+
+- Script syntax: `bash -n examples/free_evaluation_intro_site/scripts/setup_project.sh examples/free_evaluation_intro_site/scripts/run_demo.sh`
+- Dry runs: `examples/free_evaluation_intro_site/scripts/setup_project.sh --dry-run` and `examples/free_evaluation_intro_site/scripts/run_demo.sh --dry-run`
+- Local example setup: `ALAB_BIN='/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m alab' examples/free_evaluation_intro_site/scripts/setup_project.sh --reset`, which rendered `validation status: not_required`.
+- Local example demo: `examples/free_evaluation_intro_site/scripts/run_demo.sh`, which submitted directly with `final run id: none`, `best run id: none`, and no evaluator run.
+- Focused examples/docs contract checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing`
+- `git diff --check`

@@ -1,0 +1,29 @@
+schema_version = 1
+
+[project]
+name = "Free Evaluation Intro Site"
+task = "Complete a Chinese introduction website for the JTBC drama '모두가 자신의 무가치함과 싸우고 있다' without an automated evaluator."
+goal = "Demonstrate free evaluation mode for open-ended writing, design, and source-quality review tasks that need human judgment instead of numeric rewards."
+allow_public_exp_create = true
+
+[public_source_import]
+enabled = true
+max_files = 50
+max_total_bytes = 1000000
+max_file_bytes = 300000
+
+[mutable]
+include = ["index.html", "styles.css", "script.js", "content-notes.md", "assets/**"]
+
+[visibility]
+scope = "same_project"
+
+[runner]
+type = "none"
+
+[reward]
+type = "none"
+
+[git]
+author_name = "ALab Free Evaluation Example"
+author_email = "alab-free-evaluation-example@local"

@@ -8186,3 +8186,21 @@ Validation:
 - `git diff --check`
 - Sandbox full default suite `UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv --no-config run --locked pytest -q` 仅因 dashboard loopback bind `PermissionError` 失败，失败用例为 `tests/test_dashboard.py::test_dashboard_command_is_root_only_and_validates_options` 和 `tests/test_dashboard.py::test_dashboard_http_api_is_token_guarded_read_only_and_serves_content`。
 - Elevated full default suite with loopback socket access：`UV_CACHE_DIR=/private/tmp/alab-uv-cache PYTHONPYCACHEPREFIX=/private/tmp/alab-pycache uv --no-config run --locked pytest -q`
+
+## 2026-06-05 Free Evaluation Intro Site Example
+
+已实现：
+
+- 新增 `examples/free_evaluation_intro_site/` 作为 runnable free evaluation example，配置为 `runner.type = "none"` 与 `reward.type = "none"`。
+- 新增 no-run manual-review task：完成 `모두가 자신의 무가치함과 싸우고 있다` 的简体中文静态介绍网站。
+- 新增 starter site source、content notes、worker prompt、setup/demo scripts，以及同步的中英文 example README。
+- 更新 examples matrix、root README/README_cn examples summary 和 repository tree、changelogs、focused example contract tests、progress dashboard、pipeline、closed guardrails 和 completion audit。
+
+验证：
+
+- Script syntax：`bash -n examples/free_evaluation_intro_site/scripts/setup_project.sh examples/free_evaluation_intro_site/scripts/run_demo.sh`
+- Dry runs：`examples/free_evaluation_intro_site/scripts/setup_project.sh --dry-run` 和 `examples/free_evaluation_intro_site/scripts/run_demo.sh --dry-run`
+- Local example setup：`ALAB_BIN='/Users/hobeter/Desktop/code/ALab/.venv/bin/python -m alab' examples/free_evaluation_intro_site/scripts/setup_project.sh --reset`，输出 `validation status: not_required`。
+- Local example demo：`examples/free_evaluation_intro_site/scripts/run_demo.sh`，direct submit 输出 `final run id: none`、`best run id: none`，且没有 evaluator run。
+- Focused examples/docs contract checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing`
+- `git diff --check`

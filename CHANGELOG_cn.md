@@ -5,6 +5,11 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 
 ## [Unreleased]
 
+### 新增
+
+- 新增 `examples/free_evaluation_intro_site` no-run free evaluation 示例：
+  worker 完成中文静态介绍站后直接 submit，由人工 review。
+
 ## [0.1.5] - 2026-06-05
 
 ### 新增

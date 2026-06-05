@@ -10,6 +10,8 @@
 
 - [local_agent_scoreboard](local_agent_scoreboard/) 是最短 local loop：修改一个
   deterministic scorer，解析 stdout reward，捕获 artifacts，并提交结果。
+- [free_evaluation_intro_site](free_evaluation_intro_site/) 是开放式 manual-review
+  loop：完成一个韩剧中文静态介绍站，不运行 evaluator，直接 submit。
 - [docker_file_reward_artifacts](docker_file_reward_artifacts/) 是 container-only
   operations task：在 inventory、priority、cold-chain 和 split-shipment 约束下把
   诊所订单分配给仓库，然后导出 captured artifacts。
@@ -37,6 +39,7 @@
 | 示例 | Demo 任务 | Runner / adapter | 额外要求 | 主要覆盖 | 命令 |
 | --- | --- | --- | --- | --- | --- |
 | [local_agent_scoreboard](local_agent_scoreboard/) | 改进一个确定性评分 candidate，并提交最佳 run。 | local | 可选 Codex CLI | local runner、stdout reward、artifacts、submit、隔离 worker launch | `scripts/setup_project.sh`、`scripts/run_manual_demo.sh`、`scripts/run_codex_worker.sh` |
+| [free_evaluation_intro_site](free_evaluation_intro_site/) | 为 `모두가 자신의 무가치함과 싸우고 있다` 完成一个简体中文静态介绍站。 | none / free evaluation | ALab dev env 之外无额外要求 | 无 evaluator、`not_required` validation、direct submit、manual review | `scripts/setup_project.sh`、`scripts/run_demo.sh` |
 | [docker_file_reward_artifacts](docker_file_reward_artifacts/) | 基于库存、冷链和优先级约束构建容器化诊所订单履约计划器。 | Docker | Docker daemon | Dockerfile runner、file reward、manifest/summary artifacts、artifact export | `scripts/setup_project.sh`、`scripts/run_demo.sh` |
 | [harbor_verifier_minimal](harbor_verifier_minimal/) | 改进 incident-ticket urgency classifier，由 Harbor hidden verifier cases 评分。 | Harbor | Docker daemon | Harbor source import、private verifier assets、hidden verifier logs、Harbor reward | `scripts/setup_project.sh`、`scripts/run_demo.sh` |
 | [collaboration_observe_lifecycle](collaboration_observe_lifecycle/) | 协调两个 public incident-triage experiments，并从最佳 run 继续。 | local | ALab dev env 之外无额外要求 | public create、from-exp best、tags、annotations、inspection、remove dry-run | `scripts/setup_project.sh`、`scripts/run_demo.sh` |
@@ -46,7 +49,8 @@
 
 ## 建议阅读路径
 
-先从 `local_agent_scoreboard` 理解基本 project/run/submit loop。然后看
+想先看 no-run manual review path 时，从 `free_evaluation_intro_site` 开始。再用
+`local_agent_scoreboard` 理解基本 project/run/submit loop。然后看
 `collaboration_observe_lifecycle` 理解 experiment lineage 和 observe commands。
 如果想用浏览器查看一个已填充的 local home，可以使用 `dashboard_showcase`。需要验证
 runner/verifier 边界时，再看 `docker_file_reward_artifacts` 和
