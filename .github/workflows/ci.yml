@@ -90,6 +90,10 @@ jobs:
         include:
           - name: cli-contract
             pytest_args: tests/test_cli_contract.py
+          - name: cli-user-scenarios
+            pytest_args: tests/test_cli_user_scenarios.py
+          - name: dashboard
+            pytest_args: tests/test_dashboard.py
           - name: smoke
             pytest_args: tests/test_smoke.py
           - name: runners

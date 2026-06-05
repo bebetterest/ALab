@@ -462,6 +462,7 @@ _COMPLETION_AUDIT_CN_PATH = _REPO_ROOT / "docs" / "completion_audit_cn.md"
 _README_PATH = _REPO_ROOT / "README.md"
 _README_CN_PATH = _REPO_ROOT / "README_cn.md"
 _PYPROJECT_PATH = _REPO_ROOT / "pyproject.toml"
+_CI_WORKFLOW_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _GITIGNORE_PATH = _REPO_ROOT / ".gitignore"
 _ENV_EXAMPLE_PATH = _REPO_ROOT / ".env.example"
 _TESTS_ROOT = _REPO_ROOT / "tests"
@@ -1214,6 +1215,14 @@ def _declared_pytest_markers() -> list[str]:
 def _readme_pytest_marker_commands(readme_path: Path) -> list[str]:
     text = readme_path.read_text(encoding="utf-8")
     return re.findall(r"\buv run pytest -m ([a-z][a-z0-9_]*)\b", text)
+
+
+def _ci_default_pytest_files() -> list[str]:
+    text = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    files: list[str] = []
+    for args in re.findall(r"^\s*pytest_args:\s*(.+)$", text, re.MULTILINE):
+        files.extend(token for token in args.split() if re.fullmatch(r"tests/test_[A-Za-z0-9_]+\.py", token))
+    return files
 
 
 def _readme_environment_assignment_names(readme_path: Path) -> set[str]:
@@ -21289,6 +21298,14 @@ def test_readme_opt_in_pytest_marker_commands_follow_pyproject_and_tests() -> No
     assert readme_cn_markers == declared_markers
     assert len(declared_markers) == len(set(declared_markers))
     assert sorted(used_markers) == sorted(declared_markers)
+
+
+def test_default_ci_pytest_matrix_lists_all_test_files_once() -> None:
+    test_files = sorted(path.relative_to(_REPO_ROOT).as_posix() for path in _TESTS_ROOT.glob("test_*.py"))
+    ci_files = _ci_default_pytest_files()
+
+    assert sorted(ci_files) == test_files
+    assert len(ci_files) == len(set(ci_files))
 
 
 def test_root_and_docs_markdown_files_have_synchronized_chinese_pairs() -> None:

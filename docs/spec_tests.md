@@ -53,6 +53,7 @@ Add golden tests for every command's:
 - Object-specific not-found codes for run, validation, artifact, log, annotation, credential, audit, catalog, and cache selectors.
 - `ALAB_DEBUG=1` stack trace behavior for internal errors without locals/env/secrets/hidden contents.
 - README and README_cn opt-in pytest marker commands must stay synchronized with `pyproject.toml` pytest marker declarations and actual marker use under `tests/`.
+- The default GitHub Actions pytest matrix must list every `tests/test_*.py` file exactly once so local default pytest coverage and PR/push CI coverage stay aligned.
 - Every Markdown file in the repository root and `docs/` must keep a synchronized Chinese `*_cn.md` pair, and every `*_cn.md` file in those locations must have an English source file.
 - README and README_cn repository structure trees must stay synchronized and every listed path must exist.
 - `.gitignore` must keep local agent notes (`AGENTS*.md`, `CORE*.md`) and real environment files (`.env`, `.env.*`) ignored while keeping `.env.example` trackable.
@@ -137,6 +138,7 @@ This layer covers realistic multi-command journeys, not every parser edge:
 - Experiment-worker workflows, including public experiment creation, context help/status, run success and saved failure, logs/artifacts, tags, annotations, final submit, and free-evaluation direct submit.
 - Collaboration/observer workflows, including multi-experiment visibility, observe aliases, inspection checkout, hidden-log token rejection, and experiment report export.
 - Lifecycle/recovery workflows, including archive/unarchive/remove dry-runs, force-confirm paths, worktree remove/restore, token list/revoke/regenerate, stale lock clearing, and object remove dry-runs.
+- Misuse/boundary workflows, including wrong and revoked credentials/tokens, ambient key non-expansion, output overwrite guards, unsupported and duplicate options, missing input paths, secret redaction, and dirty-worktree rejection.
 - A short subprocess smoke that runs `sys.executable -m alab` with checkout-local `PYTHONPATH=src`, proving the module entrypoint works outside direct in-process `cli.run()` calls.
 
 The scenario layer is part of the default local suite. It must stay deterministic and must not require network access, a real Docker daemon, live SkyDiscover catalogs, or external services. Real Docker and real SkyDiscover gates remain opt-in marker tests.

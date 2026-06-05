@@ -50,6 +50,7 @@
 - 空的 ambient `ALAB_KEY` 与未设置 key 等价，不能把 missing-credential failures 变成 `AUTH_DENIED`。
 - `ALAB_DEBUG=1` 对 internal errors 打印 stack trace，但不打印 locals/env/secrets/hidden contents。
 - README 和 README_cn 中的 opt-in pytest marker commands 必须与 `pyproject.toml` pytest marker declarations 以及 `tests/` 下的实际 marker use 同步。
+- Default GitHub Actions pytest matrix 必须精确列出每个 `tests/test_*.py` file 一次，确保 local default pytest coverage 与 PR/push CI coverage 保持一致。
 - Repository root 和 `docs/` 中的每个 Markdown file 都必须保持同步的中文 `*_cn.md` pair，并且这些位置的每个 `*_cn.md` file 都必须有英文 source file。
 - README 和 README_cn 的 repository structure trees 必须保持同步，并且每个列出的 path 都必须存在。
 - `.gitignore` 必须保持 local agent notes（`AGENTS*.md`、`CORE*.md`）和真实 environment files（`.env`、`.env.*`）被忽略，同时保持 `.env.example` 可被跟踪。
@@ -134,6 +135,7 @@ Dashboard security cases：
 - Experiment-worker workflows，包括 public experiment creation、context help/status、run success 和 saved failure、logs/artifacts、tags、annotations、final submit，以及 free-evaluation direct submit。
 - Collaboration/observer workflows，包括 multi-experiment visibility、observe aliases、inspection checkout、hidden-log token rejection，以及 experiment report export。
 - Lifecycle/recovery workflows，包括 archive/unarchive/remove dry-runs、force-confirm paths、worktree remove/restore、token list/revoke/regenerate、stale lock clearing，以及 object remove dry-runs。
+- Misuse/boundary workflows，包括 wrong 和 revoked credentials/tokens、ambient key non-expansion、output overwrite guards、unsupported 和 duplicate options、missing input paths、secret redaction，以及 dirty-worktree rejection。
 - 一个短 subprocess smoke，通过 checkout-local `PYTHONPATH=src` 运行 `sys.executable -m alab`，证明 module entrypoint 在不直接调用 in-process `cli.run()` 时也可完成 workflow。
 
 Scenario 层属于默认本地测试套件。它必须保持 deterministic，不得要求 network access、real Docker daemon、live SkyDiscover catalogs 或 external services。Real Docker 和 real SkyDiscover gates 继续保留为 opt-in marker tests。

@@ -145,6 +145,23 @@ SCENARIO_COMMANDS: dict[str, set[tuple[str, ...]]] = {
         ("artifacts", "remove"),
         ("logs", "remove"),
     },
+    "misuse_boundaries": {
+        ("auth", "root", "regenerate"),
+        ("cache", "prune"),
+        ("key", "list"),
+        ("project", "init"),
+        ("project", "config", "show"),
+        ("project", "config", "export"),
+        ("project", "secret", "set"),
+        ("project", "secret", "list"),
+        ("source", "import"),
+        ("exp", "create"),
+        ("exp", "token", "regenerate"),
+        ("run",),
+        ("logs", "export"),
+        ("annotate", "add"),
+        ("status",),
+    },
 }
 
 
@@ -196,6 +213,21 @@ def _field(output: str, name: str) -> str:
     match = re.search(rf"^{re.escape(name)}: (.+)$", output, re.MULTILINE)
     assert match, output
     return match.group(1)
+
+
+def _assert_error(output: str, error_code: str, *reasons: str, absent: tuple[str, ...] = ()) -> None:
+    assert "object: error" in output
+    assert f"error code: {error_code}" in output
+    for reason in reasons:
+        assert reason in output
+    for value in absent:
+        assert value not in output
+
+
+def _table_count(home: Path, table: str) -> int:
+    assert re.fullmatch(r"[a-z_]+", table), table
+    with sqlite3.connect(home / "alab.db") as conn:
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
 
 
 def _git(args: list[str], cwd: Path) -> str:
@@ -1401,6 +1433,284 @@ def test_lifecycle_and_recovery_user_journey(tmp_path: Path, capsys) -> None:
     )
 
     _assert_recorded(scenario, "lifecycle_recovery")
+
+
+def test_misuse_and_boundary_user_journey(tmp_path: Path, monkeypatch, capsys) -> None:
+    scenario = Scenario(capsys)
+    home = tmp_path / "home"
+    root_key = _init_home(scenario, home)
+    project_id, admin_key, _source_id, _validation_id = _init_local_project(
+        scenario, tmp_path, home, root_key, name="Boundary Scenario"
+    )
+
+    public_status, _err = scenario.run(["--home", str(home), "status", "--project", project_id])
+    with monkeypatch.context() as ambient_context:
+        ambient_context.setenv("ALAB_KEY", admin_key)
+        ambient_status, _err = scenario.run(["--home", str(home), "status", "--project", project_id])
+    assert ambient_status == public_status
+
+    bad_key = "not-a-valid-key"
+    out, err = scenario.run(["--home", str(home), "--key", bad_key, "key", "list", "--root"], code=3)
+    assert out == ""
+    _assert_error(err, "AUTH_DENIED", "invalid credential", absent=(bad_key,))
+
+    out, _err = scenario.run(["--home", str(home), "--key", root_key, "auth", "root", "regenerate"])
+    old_root_key = root_key
+    root_key = _field(out, "root key")
+    out, err = scenario.run(
+        ["--home", str(home), "--key", old_root_key, "cache", "prune", "--all"],
+        code=3,
+    )
+    assert out == ""
+    _assert_error(err, "AUTH_DENIED", "invalid credential", absent=(old_root_key, root_key))
+
+    boundary_worktree = tmp_path / "boundary-exp"
+    out, _err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "exp",
+            "create",
+            "--project",
+            project_id,
+            "--name",
+            "boundary",
+            "--path",
+            str(boundary_worktree),
+        ]
+    )
+    exp_id = _field(out, "exp id")
+    token_path = Path(_field(out, "token path"))
+    old_token = token_path.read_text(encoding="utf-8").strip()
+    token_status, _err = scenario.run(["--home", str(home), "status"], cwd=boundary_worktree)
+    with monkeypatch.context() as ambient_context:
+        ambient_context.setenv("ALAB_KEY", root_key)
+        ambient_token_status, _err = scenario.run(["--home", str(home), "status"], cwd=boundary_worktree)
+    assert ambient_token_status == token_status
+
+    out, _err = scenario.run(
+        ["--home", str(home), "--key", admin_key, "exp", "token", "regenerate", exp_id, "--project", project_id]
+    )
+    new_token = Path(_field(out, "token path")).read_text(encoding="utf-8").strip()
+    assert new_token != old_token
+    out, err = scenario.run(["--home", str(home), "--key", old_token, "status", "--project", project_id], code=3)
+    assert out == ""
+    _assert_error(err, "AUTH_DENIED", "invalid credential", absent=(old_token, new_token))
+
+    out, _err = scenario.run(["--home", str(home), "run", "--message", "boundary run"], cwd=boundary_worktree)
+    run_id = _field(out, "run id")
+    log_id = _stdout_log_id_for_run(home, run_id)
+
+    export_path = tmp_path / "existing-config.toml"
+    export_path.write_text("preserve this config\n", encoding="utf-8")
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "project",
+            "config",
+            "export",
+            "--project",
+            project_id,
+            "--out",
+            str(export_path),
+        ],
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "OUTPUT_EXISTS", "output path already exists")
+    assert export_path.read_text(encoding="utf-8") == "preserve this config\n"
+    scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "project",
+            "config",
+            "export",
+            "--project",
+            project_id,
+            "--out",
+            str(export_path),
+            "--overwrite",
+        ]
+    )
+    assert "preserve this config" not in export_path.read_text(encoding="utf-8")
+
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "project",
+            "config",
+            "show",
+            "--project",
+            project_id,
+            "--reason",
+            "ignored",
+        ],
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "CONFIG_INVALID", "unsupported option --reason")
+
+    missing_value_a = tmp_path / "missing-secret-a.txt"
+    missing_value_b = tmp_path / "missing-secret-b.txt"
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "project",
+            "secret",
+            "set",
+            "BOUNDARY_TOKEN",
+            "--project",
+            project_id,
+            "--value-file",
+            str(missing_value_a),
+            "--value-file",
+            str(missing_value_b),
+        ],
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "CONFIG_INVALID", "--value-file may be provided once")
+    assert not missing_value_a.exists()
+    assert not missing_value_b.exists()
+
+    secret_file = tmp_path / "boundary-secret.txt"
+    secret_file.write_text("boundary-secret-value\n", encoding="utf-8")
+    scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "project",
+            "secret",
+            "set",
+            "BOUNDARY_TOKEN",
+            "--project",
+            project_id,
+            "--value-file",
+            str(secret_file),
+            "--skip-baseline-test",
+        ]
+    )
+    out, _err = scenario.run(
+        ["--home", str(home), "--key", admin_key, "project", "secret", "list", "--project", project_id]
+    )
+    assert "BOUNDARY_TOKEN" in out
+    assert "boundary-secret-value" not in out
+
+    missing_config = tmp_path / "missing-boundary-config.toml"
+    missing_source = tmp_path / "missing-boundary-source"
+    project_count_before = _table_count(home, "projects")
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            root_key,
+            "project",
+            "init",
+            "local",
+            "--config",
+            str(missing_config),
+            "--source-path",
+            str(boundary_worktree),
+        ],
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "CONFIG_INVALID", "config file not found")
+    assert _table_count(home, "projects") == project_count_before
+
+    valid_config = tmp_path / "missing-source-boundary.toml"
+    _write_local_config(valid_config, name="Missing Source Boundary")
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            root_key,
+            "project",
+            "init",
+            "local",
+            "--config",
+            str(valid_config),
+            "--source-path",
+            str(missing_source),
+        ],
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "SOURCE_INVALID", "source path not found")
+    assert _table_count(home, "projects") == project_count_before
+
+    source_count_before = _table_count(home, "sources")
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "source",
+            "import",
+            "--project",
+            project_id,
+            "--source-path",
+            str(missing_source),
+        ],
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "SOURCE_INVALID", "source path not found")
+    assert _table_count(home, "sources") == source_count_before
+
+    existing_log_export = tmp_path / "existing-log.txt"
+    existing_log_export.write_text("preserve log\n", encoding="utf-8")
+    out, err = scenario.run(
+        ["--home", str(home), "logs", "export", log_id, "--out", str(existing_log_export)],
+        cwd=boundary_worktree,
+        code=2,
+    )
+    assert out == ""
+    _assert_error(err, "OUTPUT_EXISTS", "output path already exists")
+    assert existing_log_export.read_text(encoding="utf-8") == "preserve log\n"
+
+    annotations_before = _table_count(home, "annotations")
+    (boundary_worktree / "main.py").write_text("print('dirty boundary')\n", encoding="utf-8")
+    out, err = scenario.run(
+        [
+            "--home",
+            str(home),
+            "--key",
+            admin_key,
+            "annotate",
+            "add",
+            "--project",
+            project_id,
+            "--target",
+            "path:main.py",
+            "--body",
+            "dirty shorthand should not bind",
+        ],
+        cwd=boundary_worktree,
+        code=4,
+    )
+    assert out == ""
+    _assert_error(err, "GIT_STATE_INVALID", "path/line annotation shorthand requires a clean experiment worktree")
+    assert _table_count(home, "annotations") == annotations_before
+
+    _assert_recorded(scenario, "misuse_boundaries")
 
 
 def test_cli_subprocess_short_local_workflow(tmp_path: Path) -> None:
