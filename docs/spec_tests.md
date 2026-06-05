@@ -126,6 +126,23 @@ Dashboard security cases:
 - Dashboard list APIs return bounded pages with `page` metadata; invalid pagination values fail; the static frontend must not fetch every project detail to build global log/artifact views.
 - Static assets avoid inline event handlers and remain compatible with the dashboard CSP.
 
+## 1.1 CLI User Scenario Tests
+
+In addition to command-contract and golden-output tests, ALab must keep a real-user CLI scenario layer in `tests/test_cli_user_scenarios.py`.
+
+This layer covers realistic multi-command journeys, not every parser edge:
+
+- First-time root/global admin workflows, including home setup, global config, feedback, audit, backup/cache maintenance, catalog lifecycle, and dashboard access guards.
+- Project-controller workflows, including project creation, project config/env/secret changes, validation, source lifecycle, key lifecycle, status, and report export.
+- Experiment-worker workflows, including public experiment creation, context help/status, run success and saved failure, logs/artifacts, tags, annotations, final submit, and free-evaluation direct submit.
+- Collaboration/observer workflows, including multi-experiment visibility, observe aliases, inspection checkout, hidden-log token rejection, and experiment report export.
+- Lifecycle/recovery workflows, including archive/unarchive/remove dry-runs, force-confirm paths, worktree remove/restore, token list/revoke/regenerate, stale lock clearing, and object remove dry-runs.
+- A short subprocess smoke that runs `sys.executable -m alab` with checkout-local `PYTHONPATH=src`, proving the module entrypoint works outside direct in-process `cli.run()` calls.
+
+The scenario layer is part of the default local suite. It must stay deterministic and must not require network access, a real Docker daemon, live SkyDiscover catalogs, or external services. Real Docker and real SkyDiscover gates remain opt-in marker tests.
+
+`tests/test_cli_user_scenarios.py` owns a command coverage manifest keyed by registered `registry.COMMANDS` paths. When a CLI command, alias, flag, output field, token/key boundary, visibility rule, runner behavior, or lifecycle semantic changes, update the relevant scenario and coverage manifest in the same change. Contract-only coverage in `tests/test_cli_contract.py` does not replace this real-user scenario coverage.
+
 ## 2. Storage And Migration Tests
 
 Cover:

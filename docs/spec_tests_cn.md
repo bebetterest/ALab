@@ -123,6 +123,23 @@ Dashboard security cases：
 - Dashboard list APIs 返回有界 page 和 `page` metadata；invalid pagination values 会失败；static frontend 构建 global log/artifact views 时不得 fetch every project detail。
 - Static assets 避免 inline event handlers，并保持 dashboard CSP-compatible。
 
+## 1.1 CLI User Scenario Tests
+
+除 command-contract 和 golden-output tests 外，ALab 必须在 `tests/test_cli_user_scenarios.py` 保留一层真实用户 CLI 场景测试。
+
+这一层覆盖真实的多命令旅程，而不是每个 parser edge：
+
+- First-time root/global admin workflows，包括 home setup、global config、feedback、audit、backup/cache maintenance、catalog lifecycle，以及 dashboard access guards。
+- Project-controller workflows，包括 project creation、project config/env/secret changes、validation、source lifecycle、key lifecycle、status 和 report export。
+- Experiment-worker workflows，包括 public experiment creation、context help/status、run success 和 saved failure、logs/artifacts、tags、annotations、final submit，以及 free-evaluation direct submit。
+- Collaboration/observer workflows，包括 multi-experiment visibility、observe aliases、inspection checkout、hidden-log token rejection，以及 experiment report export。
+- Lifecycle/recovery workflows，包括 archive/unarchive/remove dry-runs、force-confirm paths、worktree remove/restore、token list/revoke/regenerate、stale lock clearing，以及 object remove dry-runs。
+- 一个短 subprocess smoke，通过 checkout-local `PYTHONPATH=src` 运行 `sys.executable -m alab`，证明 module entrypoint 在不直接调用 in-process `cli.run()` 时也可完成 workflow。
+
+Scenario 层属于默认本地测试套件。它必须保持 deterministic，不得要求 network access、real Docker daemon、live SkyDiscover catalogs 或 external services。Real Docker 和 real SkyDiscover gates 继续保留为 opt-in marker tests。
+
+`tests/test_cli_user_scenarios.py` 拥有基于 registered `registry.COMMANDS` paths 的 command coverage manifest。修改 CLI command、alias、flag、output field、token/key boundary、visibility rule、runner behavior 或 lifecycle semantic 时，必须在同一 change 中更新对应 scenario 和 coverage manifest。`tests/test_cli_contract.py` 的 contract-only coverage 不能替代这一层真实用户场景覆盖。
+
 ## 2. Storage 和 Migration Tests
 
 覆盖：
