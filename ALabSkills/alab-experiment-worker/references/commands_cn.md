@@ -29,9 +29,9 @@ Worker lifecycle 权限有意保持很窄：
 
 - `run` 和 `submit` 需要当前 experiment 的 valid worktree token。
 - Worker session 应优先使用当前 worktree 的 token file。如果显式提供 token，它必须匹配这个 worktree 或 inspection checkout。
-- Observe commands 只显示当前 token 可见的 records。
+- Observe commands 只显示当前 token 可见的 items。
 - `exp checkout` 只能为当前 token 可见的 experiments 创建 inspection checkout。
-- Experiment tags 只是 metadata；它们绝不会扩展 visibility。
+- Experiment tags 只是 labels；它们绝不会扩展 visibility。
 - Hidden logs 需要 root/admin，不属于本 skill。
 - Worker annotation mutation 只限于 visible targets 和由该 worker token 创建的 annotations。
 - Project-level 或 root-required operations 应报告给带 project admin key 的 project-level session 或 root-admin session；不要在 worker session 中请求这些 keys。
@@ -59,13 +59,13 @@ Worker lifecycle 权限有意保持很窄：
   注意点：Standard evaluation projects 需要 supporting passed run，或用 `--rerun` 创建一个。Free evaluation projects 没有 evaluator；省略 `--rerun`，直接 submit，并预期输出 `final run id: none`。
 - **`alab exp checkout`**：在选定 commit 上为一个可见历史 experiment 创建 inspection checkout。
   关键参数：必需 `<exp_id>` 和 `--path <dir>`；可选 `--commit final|latest|best|<sha>`。使用当前 worktree 和其他 ALab contexts 之外的空路径。
-  输出用途：得到一个用于只读比较的 workspace，其中包含可见 prior experiment 的源码。阅读代码以寻找实现思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。记录自己创建的 inspection path，方便 project-level session 后续清理；不要在 inspection checkouts 内编辑。
-- **`alab exp tag add|remove|list`**：为当前 experiment 添加或查看 metadata tags。
+  输出用途：得到一个来自可见 prior experiment 的只读比较 workspace。阅读其中与任务相关的文件来寻找有用思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。记录自己创建的 inspection path，方便 project-level session 后续清理；不要在 inspection checkouts 内编辑。
+- **`alab exp tag add|remove|list`**：为当前 experiment 添加或查看 tags。
   关键参数：`add`/`remove` 需要 `<exp_id> <tag>`；`list` 需要 `<exp_id>`。
   输出用途：当 project-level session 预期 tags 时，标记有用的 worker-local evidence，例如 `promising`、`needs-review` 或任务相关标签。Tags 不是 authorization，也不能替代 submit refs。
 - **`alab report`**：为一个 visible experiment 导出 Markdown report。
   关键参数：必需 `--exp <exp_id> --out <path>`；可选 `--overwrite`。在 worktree context 中，`--project` 通常由 context 提供。
-  输出用途：生成本地 handoff/evidence 文件，包含 safe metadata、runs、submission text，以及可见 artifact/log metadata。Worker report 不包含 hidden logs、raw secrets、tokens 或 artifact bytes。
+  输出用途：生成本地 handoff/evidence 文件，包含 safe details、runs、submission text，以及可见 artifact/log summaries。Worker report 不包含 hidden logs、raw secrets、tokens 或 artifact bytes。
 - **`observe experiments list`**：查看 project 中当前 token 可见的 experiments。
   关键参数：Filters 包括 `--status`、重复 `--tag`、`--source-id`、`--name-query`、reward bounds、config version、timestamps 和 `--include-archived`；pagination 使用 `--limit`/`--offset`；sorting 使用 `--sort <field>:<asc|desc>`。
   输出用途：查找 prior attempts、similar tags、source lineage、closed experiments 和可能的 refs。
@@ -130,9 +130,9 @@ alab observe logs list --exp <exp_id>
 alab observe annotations list --target-type experiment --target-id <exp_id>
 ```
 
-可见历史用于提供证据和灵感，不用于扩展权限。优先参考 high-reward passed runs、有用 warning patterns、清晰 annotations，以及可比较的 task/source lineage。Submit refs 是便于后续 review 和继续优化的 provenance links：如果某个 prior experiment 影响了最终策略、代码、comparison baseline、failure avoidance 或 continuation path，应通过重复 `--ref <exp_id>` 显式引用。
+可见历史用于提供证据和灵感，不用于扩展权限。优先参考 high-reward passed runs、有用 warning patterns、清晰 annotations，以及可比较的 task/source lineage。Submit refs 是便于后续 review 和继续优化的 provenance links：如果某个 prior experiment 影响了最终策略、source changes、comparison baseline、failure avoidance 或 continuation path，应通过重复 `--ref <exp_id>` 显式引用。
 
-当某个可见 experiment 看起来可能有借鉴价值时，直接查看它的代码，不要只依赖 summary：
+当某个可见 experiment 看起来可能有借鉴价值时，查看其中与任务相关的文件，不要只依赖 summary：
 
 ```text
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
@@ -219,7 +219,7 @@ Free evaluation mode 中，应说明没有 evaluator run，且 `final run id` �
 
 Worker 的最终回复应包含：
 
-- 调整过的策略或实现区域；
+- 调整过的策略或 source area；
 - final run id 和 status，或 free evaluation 的 `final run id: none`；
 - 存在时的 reward 与关键 metrics；
 - 使用的 submit refs，或说明为什么是 `ref none`；

@@ -47,22 +47,22 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Revokes the previous root verifier and prints the replacement root key exactly once.
 - **`config show`**: Inspect ALab home-level config and validity.
   Parameters: No required args.
-  Notes: Shows schema version, output format, preview bytes, lock timing, busy timeout, and config validity.
+  Notes: Shows home config values and validity.
 - **`config set`**: Change one ALab home-level setting.
-  Parameters: Required `<field> <toml-literal>`; allowed fields include output, storage timeout, and lock timing fields.
+  Parameters: Required `<field> <toml-literal>`; use `alab help` or `config show` to confirm allowed fields.
   Notes: `output.format` only accepts TOML string `"text"`.
 - **`config reset`**: Reset one home-level setting or all config.
   Parameters: Required `<field>` or `--all`.
   Notes: Use to recover from bad local config values; no root key required.
 - **`config validate`**: Validate home config and optionally refresh runtime capability checks.
   Parameters: Optional `--refresh-capabilities`.
-  Notes: Use before Docker/runner-sensitive work or after environment changes. Unsupported/error capability rows include an actionable `next` remediation and should be refreshed again after the local runtime is fixed.
+  Notes: Use before Docker/runner-sensitive work or after environment changes. Unsupported/error capability results include an actionable `next` remediation and should be refreshed again after the local runtime is fixed.
 - **`feedback`**: Leave HOME-level feedback about ALab operation, docs, environment issues, or bugs.
   Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
-  Notes: Feedback is plaintext under `ALAB_HOME/feedback/` and does not create SQLite audit rows.
-- **`feedback list|show|archive`**: Inspect and archive HOME-level feedback records.
+  Notes: Feedback is local home-level text and does not affect project evidence.
+- **`feedback list|show|archive`**: Inspect and archive HOME-level feedback.
   Parameters: `list` accepts optional `--kind`, `--query`, `--limit`, `--offset`, and `--include-archived`; `show` requires `<feedback_id>`; `archive` requires `<feedback_id>` and optional `--reason <text>`.
-  Notes: Root-only. Archive updates only the feedback `metadata.json`, is idempotent, and does not create SQLite audit rows.
+  Notes: Root-only. Archive is idempotent and does not affect project evidence.
 - **`dashboard`**: Open the root-only local read-only dashboard.
   Parameters: Optional `--port <0-65535>`, `--refresh-seconds <0-3600>`, and `--no-open`.
   Notes: Requires root credential, binds only to `127.0.0.1`, renders a token URL, and blocks until interrupted. Do not share the token URL; the dashboard can read hidden/full logs and artifacts but must not mutate ALab state.
@@ -72,16 +72,16 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`key create`**: Create a project admin key for a project-level session.
   Parameters: Required `--project <project_id>`; optional `--role admin`.
   Notes: Root-only; prints raw admin key exactly once.
-- **`key list --root`**: Inspect root credential rows.
+- **`key list --root`**: Inspect root credentials.
   Parameters: Required `--root`; conflicts with `--project`.
   Notes: Use to confirm active/revoked root credential ids without exposing raw keys.
-- **`key list --project`**: Inspect project admin credential rows.
+- **`key list --project`**: Inspect project admin credentials.
   Parameters: Required `--project <project_id>` unless project context supplies it.
   Notes: Root/admin may inspect project credentials; does not render raw admin keys.
 - **`key revoke`**: Revoke a credential by id.
   Parameters: Required `<key_id>`; optional `--project <project_id>`.
   Notes: Root-only for revocation; do not revoke the wrong active key without checking audit and scope.
-- **`context show`**: Inspect path context markers and registered ALab path records.
+- **`context show`**: Inspect path context markers and registered ALab paths.
   Parameters: Optional `--path <dir>`; default `.`.
   Notes: Use before repair or when a command is running in an unexpected project/experiment/inspection context.
 - **`context repair`**: Repair a path context marker when authorized.
@@ -89,23 +89,23 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Root/admin can repair in scope; token self-repair has strict Git branch or pinned-commit checks.
 - **`project init`**: Create a project, source, config version, baseline validation, and project admin key.
   Parameters: Mode `local|git|empty|harbor|skydiscover`; required `--config`; common `--name`, `--task`, `--goal`, `--skip-baseline-test`; mode-specific source/task fields; source size limits.
-  Notes: Runtime behavior comes from config only. Generated project admin key is printed once after project row creation.
-- **`project list|show`**: Inspect retained projects.
+  Notes: Runtime behavior comes from config only. Generated project admin key is printed once after the project is created.
+- **`project list|show`**: Inspect projects.
   Parameters: `list` accepts `--include-archived`; `show` accepts optional `--project <project_id>`.
   Notes: Use to find project ids, statuses, active config version, default source, runner, reward, and visibility.
 - **`project archive|unarchive`**: Toggle project lifecycle status.
   Parameters: Optional `--project <project_id>`.
   Notes: Archive can be blocked by active locks or maintenance.
-- **`project remove`**: Remove an archived project and its retained tree by audited cascade.
+- **`project remove`**: Remove an archived project by audited cascade.
   Parameters: Required `--cascade`; plus `--dry-run` or `--force --confirm <project_id>`; optional `--project`, `--reason`.
-  Notes: Root-only and destructive. Always dry-run first; actual remove stages filesystem paths through ALab trash.
+  Notes: Root-only and destructive. Always dry-run first; actual remove moves removable paths through ALab trash.
 - **`catalog skydiscover add|update`**: Install or change the pinned SkyDiscover catalog.
   Parameters: Optional `--origin-url <url>`; exactly zero or one of `--ref <ref>` or `--commit <full_sha>`.
-  Notes: Prefer `--commit` for reproducible examples and releases. `update` requires a clean ALab-managed catalog.
-- **`catalog skydiscover show`**: Inspect active SkyDiscover catalog metadata.
+  Notes: Prefer `--commit` when reproducibility matters. `update` requires a clean ALab-managed catalog.
+- **`catalog skydiscover show`**: Inspect active SkyDiscover catalog state.
   Parameters: No catalog selector needed.
   Notes: Must not fetch from the network; use to confirm pinned commit and local path.
-- **`catalog skydiscover remove`**: Remove active SkyDiscover catalog metadata and local checkout.
+- **`catalog skydiscover remove`**: Remove active SkyDiscover catalog state and local checkout.
   Parameters: Required `--force --confirm skydiscover`; optional `--reason`.
   Notes: Blocked while active configs or open experiments reference the catalog.
 - **`cache prune`**: Remove ALab-owned non-authoritative caches.
@@ -117,7 +117,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`audit list`**: Search global or project-scoped audit events.
   Parameters: Optional `--project`, `--object-type`, `--object-id`, `--action`, `--actor`, time bounds, `--limit`, `--offset`.
   Notes: Root can query globally; project admin is scoped to the project.
-- **`audit show`**: Inspect one audit event and sanitized metadata.
+- **`audit show`**: Inspect one audit event and redacted details.
   Parameters: Required `<audit_id>`; optional `--project <project_id>`.
   Notes: Use to verify credential, project, catalog, cleanup, repair, and remove actions without raw secrets.
 
@@ -127,7 +127,7 @@ Root can also inspect or maintain project-scoped resources when needed, but shou
 
 After `project init` succeeds, treat the printed project admin key as handoff material. Keep this session focused on root-scoped setup, credentials, catalogs, cleanup, audit, and handoff unless the user explicitly asks otherwise.
 
-Use the layer-specific credential rules from `SKILL.md`: project-level work receives only the project admin key and `alab-project-controller` skill/instructions; experiment implementation receives only the experiment worktree token context and `alab-experiment-worker` skill/instructions.
+Use the layer-specific credential rules from `SKILL.md`: project-level work receives only the project admin key and `alab-project-controller` skill/instructions; experiment work receives only the experiment worktree token context and `alab-experiment-worker` skill/instructions.
 
 Local project:
 
@@ -150,7 +150,7 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
   --task "$TASK"
 ```
 
-`project init` prints the generated project admin key exactly once after the project record is written. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to the delegated project-level session, never to experiment workers.
+`project init` prints the generated project admin key exactly once after the project is created. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to the delegated project-level session, never to experiment workers.
 Configs with paired `runner.type = "none"` and `reward.type = "none"` create free evaluation projects for direct submit without baseline evaluator runs; use them only with `local`, `git`, or `empty` project init modes, not Harbor or SkyDiscover adapter init.
 
 ## Catalog Rules

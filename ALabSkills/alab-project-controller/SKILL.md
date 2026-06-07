@@ -11,9 +11,9 @@ Use this skill for the project layer of ALab. It coordinates one existing projec
 
 ## Layer Boundaries
 
-- This skill is not the root-administration layer and not the experiment-implementation layer.
+- This skill is not the root-administration layer and not the experiment-work layer.
 - It must not initialize ALab homes, rotate root credentials, manage SkyDiscover catalogs, prune global caches/backups, or create/revoke project admin keys.
-- After creating an experiment, hand implementation to a separate session/thread or subagent in that experiment worktree using `alab-experiment-worker`.
+- After creating an experiment, hand worktree changes to a separate session/thread or subagent in that experiment worktree using `alab-experiment-worker`.
 - If follow-up project-level coordination needs its own execution context, use a separate session/thread or subagent with the project admin key and this skill.
 - If a separate session is unavailable, use a subagent or worker process with equivalent project/worktree/token isolation. User instructions override this preference.
 
@@ -22,11 +22,11 @@ Use this skill for the project layer of ALab. It coordinates one existing projec
 - Accept the project admin key only from a private environment variable or secure stdin.
 - Prefer `--key-stdin` for ALab admin commands; avoid inline key arguments in commands that may be logged.
 - Never print, commit, write to prompts, or pass the project admin key to experiment worker sessions/subagents.
-- When delegating, provide only the credential needed for the delegated task. Project-level coordination may receive the project admin key through a private environment variable, ignored secret file, or secure stdin. Experiment implementation must use only that experiment's worktree token context.
-- The project admin key is for project-level commands such as experiment creation, config/source/lifecycle maintenance, observe, report, and audit. It must not be inherited by experiment implementation sessions.
-- Experiment implementation sessions should not receive root/admin keys or unrelated ambient tokens. Prefer the token file already written in the worktree; if a token must be supplied explicitly, provide only the token for that exact worktree or inspection checkout through a private channel.
-- Provide `alab-experiment-worker` skill/instructions to any delegated experiment implementation session/thread or subagent.
-- When launching a worker, target the experiment worktree and clear admin/root credentials plus unrelated ambient tokens. Use the command reference for launcher-specific environment and path requirements.
+- When delegating, provide only the credential needed for the delegated task. Project-level coordination may receive the project admin key through a private environment variable, ignored secret file, or secure stdin. Experiment work must use only that experiment's worktree token context.
+- The project admin key is for project-level commands such as experiment creation, config/source/lifecycle maintenance, observe, report, and audit. It must not be inherited by experiment worker sessions.
+- Experiment worker sessions should not receive root/admin keys or unrelated ambient tokens. Prefer the token file already written in the worktree; if a token must be supplied explicitly, provide only the token for that exact worktree or inspection checkout through a private channel.
+- Provide `alab-experiment-worker` skill/instructions to any delegated experiment worker session/thread or subagent.
+- When launching a worker, target the experiment worktree and clear admin/root credentials plus unrelated ambient tokens. Use the command reference for environment and path requirements.
 
 ## Capabilities
 
@@ -34,7 +34,7 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 
 - Inspect project state with `alab project show`, `alab project config show`, `alab status`, and project-scoped audit or observe commands.
 - Use `alab feedback` for ALab/tooling suggestions, questions, or bug reports that should be stored with the local home rather than inside project annotations.
-- Create new experiments from the project default source, explicit sources, or visible predecessor experiments when continuation is useful, then delegate implementation from that worktree.
+- Create new experiments from the project default source, explicit sources, or visible predecessor experiments when continuation is useful, then delegate worktree changes from that worktree.
 - Coordinate experiment lineage by recording experiment ids, worktree paths, source refs, tags, from-experiment choices, and selected commits such as `best`, `final`, or `latest`.
 - Launch experiment worker sessions or subagents in experiment worktrees with `alab-experiment-worker` skill/instructions and without project admin or root credentials. Provide task instructions and non-secret helper variables only; let workers use their worktree tokens for `alab run` and `alab submit`.
 - When a project uses free evaluation (`runner.type = "none"` and `reward.type = "none"`), tell experiment worker sessions/subagents to submit directly without `alab run`; final run id will be `none` and the result will not appear in best reward ranking.

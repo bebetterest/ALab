@@ -29,9 +29,9 @@ Worker lifecycle permissions are intentionally narrow:
 
 - `run` and `submit` require the valid worktree token from the current experiment.
 - A worker session should use the current worktree's token file when available. If a token is supplied explicitly, it must match this worktree or inspection checkout.
-- Observe commands show only records visible to the current token.
+- Observe commands show only items visible to the current token.
 - `exp checkout` can create an inspection checkout only for experiments visible to the current token.
-- Experiment tags are metadata only; they never expand visibility.
+- Experiment tags are labels only; they never expand visibility.
 - Hidden logs require root/admin and are outside this skill.
 - Worker annotation mutation is limited to visible targets and annotations created by the worker token.
 - Project-level or root-required operations should be reported to a project-level session with the project admin key or to a root-admin session; do not request those keys in the worker session.
@@ -59,13 +59,13 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Standard evaluation projects require a supporting passed run or `--rerun` to create one. Free evaluation projects do not have an evaluator; omit `--rerun`, submit directly, and expect `final run id: none`.
 - **`alab exp checkout`**: Create an inspection checkout of a visible historical experiment at a selected commit.
   Parameters: Required `<exp_id>` and `--path <dir>`; optional `--commit final|latest|best|<sha>`. Use an empty path outside the current worktree and other ALab contexts.
-  Use the output for: A read-only comparison workspace with source code from a visible prior experiment. Read it for implementation ideas, then copy only genuinely useful task-relevant source files or snippets into the current worktree. Do not copy `.alab/`, raw tokens, hidden assets, or project control files. Record any inspection path you create so a project-level session can clean it up later; do not edit inside inspection checkouts.
-- **`alab exp tag add|remove|list`**: Add or inspect metadata tags on the current experiment.
+  Use the output for: A read-only comparison workspace from a visible prior experiment. Read it for useful task ideas, then copy only genuinely useful task-relevant source files or snippets into the current worktree. Do not copy `.alab/`, raw tokens, hidden assets, or project control files. Record any inspection path you create so a project-level session can clean it up later; do not edit inside inspection checkouts.
+- **`alab exp tag add|remove|list`**: Add or inspect tags on the current experiment.
   Parameters: `add`/`remove` require `<exp_id> <tag>`; `list` requires `<exp_id>`.
   Use the output for: Marking useful worker-local evidence such as `promising`, `needs-review`, or task-specific labels when the project-level session expects tags. Tags are not authorization and should not replace submit refs.
 - **`alab report`**: Export a Markdown report for a visible experiment.
   Parameters: Required `--exp <exp_id> --out <path>`; optional `--overwrite`. In a worktree context, `--project` is usually supplied by the context.
-  Use the output for: A local handoff/evidence file containing safe metadata, runs, submission text, and visible artifact/log metadata. Worker reports cannot include hidden logs, raw secrets, tokens, or artifact bytes.
+  Use the output for: A local handoff/evidence file containing safe details, runs, submission text, and visible artifact/log summaries. Worker reports cannot include hidden logs, raw secrets, tokens, or artifact bytes.
 - **`observe experiments list`**: See visible experiments in the project.
   Parameters: Filters include `--status`, repeated `--tag`, `--source-id`, `--name-query`, reward bounds, config version, timestamps, and `--include-archived`; pagination uses `--limit`/`--offset`; sorting uses `--sort <field>:<asc|desc>`.
   Use the output for: Find prior attempts, similar tags, source lineage, closed experiments, and possible refs.
@@ -130,9 +130,9 @@ alab observe logs list --exp <exp_id>
 alab observe annotations list --target-type experiment --target-id <exp_id>
 ```
 
-Use visible history as evidence and inspiration, not as permission expansion. Prefer high-reward passed runs, useful warning patterns, clear annotations, and comparable task/source lineage. Submit refs are provenance links for later review and optimization: if a prior experiment influenced the final strategy, code, comparison baseline, failure avoidance, or continuation path, include it with repeated `--ref <exp_id>`.
+Use visible history as evidence and inspiration, not as permission expansion. Prefer high-reward passed runs, useful warning patterns, clear annotations, and comparable task/source lineage. Submit refs are provenance links for later review and optimization: if a prior experiment influenced the final strategy, source changes, comparison baseline, failure avoidance, or continuation path, include it with repeated `--ref <exp_id>`.
 
-When a visible experiment looks potentially useful, inspect its code directly instead of relying only on summaries:
+When a visible experiment looks potentially useful, inspect its task-relevant files instead of relying only on summaries:
 
 ```text
 alab exp checkout <exp_id> --path /tmp/alab-inspect-<exp_id> --commit best
@@ -219,7 +219,7 @@ In free evaluation mode, state that there is no evaluator run and that `final ru
 
 The final worker response should include:
 
-- changed strategy or implementation area,
+- changed strategy or source area,
 - final run id and status, or `final run id: none` for free evaluation,
 - reward and key metrics when present,
 - submit refs used, or `ref none` with a reason,

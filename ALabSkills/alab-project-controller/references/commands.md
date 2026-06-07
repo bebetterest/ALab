@@ -53,8 +53,8 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Use annotations for project-visible experiment notes; use feedback for local ALab/tooling feedback that should be stored under `ALAB_HOME/feedback/`.
 - **`report`**: Export a Markdown evidence report for the project or one visible experiment.
   Parameters: Required `--out <path>` and `--project <project_id>` outside context; optional `--exp <exp_id>` and `--overwrite`.
-  Notes: Project reports require admin/root authority. Experiment reports follow observe visibility. Reports include summaries and metadata, but not raw keys, tokens, raw secrets, hidden-log contents, or artifact bytes.
-- **`project config show`**: Inspect retained config metadata.
+  Notes: Project reports require admin/root authority. Experiment reports follow observe visibility. Reports include summaries and safe details, but not raw keys, tokens, raw secrets, hidden-log contents, or artifact bytes.
+- **`project config show`**: Inspect config details.
   Parameters: Optional `--project`; `--version latest-attempted|active-valid|<n>`.
   Notes: Shows runner/reward/artifact/env/secret fingerprints without raw secret values. Free evaluation projects show `runner type: none` and `reward type: none`.
 - **`project config export`**: Write a config snapshot to a file.
@@ -62,7 +62,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Use for review or controlled edits; export never writes raw secret values.
 - **`project config import`**: Import a config file and optionally run baseline validation.
   Parameters: Required `--config <path>`; optional `--project`, `--dry-run`, `--skip-baseline-test`; `--dry-run` conflicts with skip.
-  Notes: Dry-run parses, canonicalizes, diffs, and checks capabilities without DB/file mutations or runner execution. A runtime-affecting free evaluation import with paired `runner.type = "none"` and `reward.type = "none"` records `validation status: not_required` and becomes active valid without running a baseline evaluator.
+  Notes: Dry-run parses, canonicalizes, diffs, and checks capabilities without saving changes or running an evaluator. A runtime-affecting free evaluation import with paired `runner.type = "none"` and `reward.type = "none"` sets `validation status: not_required` and becomes active valid without running a baseline evaluator.
 - **`project config set`**: Change one non-secret config field.
   Parameters: Required `<field> <toml-literal>`; optional `--project`, `--dry-run`, `--skip-baseline-test`.
   Notes: Replaces whole array/map fields; secret fields must use `project secret`. Do not use single-field `set` to switch into or out of free evaluation because runner and reward `none` must change atomically.
@@ -74,9 +74,9 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Raw secret values are never rendered; input must be non-empty single-line UTF-8 without NUL bytes.
 - **`project validate`**: Run the active project baseline validation.
   Parameters: Optional `--project <project_id>`.
-  Notes: Produces validation id, status, reward, parse status, warning codes, and project status. Free evaluation configs record `validation status: not_required` without running an evaluator.
+  Notes: Produces validation id, status, reward, parse status, warning codes, and project status. Free evaluation configs show `validation status: not_required` without running an evaluator.
   Notes: For file and Harbor rewards, `reward.json` metrics must be finite numbers. Non-numeric details belong in artifacts or logs, not the reward metrics object.
-- **`project validation archive|unarchive|remove`**: Maintain validation records and their dependent logs/artifacts.
+- **`project validation archive|unarchive|remove`**: Maintain validation entries and their dependent logs/artifacts.
   Parameters: Required `<validation_id>`; remove requires `--dry-run` or `--force --confirm <validation_id>`, optional `--cascade`, `--reason`, `--project`.
   Notes: Archive active validations is blocked; dry-run before remove.
 - **`project locks clear-stale`**: Clear stale project locks.
@@ -85,7 +85,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`source import`**: Add a reusable source snapshot.
   Parameters: Exactly one of `--source-path`, `--source-git`, `--source-empty`; optional `--source-subdir`, `--name`, source size limits, `--project`.
   Notes: Imports are canonical source refs; source limits must be non-negative.
-- **`source list|show`**: Inspect retained sources.
+- **`source list|show`**: Inspect sources.
   Parameters: `show` requires `<source_id>`; optional `--project`, `--include-archived` for list.
   Notes: Use to choose source refs for new experiments and verify origin summaries.
 - **`source archive|unarchive|remove`**: Maintain project sources.
@@ -96,7 +96,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: At most one source origin. Raw worktree token is written to token path and never printed.
 - **`exp list|search|show|best`**: Inspect and rank project experiments.
   Parameters: Search requires `--query`; filters include status, tags, source id, name query, reward bounds, config version, timestamps, archive flag, pagination, and sorting where supported.
-  Notes: Use to pick predecessors, refs, and worker targets. Free evaluation submissions have no run/reward rows and do not qualify for `best` ranking.
+  Notes: Use to pick predecessors, refs, and worker targets. Free evaluation submissions have no run/reward evidence and do not qualify for `best` ranking.
 - **`exp archive|unarchive|remove`**: Maintain experiment lifecycle.
   Parameters: Required `<exp_id>`; remove requires `--dry-run` or `--force --confirm <exp_id>`, optional `--cascade`, `--reason`, `--project`.
   Notes: Remove is archive-first and may stage worktrees, inspection paths, logs, artifacts, and branch refs through trash.
@@ -120,7 +120,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Hidden logs require root/admin and explicit `--include-hidden`; use observe outputs as evidence for decisions.
 - **`annotate add|edit|archive|unarchive|remove`**: Add or maintain project notes.
   Parameters: `add` accepts optional `--target` and one body input. Targetless notes require `--title <title>` plus `--exp <exp_id>` from project context; targeted notes may also use `--title`. Optional `--author`, `--private`, and `--private-to-exp` are available. Edit requires annotation id and body; remove requires dry-run or force/confirm.
-  Notes: Use for decision records, review notes, and project-visible guidance. Omit `--target` only for experiment-scoped notes that are not tied to one object or path.
+  Notes: Use for decision notes, review notes, and project-visible guidance. Omit `--target` only for experiment-scoped notes that are not tied to one object or path.
 - **`audit list|show --project`**: Inspect project-scoped audit evidence.
   Parameters: Filters include `--object-type`, `--object-id`, `--action`, `--actor`, time bounds, `--limit`, and `--offset`; show requires `<audit_id>`.
   Notes: Use to verify lifecycle, credential, config, source, validation, and cleanup actions.
@@ -154,9 +154,9 @@ alab backup prune
 
 ## Experiment Creation Patterns
 
-Create the experiment first, then use the worktree path from `exp create` for implementation handoff. The detailed session/subagent launch requirements live in [Worker Launch Pattern](#worker-launch-pattern).
+Create the experiment first, then use the worktree path from `exp create` for worker handoff. The detailed session/subagent launch requirements live in [Worker Launch Pattern](#worker-launch-pattern).
 
-Keep credentials layer-specific: use the project admin key only for `exp create` and other project-level commands; do not pass it to the experiment implementation context.
+Keep credentials layer-specific: use the project admin key only for `exp create` and other project-level commands; do not pass it to the experiment worker context.
 
 Default source:
 
@@ -197,7 +197,7 @@ If the worker must run ALab from a sandbox and ALab home/cache are outside the w
 --add-dir "$ALAB_SHARED_DIR"
 ```
 
-Do not use the repository root as `-C` for a worker. Do not pass the project admin key through argv, stdin prompt text, copied files, inherited environment, `--add-dir "$RUN_DIR"`, `.run/secrets`, or `project.env`. Clear unrelated ambient token variables before launch; an experiment implementation session should use only the token context for its own worktree.
+Do not use the repository root as `-C` for a worker. Do not pass the project admin key through argv, stdin prompt text, copied files, inherited environment, `--add-dir "$RUN_DIR"`, `.run/secrets`, or `project.env`. Clear unrelated ambient token variables before launch; an experiment worker session should use only the token context for its own worktree.
 Before launching, resolve the worktree path and refuse repo root, the whole `.run` directory, or any secret/control path. Tell worker sessions/subagents that added ALab home/cache/shared directories are CLI state only, not source-editing surfaces.
 
 ## Closeout Report

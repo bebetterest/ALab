@@ -1,6 +1,6 @@
 ---
 name: alab-experiment-worker
-description: Use when operating inside one ALab experiment worktree with that worktree token context to inspect status, edit candidate code, run evaluations, submit final results, and read visible experiment evidence without project admin or root privileges.
+description: Use when operating inside one ALab experiment worktree with that worktree token context to inspect status, edit candidate source, run evaluations, submit final results, and read visible experiment evidence without project admin or root privileges.
 ---
 
 # ALab Experiment Worker
@@ -20,7 +20,7 @@ Use this skill for the experiment worktree layer of ALab. It improves one candid
 - Trust only the current worktree context and its `.alab/token`.
 - Do not accept root keys, project admin keys, or tokens for other worktrees or inspection checkouts. If a launcher provides an explicit token, verify that it belongs to the current worktree context before using it.
 - Do not read, print, copy, commit, or rewrite raw tokens or keys.
-- Do not edit `.alab/`, ALab home records, cache directories, shared run directories, hidden evaluator assets, secret files, or project control files.
+- Do not edit `.alab/`, ALab home state, cache directories, shared run directories, hidden evaluator assets, secret files, or project control files.
 - Edit only task-relevant source files inside the experiment worktree.
 - Keep source editing and CLI state separate. The experiment worktree is the only editable source surface; any added ALab home, uv cache, pycache, or shared directory is for `alab run`/`submit` state only and must not be inspected, patched, copied, or committed.
 - Keep changes reviewable: prefer focused iterations, deterministic checks, and concise run messages.
@@ -46,9 +46,9 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Inspect current context with `alab status` and `alab help`.
 - Leave ALab-home feedback with `alab feedback` when you notice a tooling suggestion, question, or bug that should not be mixed into experiment submission feedback.
 - Read task files and project instructions that are present in the worktree.
-- Inspect visible historical experiments with `alab observe experiments ...` and related visible runs, artifacts, logs, and annotations. Use this evidence to find promising approaches, avoid repeated failures, and understand prior best or final commits. Visibility is still enforced by ALab; do not try to access hidden or unavailable records.
-- When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, record the rendered inspection commit, read its source code, and compare it with the current worktree before copying anything. Use normal Git comparison tools where helpful, for example `git diff --stat <inspection_commit>..HEAD`, `git diff <inspection_commit> -- <path>`, or `git diff --no-index <inspection_checkout>/<source_path> <current_worktree>/<source_path>` for a direct file/subtree comparison. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, secret files, ALab home/cache files, or project control files.
-- Change task-relevant source files in the worktree and keep the implementation understandable for later workers.
+- Inspect visible historical experiments with `alab observe experiments ...` and related visible runs, artifacts, logs, and annotations. Use this evidence to find promising approaches, avoid repeated failures, and understand prior best or final commits. Visibility is still enforced by ALab; do not try to access hidden or unavailable items.
+- When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, record the rendered inspection commit, read its task-relevant files, and compare them with the current worktree before copying anything. Use normal Git comparison tools where helpful, for example `git diff --stat <inspection_commit>..HEAD`, `git diff <inspection_commit> -- <path>`, or `git diff --no-index <inspection_checkout>/<source_path> <current_worktree>/<source_path>` for a direct file/subtree comparison. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, secret files, ALab home/cache files, or project control files.
+- Change task-relevant source files in the worktree and keep the changes understandable for later workers.
 - Add or list tags on the current experiment when tags are useful evidence for later project-level sessions or workers; tags do not grant visibility.
 - Keep runner outputs machine-parseable. If the task writes a reward file, put only the configured numeric metrics in that reward file; put case details, traces, or explanations in separate visible artifacts/logs when allowed.
 - Run local cheap checks when they exist, then run `alab run --message "<brief reason>"` for standard evaluation projects. For free evaluation projects, do not force a run; direct submit is expected.
@@ -59,7 +59,7 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 
 - Submit only after a passed run for the current candidate in standard evaluation mode. In free evaluation mode, direct submit is allowed and the final run id will render as `none`.
 - Treat submit refs as provenance links for later review and optimization, not as decoration.
-- Actively add `--ref <exp_id>` for visible experiments that informed the strategy, code, comparison baseline, failure avoidance, or continuation path.
+- Actively add `--ref <exp_id>` for visible experiments that informed the strategy, source changes, comparison baseline, failure avoidance, or continuation path.
 - Use `--ref none` only when the result does not depend on or intentionally reference any prior experiment.
 - Do not invent refs, cite inaccessible experiment ids, or cite a visible experiment only because it exists.
 - Keep `--message` short. Put the substantive record in `--summary`/`--summary-file` and `--feedback`/`--feedback-file`: what changed, which passed run supports it or why free evaluation has no run, key metrics when present, which refs mattered, and remaining risks.

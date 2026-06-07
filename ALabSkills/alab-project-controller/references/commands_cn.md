@@ -53,8 +53,8 @@ alab audit list|show --project <project_id> ...
   注意点：project-visible experiment notes 用 annotations；local ALab/tooling feedback 用 feedback，存储在 `ALAB_HOME/feedback/`。
 - **`report`**：导出 project 或一个 visible experiment 的 Markdown evidence report。
   关键参数：必须提供 `--out <path>`；不在 context 中时提供 `--project <project_id>`；可选 `--exp <exp_id>` 和 `--overwrite`。
-  注意点：Project report 要求 admin/root authority。Experiment report 遵循 observe visibility。Report 包含 summaries 和 metadata，但不包含 raw keys、tokens、raw secrets、hidden-log contents 或 artifact bytes。
-- **`project config show`**：查看 retained config metadata。
+  注意点：Project report 要求 admin/root authority。Experiment report 遵循 observe visibility。Report 包含 summaries 和 safe details，但不包含 raw keys、tokens、raw secrets、hidden-log contents 或 artifact bytes。
+- **`project config show`**：查看 config details。
   关键参数：可选 `--project`；`--version latest-attempted|active-valid|<n>`。
   注意点：显示 runner/reward/artifact/env/secret fingerprints，但不显示 raw secret values。Free evaluation projects 会显示 `runner type: none` 和 `reward type: none`。
 - **`project config export`**：将 config snapshot 写入文件。
@@ -62,7 +62,7 @@ alab audit list|show --project <project_id> ...
   注意点：用于 review 或受控编辑；export 永不写出 raw secret values。
 - **`project config import`**：导入 config file，并按需运行 baseline validation。
   关键参数：必需 `--config <path>`；可选 `--project`、`--dry-run`、`--skip-baseline-test`；`--dry-run` 与 skip 冲突。
-  注意点：Dry-run 会 parse、canonicalize、diff 并检查 capabilities，不写 DB/file，也不执行 runner。Runtime-affecting free evaluation import 如果成对设置 `runner.type = "none"` 和 `reward.type = "none"`，会记录 `validation status: not_required`，不运行 baseline evaluator，并成为 active valid config。
+  注意点：Dry-run 会 parse、canonicalize、diff 并检查 capabilities，不保存更改，也不运行 evaluator。Runtime-affecting free evaluation import 如果成对设置 `runner.type = "none"` 和 `reward.type = "none"`，会设置 `validation status: not_required`，不运行 baseline evaluator，并成为 active valid config。
 - **`project config set`**：修改一个 non-secret config field。
   关键参数：必需 `<field> <toml-literal>`；可选 `--project`、`--dry-run`、`--skip-baseline-test`。
   注意点：Array/map 字段整体替换；secret fields 必须用 `project secret`。不要用单字段 `set` 切入或切出 free evaluation，因为 runner 和 reward 的 `none` 必须原子更新。
@@ -74,9 +74,9 @@ alab audit list|show --project <project_id> ...
   注意点：Raw secret values 永不渲染；输入必须是非空 single-line UTF-8，且无 NUL bytes。
 - **`project validate`**：运行 active project baseline validation。
   关键参数：可选 `--project <project_id>`。
-  注意点：输出 validation id、status、reward、parse status、warning codes 和 project status。Free evaluation configs 会记录 `validation status: not_required`，不运行 evaluator。
+  注意点：输出 validation id、status、reward、parse status、warning codes 和 project status。Free evaluation configs 会显示 `validation status: not_required`，不运行 evaluator。
   注意点：对于 file 和 Harbor rewards，`reward.json` metrics 必须是 finite numbers。非 numeric details 应放入 artifacts 或 logs，而不是 reward metrics object。
-- **`project validation archive|unarchive|remove`**：维护 validation records 及其 dependent logs/artifacts。
+- **`project validation archive|unarchive|remove`**：维护 validation entries 及其 dependent logs/artifacts。
   关键参数：必需 `<validation_id>`；remove 需要 `--dry-run` 或 `--force --confirm <validation_id>`，可选 `--cascade`、`--reason`、`--project`。
   注意点：Active validation 不能 archive；remove 前先 dry-run。
 - **`project locks clear-stale`**：清理 stale project locks。
@@ -85,7 +85,7 @@ alab audit list|show --project <project_id> ...
 - **`source import`**：添加 reusable source snapshot。
   关键参数：`--source-path`、`--source-git`、`--source-empty` 三选一；可选 `--source-subdir`、`--name`、source size limits、`--project`。
   注意点：Imports 会生成 canonical source refs；source limits 必须是非负数。
-- **`source list|show`**：查看 retained sources。
+- **`source list|show`**：查看 sources。
   关键参数：`show` 需要 `<source_id>`；list 可选 `--project`、`--include-archived`。
   注意点：用于选择新 experiments 的 source refs，并验证 origin summaries。
 - **`source archive|unarchive|remove`**：维护 project sources。
@@ -96,7 +96,7 @@ alab audit list|show --project <project_id> ...
   注意点：最多一个 source origin。Raw worktree token 写入 token path，永不打印。
 - **`exp list|search|show|best`**：查看并排序 project experiments。
   关键参数：Search 需要 `--query`；filters 包括 status、tags、source id、name query、reward bounds、config version、timestamps、archive flag、pagination，以及支持处的 sorting。
-  注意点：用于选择 predecessors、refs 和 worker targets。Free evaluation submissions 没有 run/reward rows，不会进入 `best` ranking。
+  注意点：用于选择 predecessors、refs 和 worker targets。Free evaluation submissions 没有 run/reward evidence，不会进入 `best` ranking。
 - **`exp archive|unarchive|remove`**：维护 experiment lifecycle。
   关键参数：必需 `<exp_id>`；remove 需要 `--dry-run` 或 `--force --confirm <exp_id>`，可选 `--cascade`、`--reason`、`--project`。
   注意点：Remove 是 archive-first，可能把 worktrees、inspection paths、logs、artifacts 和 branch refs stage 到 trash。
@@ -120,7 +120,7 @@ alab audit list|show --project <project_id> ...
   注意点：Hidden logs 需要 root/admin 和显式 `--include-hidden`；observe outputs 是决策证据。
 - **`annotate add|edit|archive|unarchive|remove`**：添加或维护 project notes。
   关键参数：`add` 接受可选 `--target` 和一个 body input。Project context 中 targetless notes 必须提供 `--title <title>` 和 `--exp <exp_id>`；targeted notes 也可以使用 `--title`。可选 `--author`、`--private`、`--private-to-exp`。Edit 需要 annotation id 和 body；remove 需要 dry-run 或 force/confirm。
-  注意点：用于 decision records、review notes 和 project-visible guidance。只有当 note 不绑定单个 object 或 path、而是归属某个 experiment 时，才省略 `--target`。
+  注意点：用于 decision notes、review notes 和 project-visible guidance。只有当 note 不绑定单个 object 或 path、而是归属某个 experiment 时，才省略 `--target`。
 - **`audit list|show --project`**：查看 project-scoped audit evidence。
   关键参数：Filters 包括 `--object-type`、`--object-id`、`--action`、`--actor`、time bounds、`--limit`、`--offset`；show 需要 `<audit_id>`。
   注意点：用于验证 lifecycle、credential、config、source、validation 和 cleanup actions。
@@ -154,9 +154,9 @@ alab backup prune
 
 ## Experiment Creation Patterns
 
-先创建 experiment，然后使用 `exp create` 输出的 worktree path 做 implementation handoff。详细 session/subagent launch requirements 见 [Worker Launch Pattern](#worker-launch-pattern)。
+先创建 experiment，然后使用 `exp create` 输出的 worktree path 做 worker handoff。详细 session/subagent launch requirements 见 [Worker Launch Pattern](#worker-launch-pattern)。
 
-保持 credentials layer-specific：project admin key 只用于 `exp create` 和其他 project-level commands；不要传给 experiment implementation context。
+保持 credentials layer-specific：project admin key 只用于 `exp create` 和其他 project-level commands；不要传给 experiment worker context。
 
 Default source：
 
@@ -197,7 +197,7 @@ printf '%s\n' "$ALAB_PROJECT_KEY" | alab --key-stdin exp create \
 --add-dir "$ALAB_SHARED_DIR"
 ```
 
-不要把 repository root 作为 worker 的 `-C`。不要通过 argv、stdin prompt text、copied files、inherited environment、`--add-dir "$RUN_DIR"`、`.run/secrets` 或 `project.env` 传递 project admin key。启动前清掉无关的 ambient token variables；experiment implementation session 只应使用自己 worktree 对应的 token context。
+不要把 repository root 作为 worker 的 `-C`。不要通过 argv、stdin prompt text、copied files、inherited environment、`--add-dir "$RUN_DIR"`、`.run/secrets` 或 `project.env` 传递 project admin key。启动前清掉无关的 ambient token variables；experiment worker session 只应使用自己 worktree 对应的 token context。
 启动前解析 worktree path，并拒绝 repo root、整个 `.run` 目录或任何 secret/control path。告知 worker sessions/subagents：加入的 ALab home/cache/shared directories 只是 CLI state，不是 source-editing surface。
 
 ## Closeout Report
