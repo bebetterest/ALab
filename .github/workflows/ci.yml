@@ -488,4 +488,4 @@ jobs:
 
       - name: Publish missing ClawHub skill versions
         if: ${{ steps.clawhub.outputs.should_publish == 'true' }}
-        run: python .github/scripts/clawhub_skill_release.py publish
+        run: python .github/scripts/clawhub_skill_release.py publish --plan-input clawhub-skill-plan.json

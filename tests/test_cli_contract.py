@@ -21754,6 +21754,43 @@ def test_clawhub_skill_release_plan_publishes_only_missing_versions() -> None:
     assert [skill["slug"] for skill in plan["skills"] if skill["should_publish"]] == plan["missing_slugs"]
 
 
+def test_clawhub_skill_publish_reuses_saved_plan(tmp_path: Path, monkeypatch) -> None:
+    module = _load_clawhub_release_script()
+    version = module.load_project_version(_REPO_ROOT)
+    plan = module.build_plan(
+        _REPO_ROOT,
+        "https://clawhub.example",
+        version=version,
+        version_exists=lambda _base_url, slug, _version: slug in {"alab-skills"},
+    )
+    plan_path = tmp_path / "clawhub-skill-plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], *, check: bool) -> None:
+        assert check is True
+        commands.append(command)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    assert (
+        module.main(
+            [
+                "--repo-root",
+                str(_REPO_ROOT),
+                "--base-url",
+                "https://clawhub.example",
+                "publish",
+                "--plan-input",
+                str(plan_path),
+            ]
+        )
+        == 0
+    )
+
+    assert [command[command.index("--slug") + 1] for command in commands] == plan["missing_slugs"]
+
+
 def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
     workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     job_start = workflow.index("  publish-clawhub-skills:")
@@ -21763,7 +21800,7 @@ def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
     assert "    environment: clawhub" in job_text
     assert "          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}" in job_text
     assert "clawhub login --token" in job_text
-    assert "python .github/scripts/clawhub_skill_release.py publish" in job_text
+    assert "python .github/scripts/clawhub_skill_release.py publish --plan-input clawhub-skill-plan.json" in job_text
 
 
 def test_local_agent_notes_and_env_files_are_gitignored() -> None:

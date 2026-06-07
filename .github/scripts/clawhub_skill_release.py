@@ -171,6 +171,68 @@ def build_plan(
     }
 
 
+def load_plan(repo_root: Path, plan_input: Path, base_url: str) -> dict[str, object]:
+    plan = json.loads(plan_input.read_text(encoding="utf-8"))
+    if not isinstance(plan, dict):
+        raise ValueError(f"ClawHub release plan must be a JSON object: {plan_input}")
+
+    expected_version = load_project_version(repo_root)
+    if plan.get("version") != expected_version:
+        raise ValueError(
+            f"ClawHub release plan version {plan.get('version')!r} does not match "
+            f"project version {expected_version!r}."
+        )
+
+    expected_base_url = base_url.rstrip("/")
+    if plan.get("base_url") != expected_base_url:
+        raise ValueError(
+            f"ClawHub release plan base_url {plan.get('base_url')!r} does not match "
+            f"{expected_base_url!r}."
+        )
+
+    releases_by_slug = {release.slug: release for release in validate_releases(repo_root)}
+    skills = plan.get("skills")
+    if not isinstance(skills, list):
+        raise ValueError(f"ClawHub release plan must include a skills list: {plan_input}")
+
+    plan_slugs: list[str] = []
+    missing_slugs: list[str] = []
+    for skill in skills:
+        if not isinstance(skill, dict):
+            raise ValueError(f"ClawHub release plan skill entries must be objects: {plan_input}")
+
+        slug = skill.get("slug")
+        release = releases_by_slug.get(str(slug))
+        if release is None:
+            raise ValueError(f"Unknown ClawHub skill slug in release plan: {slug!r}")
+
+        if skill.get("path") != release.path:
+            raise ValueError(
+                f"ClawHub release plan path for {slug!r} is {skill.get('path')!r}; "
+                f"expected {release.path!r}."
+            )
+        if skill.get("version") != expected_version:
+            raise ValueError(f"ClawHub release plan skill {slug!r} has a mismatched version.")
+        if not isinstance(skill.get("should_publish"), bool):
+            raise ValueError(f"ClawHub release plan skill {slug!r} needs boolean should_publish.")
+        if not isinstance(skill.get("exists"), bool):
+            raise ValueError(f"ClawHub release plan skill {slug!r} needs boolean exists.")
+
+        plan_slugs.append(release.slug)
+        if skill["should_publish"]:
+            missing_slugs.append(release.slug)
+
+    expected_slugs = [release.slug for release in validate_releases(repo_root)]
+    if plan_slugs != expected_slugs:
+        raise ValueError(f"ClawHub release plan slugs {plan_slugs!r} do not match {expected_slugs!r}.")
+    if plan.get("missing_slugs") != missing_slugs:
+        raise ValueError("ClawHub release plan missing_slugs does not match skill states.")
+    if plan.get("should_publish") is not bool(missing_slugs):
+        raise ValueError("ClawHub release plan should_publish does not match missing_slugs.")
+
+    return plan
+
+
 def write_github_output(path: str | None, plan: dict[str, object]) -> None:
     if not path:
         return
@@ -247,6 +309,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     publish_parser = subparsers.add_parser("publish", help="Publish missing skill versions.")
     publish_parser.add_argument(
+        "--plan-input",
+        type=Path,
+        help="Optional JSON plan created by the plan command. Avoids rechecking ClawHub before publishing.",
+    )
+    publish_parser.add_argument(
         "--owner",
         default=os.environ.get("CLAWHUB_OWNER", ""),
         help="Optional ClawHub owner handle. Defaults to CLAWHUB_OWNER.",
@@ -263,10 +330,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     repo_root = args.repo_root.resolve()
     base_url = args.base_url.rstrip("/")
-    plan = build_plan(repo_root, base_url)
-    write_github_output(args.github_output, plan)
 
     if args.command == "plan":
+        plan = build_plan(repo_root, base_url)
+        write_github_output(args.github_output, plan)
         body = json.dumps(plan, indent=2, sort_keys=True)
         if args.plan_output:
             args.plan_output.write_text(body + "\n", encoding="utf-8")
@@ -274,6 +341,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "publish":
+        plan = load_plan(repo_root, args.plan_input, base_url) if args.plan_input else build_plan(repo_root, base_url)
+        write_github_output(args.github_output, plan)
         publish_missing_skills(
             repo_root,
             plan,
