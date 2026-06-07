@@ -90,16 +90,22 @@ jobs:
         include:
           - name: cli-contract
             pytest_args: tests/test_cli_contract.py
+            pytest_extra_args: "-n auto"
           - name: cli-user-scenarios
             pytest_args: tests/test_cli_user_scenarios.py
+            pytest_extra_args: ""
           - name: dashboard
             pytest_args: tests/test_dashboard.py
+            pytest_extra_args: ""
           - name: smoke
             pytest_args: tests/test_smoke.py
+            pytest_extra_args: ""
           - name: runners
             pytest_args: tests/test_runner_docker.py tests/test_runner_harbor.py tests/test_runner_local.py tests/test_runner_skydiscover.py
+            pytest_extra_args: ""
           - name: storage-auth-and-opt-in-skips
             pytest_args: tests/test_auth.py tests/test_errors.py tests/test_ids.py tests/test_migrations.py tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py
+            pytest_extra_args: ""
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
@@ -131,7 +137,7 @@ jobs:
           uv --version
 
       - name: Run pytest group
-        run: uv run --locked pytest -q ${{ matrix.pytest_args }}
+        run: uv run --locked pytest -q ${{ matrix.pytest_extra_args }} ${{ matrix.pytest_args }}
 
   real-docker:
     name: Real Docker
