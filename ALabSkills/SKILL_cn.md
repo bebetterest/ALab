@@ -1,9 +1,22 @@
 ---
 name: alab-skills
-description: 作为 ALab agent-facing role skills 的顶层指南使用。它说明 ALab、root/project/experiment skill hierarchy、各 subskill 的使用时机，以及三种 role skills 的差异，而不一次性加载所有 command reference。
+description: 作为 ALab agent-facing role skills 的顶层指南使用。它说明如何安装 ALab CLI package、root/project/experiment skill hierarchy、各 subskill 的使用时机，以及三种 role skills 的差异，而不一次性加载所有 command reference。
 ---
 
 # ALab Skills
+
+## 安装 ALab
+
+ALab 以 `alab-cli` Python package 形式安装，并提供 `alab` console command。
+
+正常使用时，安装已发布的 PyPI package：
+
+```sh
+python -m pip install alab-cli
+alab help
+```
+
+如果是在 source checkout 中工作，而不是使用已发布 package，则使用项目文档中的 repository-local development command，例如在 checkout 内运行 `uv run --locked alab help`。
 
 ## 概览
 

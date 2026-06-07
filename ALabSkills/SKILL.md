@@ -1,9 +1,22 @@
 ---
 name: alab-skills
-description: Use as the top-level guide for ALab agent-facing role skills. It explains ALab, the root/project/experiment skill hierarchy, when to use each subskill, and how the three role skills differ without loading every command reference.
+description: Use as the top-level guide for ALab agent-facing role skills. It explains how to install the ALab CLI package, the root/project/experiment skill hierarchy, when to use each subskill, and how the three role skills differ without loading every command reference.
 ---
 
 # ALab Skills
+
+## Install ALab
+
+ALab installs as the `alab-cli` Python package and exposes the `alab` console command.
+
+For normal use, install the released PyPI package:
+
+```sh
+python -m pip install alab-cli
+alab help
+```
+
+When working from a source checkout instead of a published package, use the repository-local development command documented by the project, such as `uv run --locked alab help` from the checkout.
 
 ## Overview
 
