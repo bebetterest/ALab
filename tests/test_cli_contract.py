@@ -21837,10 +21837,11 @@ def test_github_release_assets_package_all_skill_archives(tmp_path: Path) -> Non
 
 def test_github_release_assets_extracts_matching_release_notes() -> None:
     module = _load_github_release_assets_script()
-    notes = module.extract_release_notes(_REPO_ROOT, "0.1.6")
+    version = module.load_project_version(_REPO_ROOT)
+    notes = module.extract_release_notes(_REPO_ROOT, version)
 
-    assert "examples/free_evaluation_intro_site" in notes
-    assert "## [0.1.5]" not in notes
+    assert "GitHub Release asset uploads" in notes
+    assert "## [0.1.6]" not in notes
 
 
 def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
@@ -21848,7 +21849,9 @@ def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
     job_start = workflow.index("  publish-clawhub-skills:")
     job_text = workflow[job_start:]
 
-    assert "      - publish-python" in job_text
+    assert "      - publish-python" not in job_text
+    assert "      - lint" in job_text
+    assert "      - tests" in job_text
     assert "    environment: clawhub" in job_text
     assert "          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}" in job_text
     assert "clawhub login --token" in job_text
@@ -21862,6 +21865,7 @@ def test_github_release_asset_workflow_uploads_python_and_skill_packages() -> No
     job_text = workflow[job_start:job_end]
 
     assert "      - publish-python" in job_text
+    assert "      - publish-clawhub-skills" in job_text
     assert "      contents: write" in job_text
     assert "python .github/scripts/github_release_assets.py prepare" in job_text
     assert "--asset-output-dir release-assets" in job_text

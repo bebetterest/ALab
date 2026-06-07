@@ -265,9 +265,9 @@ ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=http
 - 本地 cache/output paths 应保持 ignored（`.uv-cache/`、`.pytest_cache/`、`.ruff_cache/`、`.alab-demo/`、`.env`）。
 - GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 pytest suite；真实 Docker 和 live/networked SkyDiscover gates 仍是 manual workflow inputs。
 - 推送到 `main` 时会检查 PyPI 是否已有当前 `pyproject.toml` package version；如果缺少该精确版本，CI 会通过 PyPI Trusted Publishing 构建并发布，然后从 [CHANGELOG.md](CHANGELOG.md) 中匹配的版本段落创建 `v<version>` GitHub Release。如果 PyPI 已有该版本，则跳过发布。
-- Python publish job 成功后，CI 会确保对应 GitHub Release 带有 release assets：PyPI wheel/sdist files，以及 `alab-skills`、`alab-global-admin-skill`、`alab-project-controller` 和 `alab-experiment-worker` 的 zipped skill packages。
 - 首次自动发布前，PyPI `alab-cli` project 需要信任 repository `bebetterest/ALab`、workflow `ci.yml` 和 environment `pypi`。
-- Python publish job 成功后，推送到 `main` 时也会检查 ClawHub 是否已有同版本的 `alab-skills`、`alab-global-admin-skill`、`alab-project-controller` 和 `alab-experiment-worker` skill packages。缺失的 skill versions 会使用 `CLAWHUB_TOKEN` secret 发布；只有需要发布到指定 ClawHub owner 时，才设置 `CLAWHUB_OWNER` repository/environment variable。
+- 与 Python publish job 并行，推送到 `main` 时也会检查 ClawHub 是否已有同版本的 `alab-skills`、`alab-global-admin-skill`、`alab-project-controller` 和 `alab-experiment-worker` skill packages。缺失的 skill versions 会使用 `CLAWHUB_TOKEN` secret 发布；只有需要发布到指定 ClawHub owner 时，才设置 `CLAWHUB_OWNER` repository/environment variable。
+- Python 和 ClawHub publish jobs 都成功后，CI 会确保对应 GitHub Release 带有 release assets：PyPI wheel/sdist files，以及 `alab-skills`、`alab-global-admin-skill`、`alab-project-controller` 和 `alab-experiment-worker` 的 zipped skill packages。
 
 ## Security And Data Model
 

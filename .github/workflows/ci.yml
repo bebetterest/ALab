@@ -437,6 +437,7 @@ jobs:
       - lint
       - tests
       - publish-python
+      - publish-clawhub-skills
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: write
@@ -482,7 +483,6 @@ jobs:
     needs:
       - lint
       - tests
-      - publish-python
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: read

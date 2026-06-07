@@ -5,10 +5,13 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-07
+
 ### 新增
 
-- 新增 GitHub Release asset 上传：包含 PyPI wheel/sdist files，以及
-  ALab skill bundle 和三个 role skills 的 zipped packages。
+- 新增 GitHub Release asset 上传：在 Python 和 ClawHub publish jobs 都成功后，
+  上传 PyPI wheel/sdist files，以及 ALab skill bundle 和三个 role skills 的
+  zipped packages。
 
 ## [0.1.6] - 2026-06-07
 

@@ -5,10 +5,13 @@ All notable ALab changes are recorded here. Keep this file in sync with
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-07
+
 ### Added
 
 - Added GitHub Release asset uploads for PyPI wheel/sdist files and zipped
-  packages for the ALab skill bundle plus the three role skills.
+  packages for the ALab skill bundle plus the three role skills, after both
+  Python and ClawHub publish jobs finish successfully.
 
 ## [0.1.6] - 2026-06-07
 
