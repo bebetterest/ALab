@@ -21717,6 +21717,12 @@ def test_clawhub_skill_release_targets_match_current_skill_metadata() -> None:
     assert version == pyproject["project"]["version"]
     assert [release.slug for release in releases] == [
         "alab-skills",
+        "alab-global-admin-skill",
+        "alab-project-controller",
+        "alab-experiment-worker",
+    ]
+    assert [module.read_frontmatter_name(_REPO_ROOT / release.path) for release in releases] == [
+        "alab-skills",
         "alab-global-admin",
         "alab-project-controller",
         "alab-experiment-worker",
@@ -21741,7 +21747,7 @@ def test_clawhub_skill_release_plan_publishes_only_missing_versions() -> None:
     assert plan["version"] == "1.2.3"
     assert plan["should_publish"] is True
     assert plan["missing_slugs"] == [
-        "alab-global-admin",
+        "alab-global-admin-skill",
         "alab-project-controller",
         "alab-experiment-worker",
     ]

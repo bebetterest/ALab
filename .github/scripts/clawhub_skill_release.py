@@ -30,6 +30,7 @@ class SkillRelease:
     path: str
     display_name: str
     changelog: str
+    frontmatter_name: str | None = None
 
 
 SKILL_RELEASES: tuple[SkillRelease, ...] = (
@@ -40,10 +41,11 @@ SKILL_RELEASES: tuple[SkillRelease, ...] = (
         changelog="Release the ALab role skill bundle.",
     ),
     SkillRelease(
-        slug="alab-global-admin",
+        slug="alab-global-admin-skill",
         path="ALabSkills/alab-global-admin",
         display_name="ALab Global Admin",
         changelog="Release the ALab root administration role skill.",
+        frontmatter_name="alab-global-admin",
     ),
     SkillRelease(
         slug="alab-project-controller",
@@ -102,9 +104,10 @@ def validate_releases(repo_root: Path) -> tuple[SkillRelease, ...]:
 
         skill_dir = repo_root / release.path
         actual_name = read_frontmatter_name(skill_dir)
-        if actual_name != release.slug:
+        expected_name = release.frontmatter_name or release.slug
+        if actual_name != expected_name:
             raise ValueError(
-                f"{skill_dir / 'SKILL.md'} has name {actual_name!r}; expected {release.slug!r}."
+                f"{skill_dir / 'SKILL.md'} has name {actual_name!r}; expected {expected_name!r}."
             )
     return SKILL_RELEASES
 
