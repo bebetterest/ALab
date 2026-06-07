@@ -12,13 +12,15 @@ Do not use shell tracing while secrets are in environment variables. Do not incl
 
 ## Project-Scoped Surface
 
-Project controllers may use same-project admin commands:
+A project-level session using `alab-project-controller` may use same-project admin commands:
 
 ```text
 alab project show|archive|unarchive ...
+alab project locks clear-stale ...
 alab status --project <project_id>
 alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab report --project <project_id> [--exp <exp_id>] --out <path> [--overwrite]
+alab key list --project <project_id>
 alab project config show|export|import|set ...
 alab project env set|unset|list ...
 alab project secret set|unset|list|gc ...
@@ -45,7 +47,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Use for project id, status, task, goal, active config version, default source, runner, reward, visibility, and public experiment policy.
 - **`status`**: Get a safe current-state summary.
   Parameters: Optional `--project <project_id>`.
-  Notes: Useful before creating workers or when a context marker is ambiguous.
+  Notes: Useful before creating worker sessions/subagents or when a context marker is ambiguous.
 - **`feedback`**: Leave HOME-level local feedback about ALab behavior, runner issues, docs gaps, or project-operation questions.
   Parameters: Exactly one of `--body <text>` or `--body-file <path>`; optional `--kind suggestion|question|bug|other` and `--title <text>`.
   Notes: Use annotations for project-visible experiment notes; use feedback for local ALab/tooling feedback that should be stored under `ALAB_HOME/feedback/`.
@@ -112,7 +114,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Regenerate writes the raw token to the registered path and never prints it.
 - **`exp tag add|remove|list`**: Manage experiment labels.
   Parameters: Required `<exp_id>`; add/remove also require tag text.
-  Notes: Use tags for search, grouping workers, and comparing related attempts.
+  Notes: Use tags for search, grouping worker sessions/subagents, and comparing related attempts.
 - **`observe experiments|runs|artifacts|logs|annotations`**: Read or maintain project-visible evidence.
   Parameters: See observe filters: experiment/runs/artifacts/logs/annotations list filters, `show <id>`, export `--out`, archive/unarchive, and admin-only remove with dry-run/confirm.
   Notes: Hidden logs require root/admin and explicit `--include-hidden`; use observe outputs as evidence for decisions.
@@ -131,17 +133,19 @@ Use remove commands conservatively:
 
 ## Forbidden Global Surface
 
-Project controllers must not run root-only commands:
+A project-level session using `alab-project-controller` must not run root-only commands:
 
 ```text
 alab auth init
 alab auth root regenerate
+alab dashboard
+alab feedback list|show|archive
 alab key create
 alab key list --root
 alab key revoke
 alab project init
 alab project remove
-alab catalog skydiscover add|update|remove
+alab catalog skydiscover add|update|show|remove
 alab cache prune
 alab backup prune
 ```
@@ -149,6 +153,10 @@ alab backup prune
 `alab key list --project <project_id>` is acceptable for same-project inspection when the admin key permits it. Creating or revoking admin keys is a global-admin task.
 
 ## Experiment Creation Patterns
+
+A project-level session using `alab-project-controller` should normally delegate new experiment implementation. Create the experiment first, then start a separate session/thread in the experiment worktree with the worker prompt, `alab-experiment-worker` skill/instructions, and only that experiment's token context. If separate thread creation is unavailable, use a subagent or worker process with equivalent worktree/token isolation. User instructions override this preference; otherwise, avoid directly implementing experiment changes inside the current project-level session.
+
+Provision only the credential needed for the delegated task. Follow-up project-level coordination may need the project admin key through a private environment variable, ignored secret file, or secure stdin. Experiment implementation should run in the experiment worktree and use the worktree token context written by `exp create`, not the project admin key. Do not put raw keys or tokens in prompt text, command transcripts, copied source files, or shared non-secret directories.
 
 Default source:
 
@@ -170,13 +178,15 @@ printf '%s\n' "$ALAB_PROJECT_KEY" | alab --key-stdin exp create \
 
 ## Worker Launch Pattern
 
-```sh
-env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
-  ALAB_CMD_PREFIX="${ALAB_CMD_PREFIX:-alab}" \
-  codex exec -C "$WORKTREE_PATH" \
-  --sandbox workspace-write \
-  - < "$WORKER_PROMPT"
-```
+Use this pattern after `exp create` has produced a worktree path. For environments that support creating a new thread/session, prefer that path over running the worker inline in the current project-level session. Different agent launchers use different parameters, so treat the following as launch requirements rather than a literal command:
+
+- Set the worker session/thread or subagent working directory or target context to the experiment worktree path.
+- Provide the `alab-experiment-worker` skill/instructions to the worker session/thread or subagent.
+- Provide the worker prompt through the launcher's normal private prompt channel, not through a file committed to the source tree.
+- Clear admin/root credentials and unrelated ambient tokens from the worker environment. This is equivalent to unsetting `ALAB_PROJECT_KEY`, `ALAB_ROOT_KEY`, `ALAB_KEY`, and any unrelated `ALAB_TOKEN`.
+- In shells, the prefix `env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY -u ALAB_TOKEN ...` expresses this cleanup by launching the following process with those variables removed; adapt the same cleanup to non-shell session launchers.
+- Let the worker use only the experiment token context for that worktree, preferably the token file already present in the worktree.
+- If `ALAB_CMD_PREFIX` is needed so the worker can invoke the correct ALab binary, pass only that non-secret command prefix.
 
 If the worker must run ALab from a sandbox and ALab home/cache are outside the worktree, add only the required non-secret state directories:
 
@@ -187,12 +197,12 @@ If the worker must run ALab from a sandbox and ALab home/cache are outside the w
 --add-dir "$ALAB_SHARED_DIR"
 ```
 
-Do not use the repository root as `-C` for a worker. Do not pass the project admin key through argv, stdin prompt text, copied files, inherited environment, `--add-dir "$RUN_DIR"`, `.run/secrets`, or `project.env`.
-Before launching, resolve the worktree path and refuse repo root, the whole `.run` directory, or any secret/control path. Tell workers that added ALab home/cache/shared directories are CLI state only, not source-editing surfaces.
+Do not use the repository root as `-C` for a worker. Do not pass the project admin key through argv, stdin prompt text, copied files, inherited environment, `--add-dir "$RUN_DIR"`, `.run/secrets`, or `project.env`. Clear unrelated ambient token variables before launch; an experiment implementation session should use only the token context for its own worktree.
+Before launching, resolve the worktree path and refuse repo root, the whole `.run` directory, or any secret/control path. Tell worker sessions/subagents that added ALab home/cache/shared directories are CLI state only, not source-editing surfaces.
 
 ## Closeout Report
 
-A project controller final report should include:
+A project-level final report should include:
 
 - project id and active config version,
 - experiments created or reused,

@@ -69,7 +69,7 @@ alab audit list|show ...
 - **`report`**：导出 Markdown project 或 experiment evidence report。
   关键参数：必需 `--project <project_id>` 和 `--out <path>`；可选 `--exp <exp_id>` 和 `--overwrite`。
   注意点：Root 可以导出 project-wide 或 experiment-scoped reports。Report 有意省略 raw keys、tokens、secret values、hidden-log contents 和 artifact bytes。
-- **`key create`**：为 controller 创建 project admin key。
+- **`key create`**：为 project-level session 创建 project admin key。
   关键参数：必需 `--project <project_id>`；可选 `--role admin`。
   注意点：Root-only；raw admin key 只打印一次。
 - **`key list --root`**：查看 root credential rows。
@@ -121,9 +121,13 @@ alab audit list|show ...
   关键参数：必需 `<audit_id>`；可选 `--project <project_id>`。
   注意点：用于验证 credential、project、catalog、cleanup、repair 和 remove actions，不暴露 raw secrets。
 
-Root 必要时也可以 inspect 或维护 project-scoped resources，但日常 experiment coordination 应交给 project controller role。
+Root 必要时也可以 inspect 或维护 project-scoped resources，但日常 experiment coordination 应交给带 project admin key 和 `alab-project-controller` skill/instructions 的 project-level session。
 
 ## Project Initialization
+
+`project init` 成功后，后续 project setup、experiment creation 和 experiment coordination 优先交给带 project admin key 和 `alab-project-controller` skill/instructions 的独立 project-level session。Experiment implementation 和 worktree changes 交给位于 experiment worktree、带 `alab-experiment-worker` skill/instructions、且只使用该 experiment token context 的独立 session/thread。如果无法启动独立 session，则使用具备等价 project/worktree/token 隔离的 subagent 或 worker process。用户指令优先于此偏好；否则 root-admin session 应聚焦 root-scoped setup、credentials、catalogs、cleanup、audit 和 handoff。
+
+只有被委派任务需要时才传递匹配的 credential：root key 只交给 root-admin session，project admin key 只交给该 project 的 project-level session，experiment worktree 或 inspection token 只交给在该 experiment worktree 或 inspection checkout 中工作的 session。优先使用 ignored secret files、private environment variables 或 secure stdin。绝不通过 worker prompts、copied source files、shared non-secret directories 或 command transcripts 传递 root/admin keys。
 
 Local project：
 
@@ -146,8 +150,10 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
   --task "$TASK"
 ```
 
-`project init` 会在 project record 写入后只打印一次 generated project admin key。应将其捕获到 ignored local secret file（例如 example `.run/secrets/project.env`）或已批准的 secret store，然后只把 project admin key 交给 project controllers，绝不交给 workers。
+`project init` 会在 project record 写入后只打印一次 generated project admin key。应将其捕获到 ignored local secret file（例如 example `.run/secrets/project.env`）或已批准的 secret store，然后只把 project admin key 交给被委派的 project-level session，绝不交给 experiment workers。
 成对配置 `runner.type = "none"` 和 `reward.type = "none"` 会创建 free evaluation projects，用于直接 submit 且不运行 baseline evaluator；仅应搭配 `local`、`git` 或 `empty` project init modes 使用，不与 Harbor 或 SkyDiscover adapter init 混用。
+
+如果 root-admin flow 还为了 bootstrap 或 demonstration 创建 experiment，应把后续 experiment operations 委派给该 experiment worktree 中带 `alab-experiment-worker` skill/instructions 的独立 session/thread。如果无法创建独立 thread，则使用具备等价 token 隔离的 subagent 或 worker process，而不是从 root-admin session 中编辑或 submit。
 
 ## Catalog Rules
 
@@ -179,6 +185,9 @@ Global admin handoff 应包含：
 - 可安全分享时的 ALab home path 和 home id；
 - project id、project name 和 active config version；
 - generated project admin key delivery path，或已通过 ignored/secure secret 位置完成 handoff 的确认；
+- 后续仍有 project 或 experiment work 时，对应的 session/thread 或 subagent handoff target；
+- 已向该 target 提供匹配的 ALab skill/instructions（project-level work 用 `alab-project-controller`，experiment worktree work 用 `alab-experiment-worker`）；
+- 任何委派 session 需要 key/token 时，对应的 credential delivery path 或 secure-channel note；
 - 如适用，catalog pinned commit；
 - validation id 和 validation status；
 - 已执行的 cleanup 或 audit actions。

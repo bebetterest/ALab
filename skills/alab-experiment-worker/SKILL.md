@@ -1,19 +1,21 @@
 ---
 name: alab-experiment-worker
-description: Use when operating inside an ALab experiment worktree with a worktree token to inspect status, edit candidate code, run evaluations, submit final results, and read visible experiment evidence without project admin or root privileges.
+description: Use when operating inside one ALab experiment worktree with that worktree token context to inspect status, edit candidate code, run evaluations, submit final results, and read visible experiment evidence without project admin or root privileges.
 ---
 
 # ALab Experiment Worker
 
 ## Overview
 
-Use this skill when Codex is working inside one ALab experiment worktree. The worker improves the candidate source, can inspect visible historical experiment evidence for ideas, runs ALab evaluation from the worktree token context for standard projects, and submits the final result when the project mode allows it.
+Use this skill when working inside one ALab experiment worktree. The worker improves the candidate source, can inspect visible historical experiment evidence for ideas, runs ALab evaluation from that worktree's token context for standard projects, and submits the final result when the project mode allows it.
 
 This skill is not a project manager or global administrator. It must not use project admin keys, root keys, catalog commands, cache commands, project configuration mutation, or lifecycle removal commands.
 
 ## Operating Rules
 
 - Trust only the current worktree context and its `.alab/token`.
+- Do not accept root keys, project admin keys, or tokens for other worktrees or inspection checkouts. If a launcher provides an explicit token, verify that it belongs to the current worktree context before using it.
+- If an operation requires project-level or root authority, stop and report the missing capability instead of requesting or using a higher-privilege key.
 - Do not read, print, copy, commit, or rewrite raw tokens or keys.
 - Do not edit `.alab/`, ALab home records, cache directories, shared run directories, hidden evaluator assets, secret files, or project control files.
 - Edit only task-relevant source files inside the experiment worktree.
@@ -44,7 +46,7 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Inspect visible historical experiments with `alab observe experiments ...` and related visible runs, artifacts, logs, and annotations. Use this evidence to find promising approaches, avoid repeated failures, and understand prior best or final commits. Visibility is still enforced by ALab; do not try to access hidden or unavailable records.
 - When a visible historical experiment looks relevant, create an inspection checkout with `alab exp checkout <exp_id> --path <dir> --commit best|final|latest`, record the rendered inspection commit, read its source code, and compare it with the current worktree before copying anything. Use normal Git comparison tools where helpful, for example `git diff --stat <inspection_commit>..HEAD`, `git diff <inspection_commit> -- <path>`, or `git diff --no-index <inspection_checkout>/<source_path> <current_worktree>/<source_path>` for a direct file/subtree comparison. Copy only task-relevant source files or snippets into the current experiment worktree when they are genuinely useful; never copy `.alab/`, raw tokens, hidden assets, secret files, ALab home/cache files, or project control files.
 - Change task-relevant source files in the worktree and keep the implementation understandable for later workers.
-- Add or list tags on the current experiment when tags are useful evidence for later controllers or workers; tags do not grant visibility.
+- Add or list tags on the current experiment when tags are useful evidence for later project-level sessions or workers; tags do not grant visibility.
 - Keep runner outputs machine-parseable. If the task writes a reward file, put only the configured numeric metrics in that reward file; put case details, traces, or explanations in separate visible artifacts/logs when allowed.
 - Run local cheap checks when they exist, then run `alab run --message "<brief reason>"` for standard evaluation projects. For free evaluation projects, do not force a run; direct submit is expected.
 - Diagnose failed or weak runs using visible stdout/stderr previews, warning codes, artifacts, logs, metrics, and annotations.

@@ -2,7 +2,7 @@
 
 ## Invocation Prefix
 
-Examples below use `alab`. If the launcher provides `ALAB_CMD_PREFIX`, use that prefix for ALab calls exactly as the launcher instructs, for example `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`. Do not print, inspect, or rewrite launcher-provided credential material.
+Examples below use `alab`. If the launcher provides `ALAB_CMD_PREFIX`, use that prefix for ALab calls exactly as the launcher instructs, for example `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`. Do not print, inspect, or rewrite launcher-provided credential material. Use only the current worktree's token context; do not accept root keys, project admin keys, or tokens for other worktrees.
 
 ## Allowed Surface
 
@@ -28,18 +28,20 @@ alab annotate add|edit|archive|unarchive ...
 Worker lifecycle permissions are intentionally narrow:
 
 - `run` and `submit` require the valid worktree token from the current experiment.
+- A worker session should use the current worktree's token file when available. If a token is supplied explicitly, it must match this worktree or inspection checkout.
 - Observe commands show only records visible to the current token.
 - `exp checkout` can create an inspection checkout only for experiments visible to the current token.
 - Experiment tags are metadata only; they never expand visibility.
 - Hidden logs require root/admin and are outside this skill.
 - Worker annotation mutation is limited to visible targets and annotations created by the worker token.
+- Project-level or root-required operations should be reported to a project-level session with the project admin key or to a root-admin session; do not request those keys in the worker session.
 
 ## Function Details
 
 Each entry lists the function, purpose, important parameters, and how to use the result.
 
 - **`alab status`**: Check the current experiment/project state and next action hint.
-  Parameters: Optional `--project <project_id>` only when explicitly provided by a controller; normally run without flags in the worktree.
+  Parameters: Optional `--project <project_id>` only when explicitly provided by a project-level session; normally run without flags in the worktree.
   Use the output for: Confirm context type, project id, experiment id, project status, experiment status, and whether work can continue.
 - **`alab help`**: Inspect the commands available to the current worktree token.
   Parameters: `--all --explain` may show locked commands and safe reasons.
@@ -57,10 +59,10 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Standard evaluation projects require a supporting passed run or `--rerun` to create one. Free evaluation projects do not have an evaluator; omit `--rerun`, submit directly, and expect `final run id: none`.
 - **`alab exp checkout`**: Create an inspection checkout of a visible historical experiment at a selected commit.
   Parameters: Required `<exp_id>` and `--path <dir>`; optional `--commit final|latest|best|<sha>`. Use an empty path outside the current worktree and other ALab contexts.
-  Use the output for: A read-only comparison workspace with source code from a visible prior experiment. Read it for implementation ideas, then copy only genuinely useful task-relevant source files or snippets into the current worktree. Do not copy `.alab/`, raw tokens, hidden assets, or project control files. Record any inspection path you create so a controller can clean it up later; do not edit inside inspection checkouts.
+  Use the output for: A read-only comparison workspace with source code from a visible prior experiment. Read it for implementation ideas, then copy only genuinely useful task-relevant source files or snippets into the current worktree. Do not copy `.alab/`, raw tokens, hidden assets, or project control files. Record any inspection path you create so a project-level session can clean it up later; do not edit inside inspection checkouts.
 - **`alab exp tag add|remove|list`**: Add or inspect metadata tags on the current experiment.
   Parameters: `add`/`remove` require `<exp_id> <tag>`; `list` requires `<exp_id>`.
-  Use the output for: Marking useful worker-local evidence such as `promising`, `needs-review`, or task-specific labels when the controller expects tags. Tags are not authorization and should not replace submit refs.
+  Use the output for: Marking useful worker-local evidence such as `promising`, `needs-review`, or task-specific labels when the project-level session expects tags. Tags are not authorization and should not replace submit refs.
 - **`alab report`**: Export a Markdown report for a visible experiment.
   Parameters: Required `--exp <exp_id> --out <path>`; optional `--overwrite`. In a worktree context, `--project` is usually supplied by the context.
   Use the output for: A local handoff/evidence file containing safe metadata, runs, submission text, and visible artifact/log metadata. Worker reports cannot include hidden logs, raw secrets, tokens, or artifact bytes.
@@ -87,13 +89,13 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Use the output for: Examine outputs, generated reports, or files that explain prior results. Artifact bytes are not guaranteed to be secret-redacted; inspect only what is needed and do not paste raw artifact contents into final feedback unless it is clearly safe and relevant.
 - **`observe logs list/show/export`**: Inspect or export visible logs.
   Parameters: List filters include `--exp`, `--run`, `--validation`, `--stream stdout|stderr|hidden_stdout|hidden_stderr`, `--truncated`, timestamps, and archive flags. Worker tokens cannot use hidden logs.
-  Use the output for: Diagnose failures using visible stdout/stderr content and previews. Quote only short, relevant visible snippets in summaries; never request or reproduce hidden-log content in the worker role.
+  Use the output for: Diagnose failures using visible stdout/stderr content and previews. Quote only short, relevant visible snippets in summaries; never request or reproduce hidden-log content in the worker session.
 - **`observe annotations list/show`**: Read visible notes and review comments.
   Parameters: List filters include `--target-type`, `--target-id`, `--author`, `--created-by`, `--private`, `--query`, timestamps, and `--include-archived`; show accepts `<annotation_id>` and optional `--history`. Use `--target-type none` to find targetless notes.
   Use the output for: Capture prior guidance, known issues, and rationale attached to experiments, runs, or artifacts.
 - **`annotate add/edit/archive/unarchive`**: Add or maintain worker-visible notes.
   Parameters: `add` accepts an optional `--target <target>` and one of `--body`/`--body-file`; targetless notes require `--title <title>` and bind to the current experiment. Targeted notes may also use `--title`. Optional `--author` and `--private` are available. `edit` requires `<annotation_id>` and one body input. Archive/unarchive require `<annotation_id>`.
-  Use the output for: Leave useful evidence for later workers without changing project configuration. Common targets are `exp:<exp_id>`, `run:<run_id>`, `artifact:<artifact_id>`, `path:<repo_path>`, `lines:<repo_path>:<start>-<end>`, `path:<exp_id>@<commitish>:<repo_path>`, and `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`. Omit `--target` and provide `--title` for a current-experiment note that is not tied to one object or path. In experiment context, path/line shorthand requires a clean worktree. Do not use admin/root-only `--exp` from the worker role.
+  Use the output for: Leave useful evidence for later workers without changing project configuration. Common targets are `exp:<exp_id>`, `run:<run_id>`, `artifact:<artifact_id>`, `path:<repo_path>`, `lines:<repo_path>:<start>-<end>`, `path:<exp_id>@<commitish>:<repo_path>`, and `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`. Omit `--target` and provide `--title` for a current-experiment note that is not tied to one object or path. In experiment context, path/line shorthand requires a clean worktree. Do not use admin/root-only `--exp` from the worker session.
 
 ## Working Flow
 
@@ -151,11 +153,11 @@ git diff --no-index /tmp/alab-inspect-<exp_id>/<source_path> <current_worktree>/
 
 `git diff --no-index` returns exit code `1` when differences exist; treat that as useful comparison output, not as an ALab failure. Read and compare the checkout before copying anything. Copy only source content that advances the current task, adapt it to the current worktree, and keep the copied influence visible in the final `--ref <exp_id>` and feedback. Never copy `.alab/`, token files, ALab home/cache files, hidden evaluator assets, secret files, or project control files.
 
-Inspection checkouts are comparison surfaces, not editable source surfaces. Keep their paths out of commits and final artifacts. If cleanup is needed, report the path to a controller unless `alab help` in the checkout context explicitly shows a self-removal command available to that inspection token.
+Inspection checkouts are comparison surfaces, not editable source surfaces. Keep their paths out of commits and final artifacts. If cleanup is needed, report the path to a project-level session unless `alab help` in the checkout context explicitly shows a self-removal command available to that inspection token.
 
 ## Forbidden Surface
 
-Do not run these from the worker role:
+Do not run these from the worker session:
 
 ```text
 alab auth ...
@@ -177,7 +179,7 @@ alab exp token ...
 
 Also avoid direct file edits outside the current experiment worktree. If a launcher added ALab home/cache directories for CLI state, use them only through ALab commands.
 
-If one of these is necessary, report the need to a project controller or global admin.
+If one of these is necessary, report the need to a project-level session or root-admin session.
 
 ## Evaluation Pattern
 

@@ -2,7 +2,7 @@
 
 ## 调用前缀
 
-下面的示例使用 `alab`。如果 launcher 提供 `ALAB_CMD_PREFIX`，ALab 调用应按 launcher 指示使用该 prefix，例如 `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`。不要打印、检查或改写 launcher 提供的 credential material。
+下面的示例使用 `alab`。如果 launcher 提供 `ALAB_CMD_PREFIX`，ALab 调用应按 launcher 指示使用该 prefix，例如 `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`。不要打印、检查或改写 launcher 提供的 credential material。只使用当前 worktree 的 token context；不要接受 root keys、project admin keys，或其他 worktrees 的 tokens。
 
 ## 允许的 Surface
 
@@ -28,18 +28,20 @@ alab annotate add|edit|archive|unarchive ...
 Worker lifecycle 权限有意保持很窄：
 
 - `run` 和 `submit` 需要当前 experiment 的 valid worktree token。
+- Worker session 应优先使用当前 worktree 的 token file。如果显式提供 token，它必须匹配这个 worktree 或 inspection checkout。
 - Observe commands 只显示当前 token 可见的 records。
 - `exp checkout` 只能为当前 token 可见的 experiments 创建 inspection checkout。
 - Experiment tags 只是 metadata；它们绝不会扩展 visibility。
 - Hidden logs 需要 root/admin，不属于本 skill。
 - Worker annotation mutation 只限于 visible targets 和由该 worker token 创建的 annotations。
+- Project-level 或 root-required operations 应报告给带 project admin key 的 project-level session 或 root-admin session；不要在 worker session 中请求这些 keys。
 
 ## 功能明细
 
 每项说明功能、作用、关键参数和输出/注意点。
 
 - **`alab status`**：检查当前 experiment/project 状态和 next action hint。
-  关键参数：只有 controller 明确给出时才使用可选 `--project <project_id>`；通常在 worktree 内不带 flags 运行。
+  关键参数：只有 project-level session 明确给出时才使用可选 `--project <project_id>`；通常在 worktree 内不带 flags 运行。
   输出用途：确认 context type、project id、experiment id、project status、experiment status，以及是否可继续工作。
 - **`alab help`**：查看当前 worktree token 可用 commands。
   关键参数：`--all --explain` 可以显示 locked commands 和安全原因。
@@ -57,10 +59,10 @@ Worker lifecycle 权限有意保持很窄：
   注意点：Standard evaluation projects 需要 supporting passed run，或用 `--rerun` 创建一个。Free evaluation projects 没有 evaluator；省略 `--rerun`，直接 submit，并预期输出 `final run id: none`。
 - **`alab exp checkout`**：在选定 commit 上为一个可见历史 experiment 创建 inspection checkout。
   关键参数：必需 `<exp_id>` 和 `--path <dir>`；可选 `--commit final|latest|best|<sha>`。使用当前 worktree 和其他 ALab contexts 之外的空路径。
-  输出用途：得到一个用于只读比较的 workspace，其中包含可见 prior experiment 的源码。阅读代码以寻找实现思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。记录自己创建的 inspection path，方便 controller 后续清理；不要在 inspection checkouts 内编辑。
+  输出用途：得到一个用于只读比较的 workspace，其中包含可见 prior experiment 的源码。阅读代码以寻找实现思路，然后只把确实有用、任务相关的 source files 或 snippets 复制到当前 worktree。不要复制 `.alab/`、raw tokens、hidden assets 或 project control files。记录自己创建的 inspection path，方便 project-level session 后续清理；不要在 inspection checkouts 内编辑。
 - **`alab exp tag add|remove|list`**：为当前 experiment 添加或查看 metadata tags。
   关键参数：`add`/`remove` 需要 `<exp_id> <tag>`；`list` 需要 `<exp_id>`。
-  输出用途：当 controller 预期 tags 时，标记有用的 worker-local evidence，例如 `promising`、`needs-review` 或任务相关标签。Tags 不是 authorization，也不能替代 submit refs。
+  输出用途：当 project-level session 预期 tags 时，标记有用的 worker-local evidence，例如 `promising`、`needs-review` 或任务相关标签。Tags 不是 authorization，也不能替代 submit refs。
 - **`alab report`**：为一个 visible experiment 导出 Markdown report。
   关键参数：必需 `--exp <exp_id> --out <path>`；可选 `--overwrite`。在 worktree context 中，`--project` 通常由 context 提供。
   输出用途：生成本地 handoff/evidence 文件，包含 safe metadata、runs、submission text，以及可见 artifact/log metadata。Worker report 不包含 hidden logs、raw secrets、tokens 或 artifact bytes。
@@ -87,13 +89,13 @@ Worker lifecycle 权限有意保持很窄：
   输出用途：检查 outputs、generated reports 或解释 prior results 的文件。Artifact bytes 不保证已经 secret-redacted；只检查必要内容，除非明确安全且相关，不要把 raw artifact contents 粘贴到最终 feedback。
 - **`observe logs list/show/export`**：查看或导出可见 logs。
   关键参数：List filters 包括 `--exp`、`--run`、`--validation`、`--stream stdout|stderr|hidden_stdout|hidden_stderr`、`--truncated`、timestamps 和 archive flags。Worker tokens 不能使用 hidden logs。
-  输出用途：用可见 stdout/stderr content 和 previews 诊断失败。Summary 中只引用短小、相关的可见片段；worker role 下绝不请求或复述 hidden-log content。
+  输出用途：用可见 stdout/stderr content 和 previews 诊断失败。Summary 中只引用短小、相关的可见片段；worker session 下绝不请求或复述 hidden-log content。
 - **`observe annotations list/show`**：读取可见 notes 和 review comments。
   关键参数：List filters 包括 `--target-type`、`--target-id`、`--author`、`--created-by`、`--private`、`--query`、timestamps 和 `--include-archived`；show 接受 `<annotation_id>` 和可选 `--history`。使用 `--target-type none` 可查找 targetless notes。
   输出用途：捕获 prior guidance、known issues，以及挂在 experiments、runs、artifacts 上的 rationale。
 - **`annotate add/edit/archive/unarchive`**：添加或维护 worker-visible notes。
   关键参数：`add` 接受可选 `--target <target>` 和 `--body`/`--body-file` 二选一；targetless notes 必须提供 `--title <title>`，并绑定当前 experiment。Targeted notes 也可使用 `--title`。可选 `--author`、`--private`。`edit` 需要 `<annotation_id>` 和一个 body input。Archive/unarchive 需要 `<annotation_id>`。
-  输出用途：给后续 workers 留下有用证据，不改变 project configuration。常用 targets 包括 `exp:<exp_id>`、`run:<run_id>`、`artifact:<artifact_id>`、`path:<repo_path>`、`lines:<repo_path>:<start>-<end>`、`path:<exp_id>@<commitish>:<repo_path>` 和 `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`。如果 note 不绑定单个 object 或 path，可省略 `--target` 并提供 `--title`，作为当前 experiment note。在 experiment context 中，path/line shorthand 要求 clean worktree。Worker role 不要使用 admin/root-only 的 `--exp`。
+  输出用途：给后续 workers 留下有用证据，不改变 project configuration。常用 targets 包括 `exp:<exp_id>`、`run:<run_id>`、`artifact:<artifact_id>`、`path:<repo_path>`、`lines:<repo_path>:<start>-<end>`、`path:<exp_id>@<commitish>:<repo_path>` 和 `lines:<exp_id>@<commitish>:<repo_path>:<start>-<end>`。如果 note 不绑定单个 object 或 path，可省略 `--target` 并提供 `--title`，作为当前 experiment note。在 experiment context 中，path/line shorthand 要求 clean worktree。Worker session 不要使用 admin/root-only 的 `--exp`。
 
 ## 工作流程
 
@@ -151,11 +153,11 @@ git diff --no-index /tmp/alab-inspect-<exp_id>/<source_path> <current_worktree>/
 
 `git diff --no-index` 在发现差异时会返回 exit code `1`；这代表有可用的对比输出，不应视作 ALab failure。先阅读并对比 checkout，再决定是否复制。只复制能推进当前任务的 source content，并根据当前 worktree 进行调整；如果最终结果受该内容影响，应在 final `--ref <exp_id>` 和 feedback 中保留引用。绝不复制 `.alab/`、token files、ALab home/cache files、hidden evaluator assets、secret files 或 project control files。
 
-Inspection checkouts 是比较 surface，不是 editable source surface。不要把它们的路径写入 commits 或 final artifacts。如果需要清理，应把 path 报告给 controller；只有在该 checkout context 的 `alab help` 明确显示 inspection token 可用 self-removal command 时才自行清理。
+Inspection checkouts 是比较 surface，不是 editable source surface。不要把它们的路径写入 commits 或 final artifacts。如果需要清理，应把 path 报告给 project-level session；只有在该 checkout context 的 `alab help` 明确显示 inspection token 可用 self-removal command 时才自行清理。
 
 ## 禁止的 Surface
 
-Worker role 不要运行这些 commands：
+Worker session 不要运行这些 commands：
 
 ```text
 alab auth ...
@@ -177,7 +179,7 @@ alab exp token ...
 
 也不要直接编辑当前 experiment worktree 之外的文件。如果 launcher 为 CLI state 加入了 ALab home/cache directories，只通过 ALab commands 使用它们。
 
-如果确实需要其中某项能力，应报告给 project controller 或 global admin。
+如果确实需要其中某项能力，应报告给 project-level session 或 root-admin session。
 
 ## Evaluation Pattern
 

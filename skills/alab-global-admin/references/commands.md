@@ -69,7 +69,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`report`**: Export a Markdown project or experiment evidence report.
   Parameters: Required `--project <project_id>` and `--out <path>`; optional `--exp <exp_id>` and `--overwrite`.
   Notes: Root can export project-wide or experiment-scoped reports. Reports intentionally omit raw keys, tokens, secret values, hidden-log contents, and artifact bytes.
-- **`key create`**: Create a project admin key for a controller.
+- **`key create`**: Create a project admin key for a project-level session.
   Parameters: Required `--project <project_id>`; optional `--role admin`.
   Notes: Root-only; prints raw admin key exactly once.
 - **`key list --root`**: Inspect root credential rows.
@@ -121,9 +121,13 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Parameters: Required `<audit_id>`; optional `--project <project_id>`.
   Notes: Use to verify credential, project, catalog, cleanup, repair, and remove actions without raw secrets.
 
-Root can also inspect or maintain project-scoped resources when needed, but should delegate normal experiment coordination to the project controller role.
+Root can also inspect or maintain project-scoped resources when needed, but should delegate normal experiment coordination to a project-level session with the project admin key and `alab-project-controller` skill/instructions.
 
 ## Project Initialization
+
+After `project init` succeeds, prefer handing follow-up project setup, experiment creation, and experiment coordination to a separate project-level session with the project admin key and `alab-project-controller` skill/instructions. Hand experiment implementation and worktree changes to a separate session/thread in the experiment worktree with `alab-experiment-worker` skill/instructions and only that experiment's token context. If a separate session cannot be started, use a subagent or worker process with equivalent project/worktree/token isolation. User instructions override this preference; otherwise, keep the root-admin session focused on root-scoped setup, credentials, catalogs, cleanup, audit, and handoff.
+
+Pass the matching credential only when the delegated task needs it: root key only to a root-admin session, project admin key only to a project-level session for that project, and experiment worktree or inspection token only to the session working in that experiment worktree or inspection checkout. Prefer ignored secret files, private environment variables, or secure stdin. Never pass root/admin keys through worker prompts, copied source files, shared non-secret directories, or command transcripts.
 
 Local project:
 
@@ -146,8 +150,10 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
   --task "$TASK"
 ```
 
-`project init` prints the generated project admin key exactly once after the project record is written. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to project controllers, never to workers.
+`project init` prints the generated project admin key exactly once after the project record is written. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to the delegated project-level session, never to experiment workers.
 Configs with paired `runner.type = "none"` and `reward.type = "none"` create free evaluation projects for direct submit without baseline evaluator runs; use them only with `local`, `git`, or `empty` project init modes, not Harbor or SkyDiscover adapter init.
+
+If the root-admin flow also creates an experiment for bootstrap or demonstration, delegate any additional experiment operations to a separate session/thread in the experiment worktree with `alab-experiment-worker` skill/instructions. If separate thread creation is unavailable, use a subagent or worker process with equivalent token isolation instead of editing or submitting from the root-admin session.
 
 ## Catalog Rules
 
@@ -179,6 +185,9 @@ A global admin handoff should include:
 - ALab home path and home id when safe,
 - project id, project name, and active config version,
 - generated project admin key delivery path or confirmation that it was handed off through an ignored/secure secret location,
+- follow-up session/thread or subagent handoff target when further project or experiment work remains,
+- matching ALab skill/instructions provided to that target (`alab-project-controller` for project-level work, `alab-experiment-worker` for experiment worktree work),
+- credential delivery path or secure-channel note for any delegated session that needs a key/token,
 - catalog pinned commit when applicable,
 - validation id and validation status,
 - cleanup or audit actions performed.

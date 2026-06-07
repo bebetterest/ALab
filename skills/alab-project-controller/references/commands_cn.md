@@ -12,13 +12,15 @@ printf '%s\n' "$ALAB_PROJECT_KEY" | alab --key-stdin project show --project "$AL
 
 ## Project-Scoped Surface
 
-Project controller 可以使用 same-project admin commands：
+使用 `alab-project-controller` 的 project-level session 可以使用 same-project admin commands：
 
 ```text
 alab project show|archive|unarchive ...
+alab project locks clear-stale ...
 alab status --project <project_id>
 alab feedback --kind suggestion|question|bug|other --body "<text>"
 alab report --project <project_id> [--exp <exp_id>] --out <path> [--overwrite]
+alab key list --project <project_id>
 alab project config show|export|import|set ...
 alab project env set|unset|list ...
 alab project secret set|unset|list|gc ...
@@ -45,7 +47,7 @@ alab audit list|show --project <project_id> ...
   注意点：用于确认 project id、status、task、goal、active config version、default source、runner、reward、visibility 和 public experiment policy。
 - **`status`**：获取安全的当前状态 summary。
   关键参数：可选 `--project <project_id>`。
-  注意点：创建 workers 前或 context marker 不明确时很有用。
+  注意点：创建 worker sessions/subagents 前或 context marker 不明确时很有用。
 - **`feedback`**：为 ALab behavior、runner issues、docs gaps 或 project-operation questions 留 HOME-level local feedback。
   关键参数：`--body <text>` 或 `--body-file <path>` 二选一；可选 `--kind suggestion|question|bug|other` 和 `--title <text>`。
   注意点：project-visible experiment notes 用 annotations；local ALab/tooling feedback 用 feedback，存储在 `ALAB_HOME/feedback/`。
@@ -112,7 +114,7 @@ alab audit list|show --project <project_id> ...
   注意点：Regenerate 会把 raw token 写到 registered path，永不打印。
 - **`exp tag add|remove|list`**：管理 experiment labels。
   关键参数：必需 `<exp_id>`；add/remove 还需要 tag text。
-  注意点：用于 search、worker 分组和比较相关 attempts。
+  注意点：用于 search、worker sessions/subagents 分组和比较相关 attempts。
 - **`observe experiments|runs|artifacts|logs|annotations`**：读取或维护 project-visible evidence。
   关键参数：使用对应 observe filters：experiment/runs/artifacts/logs/annotations list filters、`show <id>`、export `--out`、archive/unarchive，以及 admin-only remove dry-run/confirm。
   注意点：Hidden logs 需要 root/admin 和显式 `--include-hidden`；observe outputs 是决策证据。
@@ -131,17 +133,19 @@ alab audit list|show --project <project_id> ...
 
 ## 禁止的 Global Surface
 
-Project controller 不应运行 root-only commands：
+使用 `alab-project-controller` 的 project-level session 不应运行 root-only commands：
 
 ```text
 alab auth init
 alab auth root regenerate
+alab dashboard
+alab feedback list|show|archive
 alab key create
 alab key list --root
 alab key revoke
 alab project init
 alab project remove
-alab catalog skydiscover add|update|remove
+alab catalog skydiscover add|update|show|remove
 alab cache prune
 alab backup prune
 ```
@@ -149,6 +153,10 @@ alab backup prune
 当 admin key 允许时，`alab key list --project <project_id>` 可用于 same-project inspection。创建或 revoke admin key 属于 global-admin task。
 
 ## Experiment Creation Patterns
+
+使用 `alab-project-controller` 的 project-level session 通常应委派新的 experiment implementation。先创建 experiment，然后在该 experiment worktree 中用 worker prompt、`alab-experiment-worker` skill/instructions，以及只使用该 experiment 的 token context 启动独立 session/thread。如果无法创建独立 thread，则使用具备等价 worktree/token 隔离的 subagent 或 worker process。用户指令优先于此偏好；如果用户没有特别要求，应避免在当前 project-level session 中直接实现 experiment changes。
+
+只提供被委派任务所需的 credential。后续 project-level coordination 可能需要通过私有 environment variable、ignored secret file 或 secure stdin 接收 project admin key。Experiment implementation 应在 experiment worktree 中运行，并使用 `exp create` 写入的 worktree token context，而不是 project admin key。不要把 raw keys 或 tokens 放进 prompt text、command transcripts、copied source files 或 shared non-secret directories。
 
 Default source：
 
@@ -170,13 +178,15 @@ printf '%s\n' "$ALAB_PROJECT_KEY" | alab --key-stdin exp create \
 
 ## Worker Launch Pattern
 
-```sh
-env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
-  ALAB_CMD_PREFIX="${ALAB_CMD_PREFIX:-alab}" \
-  codex exec -C "$WORKTREE_PATH" \
-  --sandbox workspace-write \
-  - < "$WORKER_PROMPT"
-```
+在 `exp create` 生成 worktree path 后使用此模式。对于支持创建新 thread/session 的环境，优先使用新 session，而不是在当前 project-level session 中 inline 运行 worker。不同 agent launcher 的参数不同，因此下面是 launch requirements，不是 literal command：
+
+- 将 worker session/thread 或 subagent 的 working directory 或 target context 设为 experiment worktree path。
+- 给 worker session/thread 或 subagent 提供 `alab-experiment-worker` skill/instructions。
+- 通过 launcher 正常的私有 prompt channel 提供 worker prompt，不要把 prompt 写入会提交到 source tree 的文件。
+- 从 worker environment 中清除 admin/root credentials 和无关 ambient tokens。这等价于 unset `ALAB_PROJECT_KEY`、`ALAB_ROOT_KEY`、`ALAB_KEY` 以及任何无关的 `ALAB_TOKEN`。
+- 在 shell 中，前缀 `env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY -u ALAB_TOKEN ...` 表达的就是这个清理动作：用移除了这些变量的环境启动后续 process；如果使用非 shell 的 session launcher，也要做等价清理。
+- 让 worker 只使用该 worktree 的 experiment token context，优先使用 worktree 中已有的 token file。
+- 如果 worker 需要 `ALAB_CMD_PREFIX` 才能调用正确的 ALab binary，只传递这个非 secret command prefix。
 
 如果 worker 在 sandbox 中运行 ALab，且 ALab home/cache 位于 worktree 外，只加入必需的非 secret state directories：
 
@@ -187,12 +197,12 @@ env -u ALAB_PROJECT_KEY -u ALAB_ROOT_KEY -u ALAB_KEY \
 --add-dir "$ALAB_SHARED_DIR"
 ```
 
-不要把 repository root 作为 worker 的 `-C`。不要通过 argv、stdin prompt text、copied files、inherited environment、`--add-dir "$RUN_DIR"`、`.run/secrets` 或 `project.env` 传递 project admin key。
-启动前解析 worktree path，并拒绝 repo root、整个 `.run` 目录或任何 secret/control path。告知 workers：加入的 ALab home/cache/shared directories 只是 CLI state，不是 source-editing surface。
+不要把 repository root 作为 worker 的 `-C`。不要通过 argv、stdin prompt text、copied files、inherited environment、`--add-dir "$RUN_DIR"`、`.run/secrets` 或 `project.env` 传递 project admin key。启动前清掉无关的 ambient token variables；experiment implementation session 只应使用自己 worktree 对应的 token context。
+启动前解析 worktree path，并拒绝 repo root、整个 `.run` 目录或任何 secret/control path。告知 worker sessions/subagents：加入的 ALab home/cache/shared directories 只是 CLI state，不是 source-editing surface。
 
 ## Closeout Report
 
-Project controller 的最终报告应包含：
+Project-level final report 应包含：
 
 - project id 与 active config version；
 - 创建或复用的 experiments；

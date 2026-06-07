@@ -1,19 +1,21 @@
 ---
 name: alab-experiment-worker
-description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 worktree token 检查状态、修改候选代码、运行 evaluation、提交最终结果、读取可见实验证据，而不能使用 project admin 或 root 权限时使用。
+description: 当位于一个 ALab experiment worktree 中，并且只应使用该 worktree token context 检查状态、修改候选代码、运行 evaluation、提交最终结果、读取可见实验证据，而不能使用 project admin 或 root 权限时使用。
 ---
 
 # ALab Experiment Worker
 
 ## 概览
 
-当 Codex 在一个 ALab experiment worktree 内工作时使用本 skill。Worker 负责改进候选源码，可以查看可见范围内的历史 experiment 证据来寻找思路，在 standard projects 中通过 worktree token context 运行 ALab evaluation，并在当前 project mode 允许时提交最终结果。
+当在一个 ALab experiment worktree 内工作时使用本 skill。Worker 负责改进候选源码，可以查看可见范围内的历史 experiment 证据来寻找思路，在 standard projects 中通过该 worktree 的 token context 运行 ALab evaluation，并在当前 project mode 允许时提交最终结果。
 
 本 skill 不是 project manager 或 global administrator。不得使用 project admin key、root key、catalog command、cache command、project config mutation 或 lifecycle removal command。
 
 ## 操作规则
 
 - 只信任当前 worktree context 及其 `.alab/token`。
+- 不接受 root keys、project admin keys，或其他 worktrees / inspection checkouts 的 tokens。如果 launcher 显式提供 token，使用前先确认它属于当前 worktree context。
+- 如果某项操作需要 project-level 或 root authority，停止并报告缺失能力，不要请求或使用更高权限 key。
 - 不读取、打印、复制、提交或重写 raw token/key。
 - 不编辑 `.alab/`、ALab home records、cache directories、shared run directories、hidden evaluator assets、secret files 或 project control files。
 - 只修改 experiment worktree 内与任务相关的 source files。
@@ -44,7 +46,7 @@ description: 当 Codex 位于 ALab experiment worktree 中，并且只应使用 
 - 用 `alab observe experiments ...` 以及相关的可见 runs、artifacts、logs、annotations 查看历史 experiments。可以用这些证据寻找有希望的方案、避免重复失败，并理解 prior best 或 final commits。可见性仍由 ALab 强制执行；不要尝试访问 hidden 或 unavailable records。
 - 当某个可见历史 experiment 看起来相关时，用 `alab exp checkout <exp_id> --path <dir> --commit best|final|latest` 创建 inspection checkout，记录输出中的 inspection commit，阅读其源码，并先与当前 worktree 对比后再决定是否复制。需要时使用常规 Git 对比工具，例如 `git diff --stat <inspection_commit>..HEAD`、`git diff <inspection_commit> -- <path>`，或用 `git diff --no-index <inspection_checkout>/<source_path> <current_worktree>/<source_path>` 直接比较文件/子目录。只有在确实有帮助时，才把任务相关的 source files 或 snippets 复制到当前 experiment worktree；绝不复制 `.alab/`、raw token、hidden assets、secret files、ALab home/cache files 或 project control files。
 - 修改 worktree 内与任务相关的 source files，并保持实现足够清晰，方便后续 worker 延续。
-- 当 tags 对后续 controller 或 worker 有证据价值时，可以为当前 experiment 添加或列出 tags；tags 不授予 visibility。
+- 当 tags 对后续 project-level sessions 或 workers 有证据价值时，可以为当前 experiment 添加或列出 tags；tags 不授予 visibility。
 - 保持 runner outputs 可被机器解析。若任务写 reward file，只把配置要求的 numeric metrics 放入该 reward file；case details、trace 或 explanation 应在允许时放到单独的可见 artifact/log。
 - 若存在本地轻量检查，先运行这些检查；standard evaluation projects 再用 `alab run --message "<brief reason>"` 运行 evaluation。Free evaluation projects 不要强行 run，direct submit 是预期流程。
 - 使用可见 stdout/stderr preview、warning code、artifact、log、metric 和 annotation 诊断 failed 或 weak runs。
