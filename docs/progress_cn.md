@@ -12,7 +12,7 @@
 
 Blueprint 和 subsystem specs 仍是规范性产品契约。
 
-## 当前位置 - 2026-06-05
+## 当前位置 - 2026-06-07
 
 ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local CLI、SQLite home/auth/context foundations、HOME-level agent feedback capture、root-only local read-only dashboard、project/source/experiment lifecycle、local/Docker/Harbor/SkyDiscover runners and adapters、observe/collaboration surfaces、audit、cleanup 和 default contract tests。
 
@@ -24,20 +24,23 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 
 当前 examples 也包括 `examples/free_evaluation_intro_site/`：这是一个 runnable free evaluation manual-review task，worker 完成简体中文静态介绍站后，不执行 `alab run`，直接 submit。
 
-当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在 2026-06-05 free evaluation workspace review 中重跑。当前 evidence ledger 没有已知缺失实现：
+当前 dashboard static behavior 也包括 2026-06-07 `0.1.8` presentation fixes：红色 best-so-far reward trend series 现在会在后续非最佳 runs 上保持此前最佳值，同时 new-best marker/count behavior 仍然独立保留；project detail sticky tabs 在滚动时会贴住 detail header，并使用不透明的 full-width background；run detail KPI rows 会为滚动条预留空间，metric notes 不再被裁切。当前 CI release behavior 也会先运行 version synchronization gate，在 lint、tests、opt-in gates 或 publish jobs 之前检查 `pyproject.toml`、`uv.lock`、`src/alab/__init__.py`、`CHANGELOG.md` 和 `CHANGELOG_cn.md`。
 
-- `docs/completion_audit.md` 已为 free evaluation mode edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
-- Latest full default-suite closeout gate 已在 2026-06-05 free evaluation review 中通过。此前 2026-06-05 annotation title 和 targetless annotation review 仍作为 annotation titles 和 targetless annotations 的 closeout evidence，2026-06-04 project lifecycle service extraction and lazy compatibility-export review 仍作为将 project list/show/archive/unarchive/remove/locks handlers 移出 `src/alab/services.py` 的 closeout evidence。Sandbox full-suite runs 仍可能只因为 dashboard tests 需要绑定 loopback ports 且 managed sandbox 以 `PermissionError` 拒绝而失败；elevated full default-suite validation 仍是本地 worktree 的 completion-quality gate。
-- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation；all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
+当前 worktree 的 default/local runnable V1 implementation 仍然覆盖面较广，且 default suite 已在 2026-06-07 `0.1.8` dashboard static release review 中重跑。当前 evidence ledger 没有已知缺失实现：
+
+- `docs/completion_audit.md` 已为 dashboard static presentation edges、free evaluation mode edge 更新当前 evidence rows，除 status legend 和 future-state instructions 外，没有已知 active `PARTIAL`、`PENDING` 或 `ENV-GATED` V1 requirement row。
+- Latest full default-suite closeout gate 已在 2026-06-07 `0.1.8` dashboard static 和 CI version-sync review 中通过，命令为 elevated `.venv/bin/python -m pytest -q`。Sandbox full-suite run 仍只会因为 dashboard tests 需要绑定 loopback ports 且 managed sandbox 以 `PermissionError` 拒绝而失败；elevated full default-suite validation 仍是本地 worktree 的 completion-quality gate。
+- Real Docker-backed Docker/Harbor/SkyDiscover Docker behavior、real Docker capability refresh、SkyDiscover Python local-wheel/network/native dependency behavior 和 live SkyDiscover catalog behavior 在当前 Darwin/Docker Desktop worktree 及当前网络上已有 opt-in validation。2026-06-07 在启用 `ALAB_RUN_REAL_DOCKER`、`ALAB_RUN_LIVE_SKYDISCOVER_CATALOG`、`ALAB_RUN_REAL_SKYDISCOVER_PYTHON`、`ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON` 和 `ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON` 后，默认 full suite 中 skipped 的 opt-in subset 已通过；此前 all-opt-in full suite 的 JUnit 结果为 `tests=390`、`skipped=0`、`failures=0`、`errors=0`。
 - Free evaluation batch 的 focused migration/schema/CLI smoke checks、project config import/validation checks、CLI docs contract checks、full `ruff`、强制 `compileall`、`git diff --check`、sandbox full-suite dashboard-bind failure confirmation 和 elevated full default suite 已通过。Feedback lifecycle batch 的 focused feedback lifecycle、CLI registry/spec/error-code/capability、documentation、dashboard 和 full default-suite checks 已通过；feedback extraction 的 focused feedback/auth/contract checks、`compileall`、docs checks 和 elevated full default suite 已通过；audit extraction 的 focused audit/registry contract checks、import-order checks、`compileall`、docs checks 和 elevated full default suite 已通过；dashboard extraction 的 focused dashboard socket/static/registry contract checks、import-order checks、docs checks 和 elevated full default suite 已通过；catalog extraction 的 focused catalog lifecycle/ref/blocker checks、migration catalog/cache contract checks、full relevant ruff checks、registry-derived CLI contract checks、`compileall` 和 elevated full default suite 已通过；annotation/observe/report/source extraction batch 的 focused annotation/observe/report/source contract 和 smoke checks、full relevant ruff checks、`compileall`、sandbox full-suite dashboard-bind failure confirmation 和 elevated full default suite 已通过；helper/credentials/maintenance extraction 的 focused removal/trash、auth/key 和 maintenance lifecycle tests、full relevant ruff checks、`compileall`、docs checks、sandbox full-suite dashboard-bind failure confirmation 和 elevated full default suite 已通过；stable-boundary project/experiment extraction 的 focused project config/env/secret、project validation、experiment query/observe aliases、experiment archive/remove、worktree/token/checkout、project lifecycle/remove、registry-derived parser/option/typed-value、ruff、`compileall`、docs 和 full default-suite checks 已通过。
 - 新增 free evaluation intro-site example 的 focused example validation 已通过：script syntax checks、dry-run checks、证明 `not_required` validation 和 direct submission with `final run id: none` 的 local setup/demo pass、focused examples/docs contract tests，以及 `git diff --check`。
+- 2026-06-07 dashboard static 和 CI fixes 的 focused validation 已通过：dashboard static frontend test、version synchronization script 和 CI ordering tests、使用当前版本 changelog section 动态比较的 release-note extraction test、focused `ruff`、full-suite skip listing、opt-in skipped-test subset，以及 in-app Browser verification，确认 `SkyDiscover Circle Packing` 的 #3 会继续沿用 #2 的最佳值，project detail tabs 滚动时贴住 header、没有半透明空白间隙，且 `Embedding reranker` run detail KPI cards 在横向滚动条上方完整显示。
 
 ## Gate 快照
 
 | Gate | State | Completion blocker |
 | --- | --- | --- |
 | Requirement evidence | 当前 free evaluation mode、feedback、audit、dashboard、catalog、annotation、observe、report、source、credentials、maintenance、project lifecycle、project config、project validation、experiment query、experiment lifecycle、experiment access service extraction、lazy compatibility-export cleanup 和 removal helper extraction edges 为 `PASSED` | 只有 changed requirement 或 environment 在 `docs/completion_audit.md` 产生 named evidence gap 时才重开。 |
-| Full default suite | `PASSED` | 如果 release claim 前还有额外 implementation/test changes，需要重跑。 |
+| Full default suite | `PASSED` | 最新 full pass 是 2026-06-07 elevated `0.1.8` dashboard static 和 CI version-sync review。后续 implementation/test changes 后或后续 release-quality claim 前需要重跑。 |
 | CLI contract completeness | focused docs/typed-value checks `PASSED` | 当前 registered CLI surfaces 已由 generated parser/capability/output matrices、docs-derived success schemas、saved result-failure/system-error checks 和 completion-audit consistency guard 证明；commands 或 output variants 变化时重跑/更新。 |
 | Non-CLI hardening | Feedback lifecycle no-SQLite/audit checks 和 dashboard focused tests `PASSED` | 仅当 `docs/completion_audit.md` 指出具体 non-CLI edge，或 release target 不同于当前已证明的 host/platform/upstream gates 时才重开。 |
 | Real-environment runners | Docker-backed、real Docker capability-refresh、live catalog 与 SkyDiscover Python dependency subsets 在 all-opt-in suite 中 `PASSED` 且 `skipped=0` | 如果 release-target host/platform/Python/network/upstream catalog behavior 变化，重跑 opt-in gates。 |
@@ -51,4 +54,4 @@ ALab 已经有覆盖面较广的 runnable V1 implementation，范围包括 local
 
 ## 下一步
 
-当前 worktree 没有 active implementation queue。如果后续还有更多 implementation changes，任何 release-quality claim 前需要再次重跑 full default suite。
+当前 worktree 没有 active implementation queue。后续任何 implementation/test changes 后，或后续 release-quality claim 前，需要再次重跑 full default suite。

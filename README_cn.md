@@ -264,6 +264,7 @@ ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=http
 - `uv.lock` 会被 tracked，因为 CI 和本地 validation 使用 `uv run --locked`。
 - 本地 cache/output paths 应保持 ignored（`.uv-cache/`、`.pytest_cache/`、`.ruff_cache/`、`.alab-demo/`、`.env`）。
 - GitHub Actions 会在 pull request 和推送到 `main` 时运行默认 lint 与 pytest suite；真实 Docker 和 live/networked SkyDiscover gates 仍是 manual workflow inputs。
+- CI 会先检查 release version synchronization：当 `pyproject.toml` 带有 package version 时，`uv.lock`、`src/alab/__init__.py`、`CHANGELOG.md` 和 `CHANGELOG_cn.md` 必须带有同一版本，然后才运行 lint、tests 或 publish jobs。
 - 推送到 `main` 时会检查 PyPI 是否已有当前 `pyproject.toml` package version；如果缺少该精确版本，CI 会通过 PyPI Trusted Publishing 构建并发布，然后从 [CHANGELOG.md](CHANGELOG.md) 中匹配的版本段落创建 `v<version>` GitHub Release。如果 PyPI 已有该版本，则跳过发布。
 - 首次自动发布前，PyPI `alab-cli` project 需要信任 repository `bebetterest/ALab`、workflow `ci.yml` 和 environment `pypi`。
 - 与 Python publish job 并行，推送到 `main` 时也会检查 ClawHub 是否已有同版本的 `alab-skills`、`alab-global-admin-skill`、`alab-project-controller` 和 `alab-experiment-worker` skill packages。缺失的 skill versions 会使用 `CLAWHUB_TOKEN` secret 发布；只有需要发布到指定 ClawHub owner 时，才设置 `CLAWHUB_OWNER` repository/environment variable。
@@ -287,6 +288,7 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 .
 ├── .github/
 │   ├── scripts/
+│   │   ├── check_version_sync.py
 │   │   ├── clawhub_skill_release.py
 │   │   └── github_release_assets.py
 │   └── workflows/

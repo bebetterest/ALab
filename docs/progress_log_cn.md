@@ -8204,3 +8204,26 @@ Validation:
 - Local example demo：`examples/free_evaluation_intro_site/scripts/run_demo.sh`，direct submit 输出 `final run id: none`、`best run id: none`，且没有 evaluator run。
 - Focused examples/docs contract checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing`
 - `git diff --check`
+
+## 2026-06-07 Dashboard Static Presentation And CI Version Gate Fixes
+
+已实现：
+
+- 更新 `src/alab/dashboard_static/app.js`，使 reward trend charts 渲染 best-so-far series：当后续 run 没有产生新的最佳值时，继续沿用当前最佳值。
+- 保留独立 new-best markers，用于 summary count 和重点标记，同时将 chart legend 改为 best-so-far wording。
+- 更新 `src/alab/dashboard_static/styles.css`，使 project detail sticky tabs 在吸顶时抵消 detail content top padding、贴住 detail header，并渲染为不透明 full-width background。
+- 更新 `src/alab/dashboard_static/styles.css`，使 run detail KPI rows 为横向滚动条保留足够高度和 padding，不再裁切 metric notes。
+- 新增 `.github/scripts/check_version_sync.py` 和最前置 `version-sync` CI job，使 `pyproject.toml`、`uv.lock`、`src/alab/__init__.py`、`CHANGELOG.md` 和 `CHANGELOG_cn.md` 必须先保持一致，然后才运行 lint、tests、opt-in gates 或 publish jobs。
+- 更新 dashboard static frontend tests，新增 version-sync script 和 CI ordering tests，将 GitHub Release note extraction coverage 改为动态比较当前版本的 changelog section，将 Python package 和 lockfile version bump 到 `0.1.8`，并同步更新 README、completion audit evidence、progress tracking，以及中英文 release-facing changelogs。
+
+验证：
+
+- Focused dashboard static frontend check：`UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run --locked pytest -q tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- 使用仓库 `.venv` 的 focused release-note/version-sync/dashboard/docs checks：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_version_sync_script_requires_runtime_lock_and_changelog_versions tests/test_cli_contract.py::test_ci_runs_version_sync_before_other_jobs tests/test_cli_contract.py::test_github_release_assets_extracts_matching_release_notes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- Focused lint：`.venv/bin/ruff check tests/test_dashboard.py tests/test_cli_contract.py`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` 只因 dashboard loopback bind `PermissionError` 失败。
+- Elevated full default suite：`.venv/bin/python -m pytest -q`
+- Full-suite skip listing：`.venv/bin/python -m pytest -q -rs tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py`，确认 16 个 opt-in real-environment tests。
+- Opt-in skipped-test subset：`ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple .venv/bin/python -m pytest -q tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py`
+- `git diff --check`
+- In-app Browser verification against `examples/dashboard_showcase/.run/alab-home`：打开 `SkyDiscover Circle Packing`，确认 minimize best-so-far 红线在 #2 更新、在 #3 继续保持 `0.21`，测得 project detail tabs 滚动时贴住 detail header、背景不透明，并打开 `Embedding reranker` run detail，确认 KPI cards 在横向滚动条上方完整显示。

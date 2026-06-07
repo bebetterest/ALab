@@ -8210,3 +8210,26 @@ Validation:
 - Local example demo: `examples/free_evaluation_intro_site/scripts/run_demo.sh`, which submitted directly with `final run id: none`, `best run id: none`, and no evaluator run.
 - Focused examples/docs contract checks: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_examples_matrix_paths_exist_and_document_current_examples tests/test_cli_contract.py::test_examples_are_task_shaped_demos tests/test_cli_contract.py::test_example_codex_launches_use_narrow_worktree_sandboxes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_readme_repository_structure_trees_are_synchronized_and_existing`
 - `git diff --check`
+
+## 2026-06-07 Dashboard Static Presentation And CI Version Gate Fixes
+
+Implemented:
+
+- Updated `src/alab/dashboard_static/app.js` so reward trend charts render a best-so-far series that carries the current best value forward when a later run does not create a new best.
+- Kept separate new-best markers for the summary count and point emphasis while changing the chart legend to best-so-far wording.
+- Updated `src/alab/dashboard_static/styles.css` so project detail sticky tabs cancel the detail content top padding while stuck, attach to the detail header, and render on an opaque full-width background.
+- Updated `src/alab/dashboard_static/styles.css` so run detail KPI rows reserve enough height and padding for horizontal scrollbars without clipping metric notes.
+- Added `.github/scripts/check_version_sync.py` and a front-of-pipeline `version-sync` CI job so `pyproject.toml`, `uv.lock`, `src/alab/__init__.py`, `CHANGELOG.md`, and `CHANGELOG_cn.md` must agree before lint, tests, opt-in gates, or publish jobs run.
+- Updated dashboard static frontend tests, added version-sync script and CI ordering tests, changed GitHub Release note extraction coverage to compare the current-version changelog section dynamically, bumped the Python package and lockfile version to `0.1.8`, and synchronized README, completion audit evidence, progress tracking, and release-facing changelogs in English and Chinese.
+
+Validation:
+
+- Focused dashboard static frontend check: `UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple uv run --locked pytest -q tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- Focused release-note/version-sync/dashboard/docs checks with the repository `.venv`: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_version_sync_script_requires_runtime_lock_and_changelog_versions tests/test_cli_contract.py::test_ci_runs_version_sync_before_other_jobs tests/test_cli_contract.py::test_github_release_assets_extracts_matching_release_notes tests/test_cli_contract.py::test_root_and_docs_markdown_files_have_synchronized_chinese_pairs tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs`
+- Focused lint: `.venv/bin/ruff check tests/test_dashboard.py tests/test_cli_contract.py`
+- Sandbox full default suite `.venv/bin/python -m pytest -q` failed only on dashboard loopback bind `PermissionError`.
+- Elevated full default suite: `.venv/bin/python -m pytest -q`
+- Full-suite skip listing: `.venv/bin/python -m pytest -q -rs tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py`, which identified 16 opt-in real-environment tests.
+- Opt-in skipped-test subset: `ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple .venv/bin/python -m pytest -q tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py`
+- `git diff --check`
+- In-app Browser verification against `examples/dashboard_showcase/.run/alab-home`: opened `SkyDiscover Circle Packing`, confirmed the minimize best-so-far red line updates at #2 and carries `0.21` forward through #3, measured the project detail tabs sitting flush with the detail header with an opaque background while scrolling, and opened the `Embedding reranker` run detail to confirm KPI cards remain fully visible above the horizontal scrollbar.

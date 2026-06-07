@@ -5,6 +5,23 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-07
+
+### 新增
+
+- 新增 CI 最前置 version synchronization gate：要求 `pyproject.toml`、
+  `uv.lock`、`src/alab/__init__.py`、`CHANGELOG.md` 和 `CHANGELOG_cn.md`
+  版本一致后，才运行 lint、tests 或 publish jobs。
+
+### 修复
+
+- 修复 dashboard reward trend charts：当后续 run 没有产生新的最佳值时，
+  best-so-far 折线会继续沿用此前最佳值。
+- 修复 dashboard project detail tabs：滚动时 sticky tabs 会贴住 detail header，
+  不再留下半透明空白间隙。
+- 修复 dashboard run detail KPI cards：横向滚动条不再裁切 metric notes 或
+  卡片下半部分内容。
+
 ## [0.1.7] - 2026-06-07
 
 ### 新增

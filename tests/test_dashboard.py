@@ -806,9 +806,12 @@ def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs()
     assert app.index('${panel(L("Run reward trend", "运行奖励趋势")') < app.index(
         '${panel(L("Project highlights", "项目要点")'
     )
-    assert "new best high" in app
+    assert "best-so-far high" in app
+    assert "bestSoFar" in app
+    assert "data: data.bestSoFar" in app
+    assert 'pointRadius: data.bestPoints.map((value) => value === null ? 0 : 5)' in app
     assert "运行奖励" in app
-    assert "新的最高最佳" in app
+    assert "累计最高最佳" in app
     assert 'label: L("experiments", "实验")' in app
     assert '`${L("status", "状态")}: ${statusLabel(run.status || "none")}`' in app
     assert 'label: "experiments"' not in app
@@ -822,7 +825,9 @@ def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs()
     assert "grid-template-columns: minmax(0, 1fr) max-content;" in styles
     assert "detail-kpis" in app
     assert ".detail-kpis" in styles
-    assert "min-height: 90px;" in styles
+    assert "min-height: 116px;" in styles
+    assert "padding-bottom: 12px;" in styles
+    assert ".detail-kpis .card {\n  flex: 0 0 clamp(128px, 21vw, 178px);\n  min-height: 96px;" in styles
     assert ".content > .grid.cards:not(.detail-kpis)" in styles
     assert ".content > .grid.cards:not(.detail-kpis) {\n    display: grid;\n    grid-template-columns: repeat(2, minmax(0, 1fr));" in styles
     assert ".content > .grid.cards:not(.detail-kpis) {\n    grid-template-columns: 1fr;" in styles
@@ -987,6 +992,9 @@ def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs()
     assert "Home" in app
     assert ".detail-tabs" in styles
     assert "position: sticky" in styles
+    assert "--detail-content-pad-y" in styles
+    assert "top: calc(-1 * var(--detail-content-pad-y, 14px));" in styles
+    assert "margin: -2px calc(-1 * var(--detail-content-pad-x, 16px)) 0;" in styles
     assert "highlight-list" in styles
     assert ".highlight-copy strong" in styles
     assert "failureReasonsForRunsHtml" in app
@@ -1131,7 +1139,7 @@ def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs()
     assert 'closeButton.addEventListener("keydown"' in app
     assert 'canvas.setAttribute("role", "img")' in app
     assert 'canvas.setAttribute("aria-label"' in app
-    assert "Run reward trend. The main line shows every run reward" in app
+    assert "Run reward trend. The main line shows every run reward and the red line carries the best-so-far value forward" in app
     assert "按日期和状态统计的运行活动" in app
     assert "按状态统计的实验数量" in app
     assert "rewardTrendSummaryHtml" in app

@@ -2381,15 +2381,15 @@ button.highlight-item:hover {
 
 .detail-tabs {
   position: sticky;
-  top: 0;
+  top: calc(-1 * var(--detail-content-pad-y, 14px));
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin: -2px 0 0;
-  padding: 8px 0;
+  margin: -2px calc(-1 * var(--detail-content-pad-x, 16px)) 0;
+  padding: 8px var(--detail-content-pad-x, 16px);
   border-bottom: 1px solid rgba(223, 231, 241, 0.8);
-  background: rgba(255, 255, 255, 0.96);
+  background: #ffffff;
 }
 
 .detail-tabs button {
@@ -2521,8 +2521,10 @@ button.highlight-item:hover {
 }
 
 .detail-content {
+  --detail-content-pad-x: 16px;
+  --detail-content-pad-y: 14px;
   overflow: auto;
-  padding: 14px 16px 28px;
+  padding: var(--detail-content-pad-y) var(--detail-content-pad-x) 28px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2530,7 +2532,9 @@ button.highlight-item:hover {
 }
 
 .detail-panel.wide .detail-content {
-  padding: 18px 28px 34px;
+  --detail-content-pad-x: 28px;
+  --detail-content-pad-y: 18px;
+  padding: var(--detail-content-pad-y) var(--detail-content-pad-x) 34px;
 }
 
 .detail-content > .panel,
@@ -2808,17 +2812,17 @@ pre,
   flex-wrap: nowrap;
   gap: 8px;
   max-width: 100%;
-  min-height: 90px;
+  min-height: 116px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  padding-bottom: 12px;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
 
 .detail-kpis .card {
   flex: 0 0 clamp(128px, 21vw, 178px);
-  min-height: 82px;
+  min-height: 96px;
   padding: 10px;
 }
 

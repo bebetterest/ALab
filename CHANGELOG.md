@@ -5,6 +5,23 @@ All notable ALab changes are recorded here. Keep this file in sync with
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-07
+
+### Added
+
+- Added a front-of-pipeline CI version synchronization gate that requires
+  `pyproject.toml`, `uv.lock`, `src/alab/__init__.py`, `CHANGELOG.md`, and
+  `CHANGELOG_cn.md` to agree before lint, tests, or publish jobs run.
+
+### Fixed
+
+- Fixed dashboard reward trend charts so the best-so-far line carries the
+  previous best value forward when a later run does not set a new best.
+- Fixed dashboard project detail tabs so sticky tabs sit flush against the
+  detail header instead of leaving an empty translucent gap while scrolling.
+- Fixed dashboard run detail KPI cards so horizontal scrollbars no longer clip
+  metric notes or lower card content.
+
 ## [0.1.7] - 2026-06-07
 
 ### Added

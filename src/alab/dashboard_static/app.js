@@ -1901,15 +1901,18 @@ function rewardTrendData(runsInput, directionInput = "maximize") {
   const rewards = runs.map((run) => Number(run.reward_value));
   const direction = directionInput === "minimize" ? "minimize" : "maximize";
   let bestValue = null;
-  const bestPoints = rewards.map((value) => {
+  const bestPoints = [];
+  const bestSoFar = rewards.map((value) => {
     const improved = bestValue === null || (direction === "minimize" ? value < bestValue : value > bestValue);
     if (improved) {
       bestValue = value;
-      return value;
+      bestPoints.push(value);
+    } else {
+      bestPoints.push(null);
     }
-    return null;
+    return bestValue;
   });
-  return { labels, rewards, bestPoints, direction, runs };
+  return { labels, rewards, bestPoints, bestSoFar, direction, runs };
 }
 
 function trendSummaryItem(label, value, note = "") {
@@ -1954,19 +1957,19 @@ function renderRewardTrendChart(id, runs, direction) {
       spanGaps: true,
     },
     {
-      label: data.direction === "minimize" ? L("new best low", "新的最低最佳") : L("new best high", "新的最高最佳"),
-      data: data.bestPoints,
+      label: data.direction === "minimize" ? L("best-so-far low", "累计最低最佳") : L("best-so-far high", "累计最高最佳"),
+      data: data.bestSoFar,
       borderColor: "#c53030",
       backgroundColor: "#c53030",
-      pointRadius: 5,
-      pointHoverRadius: 7,
-      tension: 0.15,
+      pointRadius: data.bestPoints.map((value) => value === null ? 0 : 5),
+      pointHoverRadius: data.bestPoints.map((value) => value === null ? 4 : 7),
+      tension: 0,
       spanGaps: true,
     },
   ], {
     ariaLabel: L(
-      "Run reward trend. The main line shows every run reward and red points mark new best values.",
-      "运行奖励趋势。主折线显示每次运行奖励，红点标记新的最佳值。",
+      "Run reward trend. The main line shows every run reward and the red line carries the best-so-far value forward until a new best appears.",
+      "运行奖励趋势。主折线显示每次运行奖励，红线会沿用当前最佳值，直到出现新的最佳。",
     ),
     plugins: {
       tooltip: {

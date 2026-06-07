@@ -266,6 +266,7 @@ Notes:
 - `uv.lock` is tracked because CI and local validation use `uv run --locked`.
 - Keep local cache/output paths ignored (`.uv-cache/`, `.pytest_cache/`, `.ruff_cache/`, `.alab-demo/`, `.env`).
 - GitHub Actions runs the default lint and pytest suite on pull requests and pushes to `main`; real Docker and live/networked SkyDiscover gates remain manual workflow inputs.
+- CI first checks release version synchronization: when `pyproject.toml` carries a package version, `uv.lock`, `src/alab/__init__.py`, `CHANGELOG.md`, and `CHANGELOG_cn.md` must carry the same version before lint, tests, or publish jobs run.
 - Pushes to `main` check PyPI for the current `pyproject.toml` package version; if that exact version is missing, CI builds and publishes through PyPI Trusted Publishing, then creates a `v<version>` GitHub Release from the matching [CHANGELOG.md](CHANGELOG.md) section. If PyPI already has that version, publishing is skipped.
 - The PyPI `alab-cli` project must trust repository `bebetterest/ALab`, workflow `ci.yml`, and environment `pypi` before the first automated publish can succeed.
 - In parallel with the Python publish job, pushes to `main` also check ClawHub for the same version of the `alab-skills`, `alab-global-admin-skill`, `alab-project-controller`, and `alab-experiment-worker` skill packages. Missing skill versions are published with the `CLAWHUB_TOKEN` secret; set `CLAWHUB_OWNER` as a repository/environment variable only when publishing under a specific ClawHub owner.
@@ -289,6 +290,7 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 .
 ├── .github/
 │   ├── scripts/
+│   │   ├── check_version_sync.py
 │   │   ├── clawhub_skill_release.py
 │   │   └── github_release_assets.py
 │   └── workflows/

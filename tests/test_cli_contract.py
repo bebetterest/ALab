@@ -464,6 +464,7 @@ _README_PATH = _REPO_ROOT / "README.md"
 _README_CN_PATH = _REPO_ROOT / "README_cn.md"
 _PYPROJECT_PATH = _REPO_ROOT / "pyproject.toml"
 _CI_WORKFLOW_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+_VERSION_SYNC_SCRIPT_PATH = _REPO_ROOT / ".github" / "scripts" / "check_version_sync.py"
 _CLAWHUB_RELEASE_SCRIPT_PATH = _REPO_ROOT / ".github" / "scripts" / "clawhub_skill_release.py"
 _GITHUB_RELEASE_ASSETS_SCRIPT_PATH = _REPO_ROOT / ".github" / "scripts" / "github_release_assets.py"
 _GITIGNORE_PATH = _REPO_ROOT / ".gitignore"
@@ -21720,6 +21721,16 @@ def _load_github_release_assets_script() -> object:
     return module
 
 
+def _load_version_sync_script() -> object:
+    spec = importlib.util.spec_from_file_location("alab_check_version_sync", _VERSION_SYNC_SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_clawhub_skill_release_targets_match_current_skill_metadata() -> None:
     module = _load_clawhub_release_script()
     pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
@@ -21846,9 +21857,63 @@ def test_github_release_assets_extracts_matching_release_notes() -> None:
     next_release_heading = next(
         line for line in changelog_lines[current_heading_index + 1 :] if line.startswith("## [")
     )
+    next_release_heading_index = changelog_lines.index(next_release_heading, current_heading_index + 1)
+    expected_notes = "\n".join(changelog_lines[current_heading_index + 1 : next_release_heading_index]).strip()
 
-    assert "GitHub Release asset uploads" in notes
+    assert notes == expected_notes
+    assert notes
     assert next_release_heading not in notes
+
+
+def test_version_sync_script_requires_runtime_lock_and_changelog_versions(tmp_path: Path) -> None:
+    module = _load_version_sync_script()
+    version = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))["project"]["version"]
+
+    assert module.validate_version_sync(_REPO_ROOT) == []
+
+    repo = tmp_path / "repo"
+    (repo / "src" / "alab").mkdir(parents=True)
+    repo.joinpath("pyproject.toml").write_text(
+        '[project]\nname = "alab-cli"\nversion = "2.3.4"\n',
+        encoding="utf-8",
+    )
+    repo.joinpath("uv.lock").write_text(
+        '[[package]]\nname = "alab-cli"\nversion = "2.3.3"\nsource = { editable = "." }\n',
+        encoding="utf-8",
+    )
+    repo.joinpath("src", "alab", "__init__.py").write_text('__version__ = "2.3.3"\n', encoding="utf-8")
+    repo.joinpath("CHANGELOG.md").write_text("# Changelog\n\n## [2.3.3]\n", encoding="utf-8")
+    repo.joinpath("CHANGELOG_cn.md").write_text("# 更新日志\n\n## [2.3.3]\n", encoding="utf-8")
+
+    errors = module.validate_version_sync(repo)
+
+    assert version
+    assert any("src/alab/__init__.py __version__" in error for error in errors)
+    assert any("uv.lock alab-cli version" in error for error in errors)
+    assert any("CHANGELOG.md" in error and "2.3.4" in error for error in errors)
+    assert any("CHANGELOG_cn.md" in error and "2.3.4" in error for error in errors)
+
+
+def test_ci_runs_version_sync_before_other_jobs() -> None:
+    workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    version_sync_start = workflow.index("  version-sync:")
+
+    assert "python .github/scripts/check_version_sync.py" in workflow
+    assert version_sync_start < workflow.index("  lint:")
+    assert version_sync_start < workflow.index("  tests:")
+
+    for job_name in (
+        "lint",
+        "tests",
+        "real-docker",
+        "real-skydiscover-python",
+        "networked-skydiscover-python",
+        "live-skydiscover-catalog",
+    ):
+        match = re.search(rf"^  {re.escape(job_name)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:|\Z)", workflow, re.M | re.S)
+        assert match is not None
+        job_text = match.group(0)
+        assert "needs: version-sync" in job_text
 
 
 def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:

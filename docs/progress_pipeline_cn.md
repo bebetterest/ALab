@@ -12,12 +12,12 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-06-05
+## 当前 Active Batch - 2026-06-07
 
-- Focus：用户要求的 free evaluation example 已在当前 worktree 关闭。`examples/free_evaluation_intro_site/` 现在演示成对的 `runner.type = "none"` 与 `reward.type = "none"`，任务是 no-run manual review：为 `모두가 자신의 무가치함과 싸우고 있다` 完成简体中文静态介绍站。该示例包含 project config、starter site source、content notes、worker prompt、setup/demo scripts，以及同步的中英文 README。
-- 本 batch 明确 non-goals：不改变 free evaluation runtime semantics、submit behavior、report output shape、CLI command contracts、runner families、source import rules、visibility rules、dashboard behavior 或 service extraction boundaries。本 batch 只新增 runnable example coverage 和 documentation。
+- Focus：用户要求的 dashboard static presentation fixes 和 front-of-pipeline CI version synchronization gate 已在当前 worktree 关闭。Dashboard 现在会为每个有分 run 渲染红色 best-so-far reward trend series：当后续 run 没有产生新的最佳值时，继续沿用此前最佳值，同时保留独立 new-best marker/count behavior。Project detail sticky tabs 滚动时也会贴住 detail header，并使用不透明 full-width background；run detail KPI rows 也会为横向滚动条预留足够高度。CI 现在会在 lint、tests、opt-in gates 或 publish jobs 前先检查 package version synchronization。
+- 本 batch 明确 non-goals：不改变 dashboard APIs、CLI command contracts、read-model pagination、storage schema、runner behavior、visibility rules、reward ranking semantics、package publishing semantics 或 release asset upload semantics。本 batch 只改变 static dashboard chart/detail/KPI layout presentation、CI preflight ordering gate 和 focused evidence。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
-- 已新增 evidence：新脚本 `bash -n`、`setup_project.sh --dry-run`、`run_demo.sh --dry-run`、使用仓库 `.venv` 完整跑通 local setup/demo，输出 `validation status: not_required` 且 submission 为 `final run id: none`，focused examples/docs contract tests，以及 `git diff --check`。
+- 已新增 evidence：focused dashboard static frontend test、version synchronization script 和 CI ordering contract tests、针对当前版本 changelog section 的 dynamic release-note extraction test、针对 touched Python test files 的 focused `ruff`、sandbox full-suite dashboard-bind failure confirmation、elevated full default suite、full-suite skip listing、opt-in skipped-test subset、`git diff --check`，以及使用 `examples/dashboard_showcase/.run/alab-home` 的 in-app Browser verification，确认 `SkyDiscover Circle Packing` 的 #3 会继续沿用 #2 的最佳值，project detail tabs 贴住 header、没有半透明空白间隙，且 `Embedding reranker` run detail KPI cards 在横向滚动条上方完整显示。
 
 ## Active Queue
 

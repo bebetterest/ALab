@@ -43,10 +43,27 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
+  version-sync:
+    name: Version sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check release version files
+        run: python .github/scripts/check_version_sync.py
+
   lint:
     name: Ruff
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: version-sync
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       UV_DEFAULT_INDEX: https://pypi.org/simple
@@ -84,6 +101,7 @@ jobs:
     name: Pytest (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: version-sync
     strategy:
       fail-fast: false
       matrix:
@@ -143,6 +161,7 @@ jobs:
     name: Real Docker
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    needs: version-sync
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.real_docker }}
     env:
       ALAB_RUN_REAL_DOCKER: "1"
@@ -180,6 +199,7 @@ jobs:
     name: Real SkyDiscover Python
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: version-sync
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.real_skydiscover_python }}
     env:
       ALAB_RUN_REAL_SKYDISCOVER_PYTHON: "1"
@@ -214,6 +234,7 @@ jobs:
     name: Networked SkyDiscover Python
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    needs: version-sync
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.networked_skydiscover_python }}
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
@@ -254,6 +275,7 @@ jobs:
     name: Live SkyDiscover Catalog
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: version-sync
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.live_skydiscover_catalog }}
     env:
       ALAB_RUN_LIVE_SKYDISCOVER_CATALOG: "1"
