@@ -21839,9 +21839,16 @@ def test_github_release_assets_extracts_matching_release_notes() -> None:
     module = _load_github_release_assets_script()
     version = module.load_project_version(_REPO_ROOT)
     notes = module.extract_release_notes(_REPO_ROOT, version)
+    changelog_lines = (_REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+    current_heading_index = next(
+        index for index, line in enumerate(changelog_lines) if line.startswith(f"## [{version}]")
+    )
+    next_release_heading = next(
+        line for line in changelog_lines[current_heading_index + 1 :] if line.startswith("## [")
+    )
 
     assert "GitHub Release asset uploads" in notes
-    assert "## [0.1.6]" not in notes
+    assert next_release_heading not in notes
 
 
 def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
