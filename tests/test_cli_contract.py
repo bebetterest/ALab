@@ -14,6 +14,7 @@ import sqlite3
 import subprocess
 import sys
 import tomllib
+import zipfile
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
@@ -464,6 +465,7 @@ _README_CN_PATH = _REPO_ROOT / "README_cn.md"
 _PYPROJECT_PATH = _REPO_ROOT / "pyproject.toml"
 _CI_WORKFLOW_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _CLAWHUB_RELEASE_SCRIPT_PATH = _REPO_ROOT / ".github" / "scripts" / "clawhub_skill_release.py"
+_GITHUB_RELEASE_ASSETS_SCRIPT_PATH = _REPO_ROOT / ".github" / "scripts" / "github_release_assets.py"
 _GITIGNORE_PATH = _REPO_ROOT / ".gitignore"
 _ENV_EXAMPLE_PATH = _REPO_ROOT / ".env.example"
 _TESTS_ROOT = _REPO_ROOT / "tests"
@@ -21708,6 +21710,16 @@ def _load_clawhub_release_script() -> object:
     return module
 
 
+def _load_github_release_assets_script() -> object:
+    spec = importlib.util.spec_from_file_location("alab_github_release_assets", _GITHUB_RELEASE_ASSETS_SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_clawhub_skill_release_targets_match_current_skill_metadata() -> None:
     module = _load_clawhub_release_script()
     pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
@@ -21791,6 +21803,46 @@ def test_clawhub_skill_publish_reuses_saved_plan(tmp_path: Path, monkeypatch) ->
     assert [command[command.index("--slug") + 1] for command in commands] == plan["missing_slugs"]
 
 
+def test_github_release_assets_package_all_skill_archives(tmp_path: Path) -> None:
+    module = _load_github_release_assets_script()
+    version = module.load_project_version(_REPO_ROOT)
+    assets = module.package_skill_archives(_REPO_ROOT, tmp_path, version)
+
+    assert [asset.name for asset in assets] == [
+        f"alab-skills-{version}.zip",
+        f"alab-global-admin-skill-{version}.zip",
+        f"alab-project-controller-{version}.zip",
+        f"alab-experiment-worker-{version}.zip",
+    ]
+
+    archive_contents = {}
+    for asset in assets:
+        with zipfile.ZipFile(asset) as archive:
+            archive_contents[asset.name] = set(archive.namelist())
+
+    assert f"alab-skills-{version}/SKILL.md" in archive_contents[f"alab-skills-{version}.zip"]
+    assert (
+        f"alab-global-admin-skill-{version}/references/commands.md"
+        in archive_contents[f"alab-global-admin-skill-{version}.zip"]
+    )
+    assert (
+        f"alab-project-controller-{version}/references/commands.md"
+        in archive_contents[f"alab-project-controller-{version}.zip"]
+    )
+    assert (
+        f"alab-experiment-worker-{version}/references/commands.md"
+        in archive_contents[f"alab-experiment-worker-{version}.zip"]
+    )
+
+
+def test_github_release_assets_extracts_matching_release_notes() -> None:
+    module = _load_github_release_assets_script()
+    notes = module.extract_release_notes(_REPO_ROOT, "0.1.6")
+
+    assert "examples/free_evaluation_intro_site" in notes
+    assert "## [0.1.5]" not in notes
+
+
 def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
     workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     job_start = workflow.index("  publish-clawhub-skills:")
@@ -21801,6 +21853,19 @@ def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
     assert "          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}" in job_text
     assert "clawhub login --token" in job_text
     assert "python .github/scripts/clawhub_skill_release.py publish --plan-input clawhub-skill-plan.json" in job_text
+
+
+def test_github_release_asset_workflow_uploads_python_and_skill_packages() -> None:
+    workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    job_start = workflow.index("  publish-github-release-assets:")
+    job_end = workflow.index("  publish-clawhub-skills:")
+    job_text = workflow[job_start:job_end]
+
+    assert "      - publish-python" in job_text
+    assert "      contents: write" in job_text
+    assert "python .github/scripts/github_release_assets.py prepare" in job_text
+    assert "--asset-output-dir release-assets" in job_text
+    assert "gh release upload \"$RELEASE_TAG\" release-assets/* --clobber" in job_text
 
 
 def test_local_agent_notes_and_env_files_are_gitignored() -> None:

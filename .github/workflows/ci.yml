@@ -429,6 +429,52 @@ jobs:
               --notes-file release-notes.md
           fi
 
+  publish-github-release-assets:
+    name: Publish GitHub release assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - lint
+      - tests
+      - publish-python
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Prepare GitHub release assets
+        id: release_assets
+        run: |
+          python .github/scripts/github_release_assets.py prepare \
+            --asset-output-dir release-assets \
+            --notes-output release-notes.md
+
+      - name: Upload GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_assets.outputs.tag }}
+          PACKAGE_VERSION: ${{ steps.release_assets.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub release $RELEASE_TAG already exists; uploading assets."
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "alab-cli ${PACKAGE_VERSION}" \
+              --notes-file release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+
   publish-clawhub-skills:
     name: Publish ClawHub skills
     runs-on: ubuntu-latest
