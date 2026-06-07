@@ -2,7 +2,7 @@
 
 ## Invocation Prefix
 
-Examples below use `alab`. If the launcher provides `ALAB_CMD_PREFIX`, use that prefix for ALab calls exactly as the launcher instructs, for example `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`. Do not print, inspect, or rewrite launcher-provided credential material. Use only the current worktree's token context; do not accept root keys, project admin keys, or tokens for other worktrees.
+Command snippets below use `alab`. If the launcher provides `ALAB_CMD_PREFIX`, invoke ALab through that prefix exactly as instructed instead of hard-coding `alab`. Do not print, inspect, or rewrite launcher-provided credential material. Use only the current worktree's token context; do not accept root keys, project admin keys, or tokens for other worktrees.
 
 ## Allowed Surface
 

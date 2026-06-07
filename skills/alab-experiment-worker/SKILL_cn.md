@@ -7,15 +7,18 @@ description: 当位于一个 ALab experiment worktree 中，并且只应使用�
 
 ## 概览
 
-当在一个 ALab experiment worktree 内工作时使用本 skill。Worker 负责改进候选源码，可以查看可见范围内的历史 experiment 证据来寻找思路，在 standard projects 中通过该 worktree 的 token context 运行 ALab evaluation，并在当前 project mode 允许时提交最终结果。
+本 skill 用于 ALab 的 experiment worktree layer。它改进一个 candidate source tree，读取该 worktree token 可见的 evidence，在 standard projects 中通过 worktree token context 运行 evaluation，并在当前 project mode 允许时提交最终结果。
 
-本 skill 不是 project manager 或 global administrator。不得使用 project admin key、root key、catalog command、cache command、project config mutation 或 lifecycle removal command。
+## 分层边界
+
+- 本 skill 不是 project-coordination layer，也不是 root-administration layer。
+- 不得使用 project admin keys、root keys、catalog commands、cache commands、project configuration mutation、credential management、audit commands 或 lifecycle removal commands。
+- 如果需要 project-level 或 root authority，停止该分支并向 project-level 或 root-admin session 报告所需操作，不要请求更高权限 key。
 
 ## 操作规则
 
 - 只信任当前 worktree context 及其 `.alab/token`。
 - 不接受 root keys、project admin keys，或其他 worktrees / inspection checkouts 的 tokens。如果 launcher 显式提供 token，使用前先确认它属于当前 worktree context。
-- 如果某项操作需要 project-level 或 root authority，停止并报告缺失能力，不要请求或使用更高权限 key。
 - 不读取、打印、复制、提交或重写 raw token/key。
 - 不编辑 `.alab/`、ALab home records、cache directories、shared run directories、hidden evaluator assets、secret files 或 project control files。
 - 只修改 experiment worktree 内与任务相关的 source files。
@@ -30,11 +33,11 @@ description: 当位于一个 ALab experiment worktree 中，并且只应使用�
 
 不要把这里当成固定 checklist。先主动理解当前 worktree 的任务、本地说明、已有 candidate 和 ALab context。需要时查看可见 prior experiments、runs、artifacts、logs、annotations 或 inspection checkouts，从中获得参考和灵感。
 
-围绕 candidate 做聚焦修改和轻量本地检查。在 standard evaluation projects 中，当 candidate 准备好接受 evaluation 时，运行 `alab run --message "<brief reason>"`。如果 ALab 的 next action 直接指向 submit，或 `alab run` 因没有 evaluator 返回 `COMMAND_UNAVAILABLE`，说明这是 free evaluation project，应跳过 run evidence 并准备直接 submit。根据已有的可见 stdout/stderr previews、warning codes、artifacts、logs、metrics、annotations 和 prior runs 诊断 weak 或 failed results；只要还有合理优化路径，就继续改进和迭代。
+围绕 candidate 做聚焦修改和轻量本地检查。在 standard evaluation projects 中，当 candidate 准备好时运行 `alab run --message "<brief reason>"`。在 ALab 直接指向 submit 的 free evaluation projects 中，或 `alab run` 因没有 evaluator 返回 `COMMAND_UNAVAILABLE` 时，跳过 run evidence 并准备直接 submit。
 
-当发现后续 worker 不应遗忘的重要上下文时，在 iteration 过程中添加 annotation，不要只依赖最终记忆。适合记录的内容包括决策依据、失败路径、剩余风险或下一步上下文等。如果 annotation 已不再需要、不再有效，或可能误导后续 worker，应及时 archive 和 remove。
+使用可见 evidence 诊断 weak 或 failed results；只要还有合理优化路径，就继续改进。发现后续 workers 不应丢失的重要上下文时，用 annotations 记录，尤其是 decision rationale、failed approaches、remaining risks 和 next-step context。对于不再需要、不再有效，或可能误导后续 workers 的 annotations，应 archive 和 remove。
 
-当使命完成，或已经没有有价值的继续优化路径时，在 standard evaluation mode 下只有 passed run 支撑 final candidate 才 submit；在 free evaluation mode 下，如果 direct submit 是 documented next action，则可以直接 submit。如果 standard mode 没有支撑的 passed run，不要 submit；报告当前最好的 evidence，以及无法继续推进或无法提交的原因。
+Standard evaluation mode 下只有 supporting passed run 才 submit；free evaluation mode 下只在 documented direct-submit behavior 存在时 submit。Standard mode 没有 supporting passed run 时，不要 submit；报告当前最好 evidence 和 blocker。
 
 ## 能力说明
 
@@ -52,7 +55,7 @@ description: 当位于一个 ALab experiment worktree 中，并且只应使用�
 - 使用可见 stdout/stderr preview、warning code、artifact、log、metric 和 annotation 诊断 failed 或 weak runs。
 - 当预期修改已经完成，并且当前 worktree 满足其 project mode 所需的支撑条件时，使用事实性的 message、summary、feedback 和 refs 提交。
 
-## Submit Guidance
+## 提交指引
 
 - Standard evaluation mode 下，只有当前 candidate 有 passed run 支撑时才 submit。Free evaluation mode 下允许 direct submit，final run id 会渲染为 `none`。
 - 把 submit refs 当成便于后续 review 和继续优化的 provenance links，而不是装饰性字段。
@@ -62,6 +65,10 @@ description: 当位于一个 ALab experiment worktree 中，并且只应使用�
 - `--message` 保持简短。实质记录写入 `--summary`/`--summary-file` 和 `--feedback`/`--feedback-file`：改了什么、哪个 passed run 支撑或为什么 free evaluation 没有 run、存在时的关键 metrics、哪些 refs 有意义，以及剩余风险。
 - 如果没有 submit，应明确说明阻塞原因和当前最好的 run evidence。
 
-## Command Reference
+## 文件导航
 
-需要 worker command surface、observe pattern 或 run/submit 示例时，读取 [references/commands_cn.md](./references/commands_cn.md)。
+- `SKILL.md`：canonical experiment-worktree boundaries、operating rules、workflow 和 submit guidance。
+- `SKILL_cn.md`：本文件的同步中文版本。
+- `references/commands.md`：详细 worker command surface、observe patterns、inspection checkout rules、evaluation 和 submit reference；不熟悉 ALab commands 或 run/submit flows 前读取。
+- `references/commands_cn.md`：command reference 的同步中文版本。
+- `agents/openai.yaml`：UI metadata 和 default prompt；invocation guidance 改变时同步更新。

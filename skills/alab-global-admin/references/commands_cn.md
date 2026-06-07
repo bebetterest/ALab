@@ -125,9 +125,9 @@ Root 必要时也可以 inspect 或维护 project-scoped resources，但日常 e
 
 ## Project Initialization
 
-`project init` 成功后，后续 project setup、experiment creation 和 experiment coordination 优先交给带 project admin key 和 `alab-project-controller` skill/instructions 的独立 project-level session。Experiment implementation 和 worktree changes 交给位于 experiment worktree、带 `alab-experiment-worker` skill/instructions、且只使用该 experiment token context 的独立 session/thread。如果无法启动独立 session，则使用具备等价 project/worktree/token 隔离的 subagent 或 worker process。用户指令优先于此偏好；否则 root-admin session 应聚焦 root-scoped setup、credentials、catalogs、cleanup、audit 和 handoff。
+`project init` 成功后，把打印出的 project admin key 视为 handoff material。除非用户明确要求，否则当前 session 应聚焦 root-scoped setup、credentials、catalogs、cleanup、audit 和 handoff。
 
-只有被委派任务需要时才传递匹配的 credential：root key 只交给 root-admin session，project admin key 只交给该 project 的 project-level session，experiment worktree 或 inspection token 只交给在该 experiment worktree 或 inspection checkout 中工作的 session。优先使用 ignored secret files、private environment variables 或 secure stdin。绝不通过 worker prompts、copied source files、shared non-secret directories 或 command transcripts 传递 root/admin keys。
+使用 `SKILL.md` 中的 layer-specific credential rules：project-level work 只接收 project admin key 和 `alab-project-controller` skill/instructions；experiment implementation 只接收 experiment worktree token context 和 `alab-experiment-worker` skill/instructions。
 
 Local project：
 
@@ -152,8 +152,6 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
 
 `project init` 会在 project record 写入后只打印一次 generated project admin key。应将其捕获到 ignored local secret file（例如 example `.run/secrets/project.env`）或已批准的 secret store，然后只把 project admin key 交给被委派的 project-level session，绝不交给 experiment workers。
 成对配置 `runner.type = "none"` 和 `reward.type = "none"` 会创建 free evaluation projects，用于直接 submit 且不运行 baseline evaluator；仅应搭配 `local`、`git` 或 `empty` project init modes 使用，不与 Harbor 或 SkyDiscover adapter init 混用。
-
-如果 root-admin flow 还为了 bootstrap 或 demonstration 创建 experiment，应把后续 experiment operations 委派给该 experiment worktree 中带 `alab-experiment-worker` skill/instructions 的独立 session/thread。如果无法创建独立 thread，则使用具备等价 token 隔离的 subagent 或 worker process，而不是从 root-admin session 中编辑或 submit。
 
 ## Catalog Rules
 

@@ -2,7 +2,7 @@
 
 ## 调用前缀
 
-下面的示例使用 `alab`。如果 launcher 提供 `ALAB_CMD_PREFIX`，ALab 调用应按 launcher 指示使用该 prefix，例如 `eval "$ALAB_CMD_PREFIX run --message 'focused improvement'"`。不要打印、检查或改写 launcher 提供的 credential material。只使用当前 worktree 的 token context；不要接受 root keys、project admin keys，或其他 worktrees 的 tokens。
+下面的 command snippets 使用 `alab`。如果 launcher 提供 `ALAB_CMD_PREFIX`，应按 launcher 指示通过该 prefix 调用 ALab，而不是 hard-code `alab`。不要打印、检查或改写 launcher 提供的 credential material。只使用当前 worktree 的 token context；不要接受 root keys、project admin keys，或其他 worktrees 的 tokens。
 
 ## 允许的 Surface
 

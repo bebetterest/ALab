@@ -154,9 +154,9 @@ alab backup prune
 
 ## Experiment Creation Patterns
 
-使用 `alab-project-controller` 的 project-level session 通常应委派新的 experiment implementation。先创建 experiment，然后在该 experiment worktree 中用 worker prompt、`alab-experiment-worker` skill/instructions，以及只使用该 experiment 的 token context 启动独立 session/thread。如果无法创建独立 thread，则使用具备等价 worktree/token 隔离的 subagent 或 worker process。用户指令优先于此偏好；如果用户没有特别要求，应避免在当前 project-level session 中直接实现 experiment changes。
+先创建 experiment，然后使用 `exp create` 输出的 worktree path 做 implementation handoff。详细 session/subagent launch requirements 见 [Worker Launch Pattern](#worker-launch-pattern)。
 
-只提供被委派任务所需的 credential。后续 project-level coordination 可能需要通过私有 environment variable、ignored secret file 或 secure stdin 接收 project admin key。Experiment implementation 应在 experiment worktree 中运行，并使用 `exp create` 写入的 worktree token context，而不是 project admin key。不要把 raw keys 或 tokens 放进 prompt text、command transcripts、copied source files 或 shared non-secret directories。
+保持 credentials layer-specific：project admin key 只用于 `exp create` 和其他 project-level commands；不要传给 experiment implementation context。
 
 Default source：
 

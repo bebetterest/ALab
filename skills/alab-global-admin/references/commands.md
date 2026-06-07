@@ -125,9 +125,9 @@ Root can also inspect or maintain project-scoped resources when needed, but shou
 
 ## Project Initialization
 
-After `project init` succeeds, prefer handing follow-up project setup, experiment creation, and experiment coordination to a separate project-level session with the project admin key and `alab-project-controller` skill/instructions. Hand experiment implementation and worktree changes to a separate session/thread in the experiment worktree with `alab-experiment-worker` skill/instructions and only that experiment's token context. If a separate session cannot be started, use a subagent or worker process with equivalent project/worktree/token isolation. User instructions override this preference; otherwise, keep the root-admin session focused on root-scoped setup, credentials, catalogs, cleanup, audit, and handoff.
+After `project init` succeeds, treat the printed project admin key as handoff material. Keep this session focused on root-scoped setup, credentials, catalogs, cleanup, audit, and handoff unless the user explicitly asks otherwise.
 
-Pass the matching credential only when the delegated task needs it: root key only to a root-admin session, project admin key only to a project-level session for that project, and experiment worktree or inspection token only to the session working in that experiment worktree or inspection checkout. Prefer ignored secret files, private environment variables, or secure stdin. Never pass root/admin keys through worker prompts, copied source files, shared non-secret directories, or command transcripts.
+Use the layer-specific credential rules from `SKILL.md`: project-level work receives only the project admin key and `alab-project-controller` skill/instructions; experiment implementation receives only the experiment worktree token context and `alab-experiment-worker` skill/instructions.
 
 Local project:
 
@@ -152,8 +152,6 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
 
 `project init` prints the generated project admin key exactly once after the project record is written. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to the delegated project-level session, never to experiment workers.
 Configs with paired `runner.type = "none"` and `reward.type = "none"` create free evaluation projects for direct submit without baseline evaluator runs; use them only with `local`, `git`, or `empty` project init modes, not Harbor or SkyDiscover adapter init.
-
-If the root-admin flow also creates an experiment for bootstrap or demonstration, delegate any additional experiment operations to a separate session/thread in the experiment worktree with `alab-experiment-worker` skill/instructions. If separate thread creation is unavailable, use a subagent or worker process with equivalent token isolation instead of editing or submitting from the root-admin session.
 
 ## Catalog Rules
 

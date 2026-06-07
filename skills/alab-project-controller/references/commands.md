@@ -154,9 +154,9 @@ alab backup prune
 
 ## Experiment Creation Patterns
 
-A project-level session using `alab-project-controller` should normally delegate new experiment implementation. Create the experiment first, then start a separate session/thread in the experiment worktree with the worker prompt, `alab-experiment-worker` skill/instructions, and only that experiment's token context. If separate thread creation is unavailable, use a subagent or worker process with equivalent worktree/token isolation. User instructions override this preference; otherwise, avoid directly implementing experiment changes inside the current project-level session.
+Create the experiment first, then use the worktree path from `exp create` for implementation handoff. The detailed session/subagent launch requirements live in [Worker Launch Pattern](#worker-launch-pattern).
 
-Provision only the credential needed for the delegated task. Follow-up project-level coordination may need the project admin key through a private environment variable, ignored secret file, or secure stdin. Experiment implementation should run in the experiment worktree and use the worktree token context written by `exp create`, not the project admin key. Do not put raw keys or tokens in prompt text, command transcripts, copied source files, or shared non-secret directories.
+Keep credentials layer-specific: use the project admin key only for `exp create` and other project-level commands; do not pass it to the experiment implementation context.
 
 Default source:
 

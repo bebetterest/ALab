@@ -7,15 +7,18 @@ description: Use when operating inside one ALab experiment worktree with that wo
 
 ## Overview
 
-Use this skill when working inside one ALab experiment worktree. The worker improves the candidate source, can inspect visible historical experiment evidence for ideas, runs ALab evaluation from that worktree's token context for standard projects, and submits the final result when the project mode allows it.
+Use this skill for the experiment worktree layer of ALab. It improves one candidate source tree, reads visible evidence available to that worktree token, runs evaluation from the worktree token context for standard projects, and submits the final result when the project mode allows it.
 
-This skill is not a project manager or global administrator. It must not use project admin keys, root keys, catalog commands, cache commands, project configuration mutation, or lifecycle removal commands.
+## Layer Boundaries
+
+- This skill is not the project-coordination layer and not the root-administration layer.
+- It must not use project admin keys, root keys, catalog commands, cache commands, project configuration mutation, credential management, audit commands, or lifecycle removal commands.
+- If project-level or root authority is required, stop that branch and report the needed operation to a project-level or root-admin session instead of requesting a higher-privilege key.
 
 ## Operating Rules
 
 - Trust only the current worktree context and its `.alab/token`.
 - Do not accept root keys, project admin keys, or tokens for other worktrees or inspection checkouts. If a launcher provides an explicit token, verify that it belongs to the current worktree context before using it.
-- If an operation requires project-level or root authority, stop and report the missing capability instead of requesting or using a higher-privilege key.
 - Do not read, print, copy, commit, or rewrite raw tokens or keys.
 - Do not edit `.alab/`, ALab home records, cache directories, shared run directories, hidden evaluator assets, secret files, or project control files.
 - Edit only task-relevant source files inside the experiment worktree.
@@ -30,11 +33,11 @@ This skill is not a project manager or global administrator. It must not use pro
 
 Do not treat this as a fixed checklist. First understand the current worktree task, local instructions, existing candidate, and ALab context. When useful, inspect visible prior experiments, runs, artifacts, logs, annotations, or inspection checkouts for reference and inspiration.
 
-Iterate on the candidate with focused edits and cheap local checks. In standard evaluation projects, when the candidate is ready for evaluation, run `alab run --message "<brief reason>"`. In free evaluation projects where ALab's next action points directly to submit, or `alab run` returns `COMMAND_UNAVAILABLE` because no evaluator exists, skip run evidence and prepare a direct submit instead. Use visible evidence from stdout/stderr previews, warning codes, artifacts, logs, metrics, annotations, and prior runs when those records exist to diagnose weak or failed results, then keep improving while there is a plausible path forward.
+Iterate on the candidate with focused edits and cheap local checks. In standard evaluation projects, run `alab run --message "<brief reason>"` when the candidate is ready. In free evaluation projects where ALab points directly to submit, or `alab run` returns `COMMAND_UNAVAILABLE` because no evaluator exists, skip run evidence and prepare a direct submit instead.
 
-When you discover important context that later workers should not lose, add an annotation during the iteration instead of relying only on final memory. Good annotation content includes decision rationale, failed approaches, remaining risks, next-step context, and similar durable notes. If an annotation is no longer needed, no longer valid, or likely to mislead later workers, archive and remove it promptly.
+Use visible evidence to diagnose weak or failed results and keep improving while there is a plausible path forward. Record durable context with annotations when it would help later workers, especially decision rationale, failed approaches, remaining risks, and next-step context. Archive and remove annotations that are no longer needed, no longer valid, or likely to mislead later workers.
 
-When the mission is complete, or no useful optimization path remains, submit only if a passed run supports the final candidate in standard evaluation mode, or if the project is in free evaluation mode and direct submit is the documented next action. If there is no supporting passed run in standard mode, do not submit; report the best available evidence and the reason further progress or submission is blocked.
+Submit only with a supporting passed run in standard evaluation mode, or with documented direct-submit behavior in free evaluation mode. If no supporting passed run exists in standard mode, do not submit; report the best evidence and blocker.
 
 ## Capabilities
 
@@ -62,6 +65,10 @@ This is a capability guide, not a required sequence. Use the capabilities that f
 - Keep `--message` short. Put the substantive record in `--summary`/`--summary-file` and `--feedback`/`--feedback-file`: what changed, which passed run supports it or why free evaluation has no run, key metrics when present, which refs mattered, and remaining risks.
 - If no submit is performed, clearly state the blocking reason and the best run evidence available.
 
-## Command Reference
+## Skill Files
 
-Read [references/commands.md](./references/commands.md) when you need the worker command surface, observe patterns, or examples for run and submit.
+- `SKILL.md`: Canonical experiment-worktree boundaries, operating rules, workflow, and submit guidance.
+- `SKILL_cn.md`: Synchronized Chinese version of this file.
+- `references/commands.md`: Detailed worker command surface, observe patterns, inspection checkout rules, evaluation, and submit reference; read before unfamiliar ALab commands or run/submit flows.
+- `references/commands_cn.md`: Synchronized Chinese version of the command reference.
+- `agents/openai.yaml`: UI metadata and default prompt; update when invocation guidance changes.
