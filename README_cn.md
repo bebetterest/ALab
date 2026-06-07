@@ -238,7 +238,7 @@ showcase home，以及 SkyDiscover circle-packing Codex single-worker protocol�
 local、Docker、Harbor、SkyDiscover Python 和 SkyDiscover Docker runner
 projects。
 
-仓库还在 [skills](skills/) 下提供 Codex-facing role skills。它们是通过 CLI 操作 ALab 的外部 runbooks，分别面向 experiment worker、project controller 和 global admin；它们不会给 ALab 增加内置 agent launcher。
+仓库还在 [ALabSkills](ALabSkills/) 下提供 agent-facing ALab skills。顶层 skill 用于路由 root、project 和 experiment worktree 三类 role skills；这些 role skills 是通过 CLI 操作 ALab 的外部 runbooks，不会给 ALab 增加内置 agent launcher。
 
 ## Testing And Development
 
@@ -310,7 +310,11 @@ ALab V1 是本地协作边界，不是 multi-user security product：
 │   ├── local_agent_scoreboard/
 │   ├── skydiscover_circle_packing_codex/
 │   └── templates/
-├── skills/
+├── ALabSkills/
+│   ├── SKILL.md
+│   ├── SKILL_cn.md
+│   ├── agents/
+│   │   └── openai.yaml
 │   ├── alab-experiment-worker/
 │   ├── alab-project-controller/
 │   └── alab-global-admin/

@@ -240,7 +240,7 @@ SkyDiscover circle-packing Codex single-worker protocol. The same examples area 
 local, Docker, Harbor, SkyDiscover Python, and SkyDiscover Docker runner
 projects.
 
-The repository also includes Codex-facing role skills under [skills](skills/). They are external runbooks for operating ALab through the CLI as an experiment worker, project controller, or global admin; they do not add an embedded agent launcher to ALab.
+The repository also includes agent-facing ALab skills under [ALabSkills](ALabSkills/). The top-level skill routes the root, project, and experiment worktree role skills, which are external runbooks for operating ALab through the CLI; they do not add an embedded agent launcher to ALab.
 
 ## Testing And Development
 
@@ -312,7 +312,11 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 │   ├── local_agent_scoreboard/
 │   ├── skydiscover_circle_packing_codex/
 │   └── templates/
-├── skills/
+├── ALabSkills/
+│   ├── SKILL.md
+│   ├── SKILL_cn.md
+│   ├── agents/
+│   │   └── openai.yaml
 │   ├── alab-experiment-worker/
 │   ├── alab-project-controller/
 │   └── alab-global-admin/
