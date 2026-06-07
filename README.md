@@ -268,6 +268,7 @@ Notes:
 - GitHub Actions runs the default lint and pytest suite on pull requests and pushes to `main`; real Docker and live/networked SkyDiscover gates remain manual workflow inputs.
 - Pushes to `main` check PyPI for the current `pyproject.toml` package version; if that exact version is missing, CI builds and publishes through PyPI Trusted Publishing, then creates a `v<version>` GitHub Release from the matching [CHANGELOG.md](CHANGELOG.md) section. If PyPI already has that version, publishing and release creation are skipped.
 - The PyPI `alab-cli` project must trust repository `bebetterest/ALab`, workflow `ci.yml`, and environment `pypi` before the first automated publish can succeed.
+- After the Python publish job succeeds, pushes to `main` also check ClawHub for the same version of the `alab-skills`, `alab-global-admin`, `alab-project-controller`, and `alab-experiment-worker` skill packages. Missing skill versions are published with the `CLAWHUB_TOKEN` secret; set `CLAWHUB_OWNER` as a repository/environment variable only when publishing under a specific ClawHub owner.
 
 ## Security And Data Model
 
@@ -286,6 +287,8 @@ ALab V1 is a local collaboration boundary, not a multi-user security product:
 ```text
 .
 ├── .github/
+│   ├── scripts/
+│   │   └── clawhub_skill_release.py
 │   └── workflows/
 │       └── ci.yml
 ├── docs/

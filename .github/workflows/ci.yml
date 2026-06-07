@@ -428,3 +428,64 @@ jobs:
               --title "alab-cli ${PACKAGE_VERSION}" \
               --notes-file release-notes.md
           fi
+
+  publish-clawhub-skills:
+    name: Publish ClawHub skills
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - lint
+      - tests
+      - publish-python
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+    environment: clawhub
+    env:
+      CLAWHUB_REGISTRY: ${{ vars.CLAWHUB_REGISTRY || 'https://clawhub.ai' }}
+      CLAWHUB_SITE: ${{ vars.CLAWHUB_SITE || vars.CLAWHUB_REGISTRY || 'https://clawhub.ai' }}
+      CLAWHUB_OWNER: ${{ vars.CLAWHUB_OWNER }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Check ClawHub skill release state
+        id: clawhub
+        run: python .github/scripts/clawhub_skill_release.py plan --plan-output clawhub-skill-plan.json
+
+      - name: Stop when ClawHub already has current skill versions
+        if: ${{ steps.clawhub.outputs.should_publish != 'true' }}
+        run: |
+          echo "ClawHub already has all ALab skill versions for ${{ steps.clawhub.outputs.version }}; skipping publish."
+
+      - name: Set up Node
+        if: ${{ steps.clawhub.outputs.should_publish == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install ClawHub CLI
+        if: ${{ steps.clawhub.outputs.should_publish == 'true' }}
+        run: npm install -g clawhub
+
+      - name: Log in to ClawHub
+        if: ${{ steps.clawhub.outputs.should_publish == 'true' }}
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          if [[ -z "${CLAWHUB_TOKEN}" ]]; then
+            echo "::error::CLAWHUB_TOKEN repository or environment secret is required to publish missing skill versions."
+            exit 1
+          fi
+          clawhub login --token "${CLAWHUB_TOKEN}"
+          clawhub whoami
+
+      - name: Publish missing ClawHub skill versions
+        if: ${{ steps.clawhub.outputs.should_publish == 'true' }}
+        run: python .github/scripts/clawhub_skill_release.py publish

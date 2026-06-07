@@ -463,6 +463,7 @@ _README_PATH = _REPO_ROOT / "README.md"
 _README_CN_PATH = _REPO_ROOT / "README_cn.md"
 _PYPROJECT_PATH = _REPO_ROOT / "pyproject.toml"
 _CI_WORKFLOW_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+_CLAWHUB_RELEASE_SCRIPT_PATH = _REPO_ROOT / ".github" / "scripts" / "clawhub_skill_release.py"
 _GITIGNORE_PATH = _REPO_ROOT / ".gitignore"
 _ENV_EXAMPLE_PATH = _REPO_ROOT / ".env.example"
 _TESTS_ROOT = _REPO_ROOT / "tests"
@@ -21697,6 +21698,68 @@ def test_readme_repository_structure_trees_are_synchronized_and_existing() -> No
     assert missing_paths == []
 
 
+def _load_clawhub_release_script() -> object:
+    spec = importlib.util.spec_from_file_location("alab_clawhub_skill_release", _CLAWHUB_RELEASE_SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_clawhub_skill_release_targets_match_current_skill_metadata() -> None:
+    module = _load_clawhub_release_script()
+    pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
+    version = module.load_project_version(_REPO_ROOT)
+    releases = module.validate_releases(_REPO_ROOT)
+
+    assert version == pyproject["project"]["version"]
+    assert [release.slug for release in releases] == [
+        "alab-skills",
+        "alab-global-admin",
+        "alab-project-controller",
+        "alab-experiment-worker",
+    ]
+    assert [release.path for release in releases] == [
+        "ALabSkills",
+        "ALabSkills/alab-global-admin",
+        "ALabSkills/alab-project-controller",
+        "ALabSkills/alab-experiment-worker",
+    ]
+
+
+def test_clawhub_skill_release_plan_publishes_only_missing_versions() -> None:
+    module = _load_clawhub_release_script()
+    plan = module.build_plan(
+        _REPO_ROOT,
+        "https://clawhub.example",
+        version="1.2.3",
+        version_exists=lambda _base_url, slug, _version: slug in {"alab-skills"},
+    )
+
+    assert plan["version"] == "1.2.3"
+    assert plan["should_publish"] is True
+    assert plan["missing_slugs"] == [
+        "alab-global-admin",
+        "alab-project-controller",
+        "alab-experiment-worker",
+    ]
+    assert [skill["slug"] for skill in plan["skills"] if skill["should_publish"]] == plan["missing_slugs"]
+
+
+def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
+    workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    job_start = workflow.index("  publish-clawhub-skills:")
+    job_text = workflow[job_start:]
+
+    assert "      - publish-python" in job_text
+    assert "    environment: clawhub" in job_text
+    assert "          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}" in job_text
+    assert "clawhub login --token" in job_text
+    assert "python .github/scripts/clawhub_skill_release.py publish" in job_text
+
+
 def test_local_agent_notes_and_env_files_are_gitignored() -> None:
     patterns = _gitignore_patterns()
 
@@ -21718,11 +21781,13 @@ def test_env_example_documents_setup_environment_variables() -> None:
 
 def test_runtime_stack_and_entrypoint_follow_blueprint_contract(tmp_path: Path) -> None:
     pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
+    alab_module = importlib.import_module("alab")
     runtime_roots = _pyproject_dependency_roots()
     import_roots = _runtime_import_roots()
     required_runtime_roots = {"typer", "rich", "pydantic", "tomli_w", "pathspec"}
 
     assert pyproject["project"]["name"] == "alab-cli"
+    assert alab_module.__version__ == pyproject["project"]["version"]
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert pyproject["project"]["scripts"] == {"alab": "alab.cli:main"}
     assert pyproject["tool"]["uv"]["package"] is True

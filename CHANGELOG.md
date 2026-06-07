@@ -5,11 +5,16 @@ All notable ALab changes are recorded here. Keep this file in sync with
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-06-07
+
 ### Added
 
 - Added `examples/free_evaluation_intro_site`, a no-run free evaluation example
   where workers complete a Chinese static introduction site and submit directly
   for manual review.
+- Added push-to-main ClawHub publishing after the Python publish job for the
+  ALab skill bundle and three role skill packages, skipping any skill version
+  that already exists on ClawHub.
 
 ## [0.1.5] - 2026-06-05
 

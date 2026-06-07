@@ -5,10 +5,15 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-06-07
+
 ### 新增
 
 - 新增 `examples/free_evaluation_intro_site` no-run free evaluation 示例：
   worker 完成中文静态介绍站后直接 submit，由人工 review。
+- 新增推送到 `main` 时在 Python publish job 之后执行的 ClawHub 发布：发布
+  ALab skill bundle 和三个 role skill packages，并跳过 ClawHub 已存在的
+  skill version。
 
 ## [0.1.5] - 2026-06-05
 
