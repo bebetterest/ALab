@@ -71,6 +71,17 @@ def pypi_release_url(pypi_base_url: str, package_name: str) -> str:
     return f"{base_url}/{urllib.parse.quote(normalized_name)}/json"
 
 
+def pypi_version_url(pypi_base_url: str, package_name: str, version: str) -> str:
+    base_url = pypi_base_url.rstrip("/")
+    normalized_name = normalized_package_name(package_name)
+    return f"{base_url}/{urllib.parse.quote(normalized_name)}/{urllib.parse.quote(version)}/json"
+
+
+def load_pypi_json(url: str) -> dict[str, object]:
+    with urllib.request.urlopen(url, timeout=30) as response:
+        return dict(json.load(response))
+
+
 def pypi_release_files(
     pypi_base_url: str,
     package_name: str,
@@ -79,23 +90,37 @@ def pypi_release_files(
     attempts: int = 6,
     delay_seconds: int = 10,
 ) -> list[dict[str, object]]:
-    url = pypi_release_url(pypi_base_url, package_name)
+    version_url = pypi_version_url(pypi_base_url, package_name, version)
+    project_url = pypi_release_url(pypi_base_url, package_name)
     last_error: Exception | None = None
 
     for attempt in range(1, attempts + 1):
         try:
-            with urllib.request.urlopen(url, timeout=30) as response:
-                payload = json.load(response)
+            version_payload = load_pypi_json(version_url)
         except urllib.error.HTTPError as exc:
             if exc.code != 404:
                 raise
-            last_error = RuntimeError(f"PyPI package {package_name!r} does not exist.")
+            last_error = RuntimeError(f"PyPI package {package_name!r} has no version {version!r}.")
         else:
-            releases = payload.get("releases", {})
-            files = releases.get(version, [])
+            files = version_payload.get("urls", [])
             if files:
                 return list(files)
             last_error = RuntimeError(f"PyPI package {package_name!r} has no files for version {version!r}.")
+
+        try:
+            project_payload = load_pypi_json(project_url)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            if last_error is None:
+                last_error = RuntimeError(f"PyPI package {package_name!r} does not exist.")
+        else:
+            releases = project_payload.get("releases", {})
+            files = releases.get(version, []) if isinstance(releases, dict) else []
+            if files:
+                return list(files)
+            if last_error is None:
+                last_error = RuntimeError(f"PyPI package {package_name!r} has no files for version {version!r}.")
 
         if attempt < attempts:
             print(f"Waiting for PyPI files for {package_name} {version} ({attempt}/{attempts}).")

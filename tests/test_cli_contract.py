@@ -21865,6 +21865,47 @@ def test_github_release_assets_extracts_matching_release_notes() -> None:
     assert next_release_heading not in notes
 
 
+def test_github_release_assets_reads_pypi_version_json_first(monkeypatch) -> None:
+    module = _load_github_release_assets_script()
+    calls: list[str] = []
+    pypi_files = [
+        {
+            "filename": "alab_cli-1.2.3-py3-none-any.whl",
+            "url": "https://files.pythonhosted.org/packages/alab_cli-1.2.3-py3-none-any.whl",
+            "digests": {"sha256": "abc123"},
+        }
+    ]
+
+    class FakeResponse:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self._payload = payload
+
+        def __enter__(self) -> io.BytesIO:
+            return io.BytesIO(json.dumps(self._payload).encode("utf-8"))
+
+        def __exit__(self, *args: object) -> bool:
+            return False
+
+    def fake_urlopen(url: str, timeout: int) -> FakeResponse:
+        assert timeout == 30
+        calls.append(url)
+        assert url == "https://pypi.example/pypi/alab-cli/1.2.3/json"
+        return FakeResponse({"urls": pypi_files})
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+
+    files = module.pypi_release_files(
+        "https://pypi.example/pypi",
+        "alab_cli",
+        "1.2.3",
+        attempts=1,
+        delay_seconds=0,
+    )
+
+    assert files == pypi_files
+    assert calls == ["https://pypi.example/pypi/alab-cli/1.2.3/json"]
+
+
 def test_version_sync_script_requires_runtime_lock_and_changelog_versions(tmp_path: Path) -> None:
     module = _load_version_sync_script()
     version = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))["project"]["version"]
