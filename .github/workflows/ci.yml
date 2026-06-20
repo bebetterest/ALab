@@ -347,25 +347,40 @@ jobs:
           package_name = project["name"]
           current = project["version"]
           normalized_name = re.sub(r"[-_.]+", "-", package_name).lower()
-          url = f"https://pypi.org/pypi/{urllib.parse.quote(normalized_name)}/json"
-          package_exists = True
+          project_url = f"https://pypi.org/pypi/{urllib.parse.quote(normalized_name)}/json"
+          version_url = f"https://pypi.org/pypi/{urllib.parse.quote(normalized_name)}/{urllib.parse.quote(current)}/json"
+          package_exists = False
           version_exists = False
           latest = "none"
 
           try:
-              with urllib.request.urlopen(url, timeout=30) as response:
-                  payload = json.load(response)
+              with urllib.request.urlopen(version_url, timeout=30) as response:
+                  version_payload = json.load(response)
           except urllib.error.HTTPError as exc:
               if exc.code == 404:
-                  package_exists = False
-                  payload = {"info": {}, "releases": {}}
+                  version_payload = {"info": {}, "urls": []}
               else:
                   raise
+          else:
+              package_exists = True
+              version_exists = True
+              latest = version_payload.get("info", {}).get("version") or current
 
-          if package_exists:
-              releases = payload.get("releases", {})
-              version_exists = current in releases
-              latest = payload.get("info", {}).get("version") or "none"
+          try:
+              with urllib.request.urlopen(project_url, timeout=30) as response:
+                  project_payload = json.load(response)
+          except urllib.error.HTTPError as exc:
+              if exc.code != 404:
+                  raise
+          else:
+              package_exists = True
+              latest = project_payload.get("info", {}).get("version") or latest
+              releases = project_payload.get("releases", {})
+              if not version_exists:
+                  version_exists = current in releases
+
+          if package_exists and latest == "none":
+              latest = current if version_exists else "none"
 
           should_publish = not version_exists
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:

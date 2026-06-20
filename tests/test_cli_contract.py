@@ -21971,6 +21971,19 @@ def test_clawhub_skill_publish_workflow_uses_environment_secret() -> None:
     assert "python .github/scripts/clawhub_skill_release.py publish --plan-input clawhub-skill-plan.json" in job_text
 
 
+def test_publish_python_workflow_checks_pypi_version_json_before_publish() -> None:
+    workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    job_start = workflow.index("  publish-python:")
+    job_end = workflow.index("  publish-github-release-assets:")
+    job_text = workflow[job_start:job_end]
+
+    assert "version_url = f\"https://pypi.org/pypi/{urllib.parse.quote(normalized_name)}/{urllib.parse.quote(current)}/json\"" in job_text
+    assert "with urllib.request.urlopen(version_url, timeout=30)" in job_text
+    assert "version_exists = True" in job_text
+    assert "should_publish = not version_exists" in job_text
+    assert "if: ${{ steps.version.outputs.should_publish == 'true' }}" in job_text
+
+
 def test_github_release_asset_workflow_uploads_python_and_skill_packages() -> None:
     workflow = _CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     job_start = workflow.index("  publish-github-release-assets:")
