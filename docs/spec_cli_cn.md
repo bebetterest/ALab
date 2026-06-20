@@ -757,7 +757,7 @@ Lifecycle command rules：
 - Context：Project 或 explicit project。
 - Credential：Root/admin。
 - 默认 `--version latest-attempted`；`active-valid` 在无 active valid config 时以 `PROJECT_INVALID` 失败；显式 `<n>` 必须是正整数 retained config version number。
-- Success fields：`project id`、`config version`、`version selector`、`config hash`、`project name`、`task`、`goal`、`default source`、`runner type`、`sandbox`、`runner working directory`、`timeout seconds`、`env mode`、`reward type`、`reward direction`、`primary metric`、`artifact glob count`、`stdout limit bytes`、`stderr limit bytes`、`mutable summary`、`visibility scope`、`public exp create`、repeated `env name`、repeated `secret name`、repeated `secret fingerprint`。
+- Success fields：`project id`、`config version`、`version selector`、`config hash`、`project name`、`task`、`goal`、`default source`、`runner type`、`sandbox`、`runner working directory`、`timeout seconds`、`env mode`、`reward type`、`reward direction`、`primary metric`、repeated `reference metric`、`artifact glob count`、`stdout limit bytes`、`stderr limit bytes`、`mutable summary`、`visibility scope`、`public exp create`、repeated `env name`、repeated `secret name`、repeated `secret fingerprint`。
 - Sandbox rule：SkyDiscover Python runners 的 `sandbox` 是 `not-os-sandbox`，其他 runner 是 `not-declared`。
 - Secret rule：绝不打印 raw secret values。
 

@@ -152,6 +152,7 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
 
 `project init` 会在 project 创建后只打印一次 generated project admin key。应将其捕获到 ignored local secret file（例如 example `.run/secrets/project.env`）或已批准的 secret store，然后只把 project admin key 交给被委派的 project-level session，绝不交给 experiment workers。
 成对配置 `runner.type = "none"` 和 `reward.type = "none"` 会创建 free evaluation projects，用于直接 submit 且不运行 baseline evaluator；仅应搭配 `local`、`git` 或 `empty` project init modes 使用，不与 Harbor 或 SkyDiscover adapter init 混用。
+Config 也可以声明 `metrics.reference` entries，用于 dashboard 将 optional numeric run metrics 绘制为 reference curves；这些声明不影响 reward ranking 或 baseline execution。
 
 ## Catalog Rules
 

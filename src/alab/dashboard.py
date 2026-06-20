@@ -1046,6 +1046,7 @@ def _project_summary(conn: Any, row: Any) -> dict[str, Any]:
             "runner_type": ((config or {}).get("runner") or {}).get("type"),
             "reward_type": ((config or {}).get("reward") or {}).get("type"),
             "reward_direction": direction,
+            "reference_metrics": ((config or {}).get("metrics") or {}).get("reference") or [],
             "visibility_scope": ((config or {}).get("visibility") or {}).get("scope"),
             "counts": counts,
             "best_run": _run_summary(best) if best else None,

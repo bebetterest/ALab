@@ -77,6 +77,17 @@ def _seed_dashboard_data(home: Home) -> dict[str, str]:
         },
         "mutable": {"include": ["**"], "exclude": []},
         "visibility": {"scope": "same_project", "experiment_ids": []},
+        "metrics": {
+            "reference": [
+                {
+                    "name": "latency_ms",
+                    "label": "Latency",
+                    "direction": "minimize",
+                    "unit": "ms",
+                },
+                {"name": "coverage", "label": "Coverage", "direction": "maximize"},
+            ]
+        },
         "runner": {
             "type": "local",
             "timeout_seconds": 30,
@@ -176,7 +187,7 @@ def _seed_dashboard_data(home: Home) -> dict[str, str]:
               source_commit, status, exit_code, reward_value, reward_parse_status, archive_status,
               archived_at, unarchived_at, started_at, ended_at, record_json)
             VALUES (?, ?, 1, ?, 'abc123', 'passed', 0, 1.0, 'parsed', 'active',
-              NULL, NULL, ?, ?, '{"metrics":{"reward":1}}')
+              NULL, NULL, ?, ?, '{"metrics":{"reward":1,"latency_ms":120}}')
             """,
             (validation_id, project_id, f"alab/source/{source_id}", _now(), _now()),
         )
@@ -218,7 +229,7 @@ def _seed_dashboard_data(home: Home) -> dict[str, str]:
               exit_code, reward_value, reward_parse_status, archive_status, archived_at,
               unarchived_at, started_at, ended_at, rolled_back_auto_commit, record_json)
             VALUES (?, ?, ?, 'abc123', 1, 'passed', 0, 1.0, 'parsed', 'active',
-              NULL, NULL, ?, ?, NULL, '{"metrics":{"reward":1},"warning_codes":[]}')
+              NULL, NULL, ?, ?, NULL, '{"metrics":{"reward":1,"latency_ms":120,"coverage":0.95},"warning_codes":[]}')
             """,
             (run_id, exp_id, project_id, _now(), _now()),
         )
@@ -461,6 +472,17 @@ def test_dashboard_read_models_redact_raw_secrets(tmp_path: Path, capsys) -> Non
     assert "hmac-sha256:dashboard" in serialized
     secret_env = detail["configs"][0]["config"]["secret_env"]
     assert secret_env == {"API_TOKEN": {"fingerprint": "hmac-sha256:dashboard"}}
+    assert detail["project"]["reference_metrics"] == [
+        {
+            "name": "latency_ms",
+            "label": "Latency",
+            "direction": "minimize",
+            "unit": "ms",
+        },
+        {"name": "coverage", "label": "Coverage", "direction": "maximize", "unit": None},
+    ]
+    assert detail["runs"][0]["metrics"]["latency_ms"] == 120
+    assert detail["runs"][0]["metrics"]["coverage"] == 0.95
 
 
 def test_report_command_exports_project_and_experiment_markdown(tmp_path: Path, capsys, monkeypatch) -> None:
@@ -971,6 +993,12 @@ def test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs()
     assert "wireExperimentHighlights" in app
     assert "bestRunForRuns" in app
     assert "latest reward" in app
+    assert "Reference metric trends" in app
+    assert "referenceMetricTrendData" in app
+    assert "renderReferenceMetricChart" in app
+    assert "project-reference-metric-trends" in app
+    assert ".reference-metric-grid" in styles
+    assert ".reference-metric-chart-box" in styles
     assert "实验时间线" in app
     assert "project-exp-cards" in app
     assert "row-action" in app

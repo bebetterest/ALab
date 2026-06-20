@@ -207,6 +207,7 @@ General rules:
 - Reward parse failure with non-zero exit keeps status `failed` and records reward parse failure.
 - Ranking requires a parsed finite numeric reward.
 - `NaN`, `Infinity`, missing values, empty strings, and non-numeric values fail reward parsing.
+- Simple reward types store the parsed reward under the configured `reward.primary_metric` name in the run record's `metrics` map. When a file reward, Harbor verifier, or SkyDiscover evaluator produces a top-level string-to-finite-number metric object, ALab stores that full object in `metrics`. Project `metrics.reference` declarations may point at any of those metric names for dashboard reference curves, and each run may omit any reference metric.
 
 File reward:
 

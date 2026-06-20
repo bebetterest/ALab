@@ -220,6 +220,7 @@ Project behavior 由 TOML config 控制：
 
 - `[runner]`：runner type、command/shell、working directory、timeout、Docker fields、Harbor task refs、SkyDiscover task refs，或用于 free evaluation 的 `type = "none"`。
 - `[reward]`：reward type 和 primary metric。支持 `exit_code`、`file`、`stdout_regex`、`harbor`、`skydiscover` 和 `none`。`reward.type = "none"` 必须与 `runner.type = "none"` 成对使用。
+- `[metrics]`：可选 `reference` metric declarations，用于 dashboard trend curves；数值来自各 run 可选写入的 stored `metrics` map。
 - `[artifacts]` 和 `[logs]`：captured output roots、glob patterns 和 byte limits。
 - `[env]` 和 `[secret_env]`：显式 environment injection。Secret values 是本地 plaintext，但不渲染或 export。
 - `[mutable]`：experiment 在 run 或 submit 时允许修改的 paths。

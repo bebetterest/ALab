@@ -207,6 +207,7 @@ Reward types：
 - Non-zero exit 且 reward parse failure 保持 `failed`，并记录 parse failure。
 - Ranking 需要 parsed finite numeric reward。
 - `NaN`、`Infinity`、missing value、empty string、non-numeric value 都导致 parse failure。
+- Simple reward types 会把 parsed reward 以配置的 `reward.primary_metric` name 存入 run record 的 `metrics` map。当 file reward、Harbor verifier 或 SkyDiscover evaluator 产生 top-level string-to-finite-number metric object 时，ALab 会把完整 object 存入 `metrics`。Project `metrics.reference` declarations 可指向这些 metric names 作为 dashboard reference curves，且每个 run 都可以省略任意 reference metric。
 
 File reward：
 

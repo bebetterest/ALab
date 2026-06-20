@@ -109,7 +109,7 @@ Dashboard read model 应暴露：
 
 - Global overview：home health、status distributions、active locks、recent activity、validation health、feedback count、cache/capability/catalog state、artifact/log volume 和 recent failures。
 - Projects：sortable/filterable project summaries，包含 status、source count、experiment count、latest activity、run health、artifact/log volume、active config/validation 和 project-local best summary。
-- Project detail：overview、有界 recent experiments、runs、sources/config、validations、logs/artifacts、annotations 和 audit records，并带 related-record page totals。Overview 必须包含 project-level aggregate statistics，以及按 project reward direction 绘制 loaded run reward 并连接每个 new best point 的 reward trend chart。
+- Project detail：overview、有界 recent experiments、runs、sources/config、validations、logs/artifacts、annotations 和 audit records，并带 related-record page totals。Overview 必须包含 project-level aggregate statistics。Runs tab 必须包含按 project reward direction 绘制 loaded run reward 并连接每个 new best point 的 reward trend chart；同时在 loaded runs 对应 metric 有 numeric value 时，为每个声明的 `metrics.reference` entry 显示一张 reference-metric trend chart。
 - Run detail：overview、有界 recent logs/artifacts、related-record page totals、parsed metrics、runner/failure metadata、safe log preview/download links，以及 safe artifact preview/download links。
 - Experiments：status、tags、source binding、config binding、worktree state、latest/final run、submission 和 reward trend。Free evaluation experiments 会展示 submission 和 final commit，但由于 `final_run_id` 为 `NULL`，没有 final run detail 或 reward trend。
 - Runs：status、reward、warnings、runner metadata、stdout/stderr/hidden log references、artifact references、commit/config context 和 failure reasons。

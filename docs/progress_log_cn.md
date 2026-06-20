@@ -8227,3 +8227,40 @@ Validation:
 - Opt-in skipped-test subset：`ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple .venv/bin/python -m pytest -q tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py`
 - `git diff --check`
 - In-app Browser verification against `examples/dashboard_showcase/.run/alab-home`：打开 `SkyDiscover Circle Packing`，确认 minimize best-so-far 红线在 #2 更新、在 #3 继续保持 `0.21`，测得 project detail tabs 滚动时贴住 detail header、背景不透明，并打开 `Embedding reranker` run detail，确认 KPI cards 在横向滚动条上方完整显示。
+
+## 2026-06-20 Project Reference Metrics And Dashboard Curves
+
+已实现：
+
+- 新增 optional `[metrics].reference` project config metadata，校验 metric names、labels、units、maximize/minimize direction，拒绝 duplicate metrics，并兼容缺少该 optional section 的 legacy configs。
+- 为 `project config show` 新增 `reference metric` 渲染，并同步 CLI success-field specs。
+- 更新 local 和 Docker reward extraction，使 simple exit-code/stdout/file rewards 在 `record_json.metrics` 中持久化 `{primary_metric: reward}`，JSON reward files 则保留完整 finite numeric metrics map。
+- 在 root dashboard read model 中暴露 configured project `reference_metrics`，并在 frontend 中于既有 reward trend 旁新增 per-reference-metric trend cards。
+- 同步更新 README、specs、role skill references、changelogs、progress dashboard、pipeline、closed guardrails、completion audit，以及本历史日志的中英文版本。
+
+验证：
+
+- Focused schema/dashboard/runner/docs check：`.venv/bin/python -m pytest -q tests/test_runner_local.py::test_local_runner_persists_json_reward_metrics tests/test_runner_local.py::test_project_config_schema_maps_runner_reward_and_env_edges tests/test_migrations.py::test_project_config_json_contract_enforces_documented_shape tests/test_dashboard.py::test_dashboard_read_models_redact_raw_secrets tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs tests/test_cli_contract.py::test_project_config_show_export_never_render_raw_secret_values`
+- Focused CLI docs check：`.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- Smoke checks：`.venv/bin/python -m pytest -q tests/test_smoke.py::test_config_source_observe_and_tags tests/test_smoke.py::test_local_project_run_submit_workflow`
+- Full runner suites：`.venv/bin/python -m pytest -q tests/test_runner_local.py tests/test_runner_docker.py tests/test_runner_harbor.py tests/test_runner_skydiscover.py`
+- Relevant ruff：`.venv/bin/ruff check src/alab/configs.py src/alab/project_config.py src/alab/dashboard.py src/alab/runner.py tests/test_runner_local.py tests/test_migrations.py tests/test_dashboard.py tests/test_smoke.py`
+- Compile check：`.venv/bin/python -m compileall -q src/alab`
+- Dashboard JavaScript syntax：`node --check src/alab/dashboard_static/app.js`
+- Full default suite：`.venv/bin/python -m pytest -q`
+- `git diff --check`
+
+## 2026-06-20 Version 0.1.9 Release Prep
+
+已实现：
+
+- 将 project reference metrics 和 dashboard curves 的 changelog entry 收口为 `0.1.9`。
+- 同步 bump package version files：`pyproject.toml`、`uv.lock` 和 `src/alab/__init__.py`。
+
+验证：
+
+- Version synchronization check：`.venv/bin/python .github/scripts/check_version_sync.py`
+- Final full default suite：`.venv/bin/python -m pytest -q`
+- Dashboard JavaScript syntax：`node --check src/alab/dashboard_static/app.js`
+- Compile check：`.venv/bin/python -m compileall -q src tests`
+- `git diff --check`

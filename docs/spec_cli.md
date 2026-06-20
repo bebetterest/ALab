@@ -778,7 +778,7 @@ Lifecycle command rules:
 - Credential: Root/admin.
 - Defaults: `--version latest-attempted`.
 - Version rule: `active-valid` fails with `PROJECT_INVALID` when no active valid config exists; explicit `<n>` must be a positive retained config version number.
-- Success fields: `project id`, `config version`, `version selector`, `config hash`, `project name`, `task`, `goal`, `default source`, `runner type`, `sandbox`, `runner working directory`, `timeout seconds`, `env mode`, `reward type`, `reward direction`, `primary metric`, `artifact glob count`, `stdout limit bytes`, `stderr limit bytes`, `mutable summary`, `visibility scope`, `public exp create`, repeated `env name`, repeated `secret name`, repeated `secret fingerprint`.
+- Success fields: `project id`, `config version`, `version selector`, `config hash`, `project name`, `task`, `goal`, `default source`, `runner type`, `sandbox`, `runner working directory`, `timeout seconds`, `env mode`, `reward type`, `reward direction`, `primary metric`, repeated `reference metric`, `artifact glob count`, `stdout limit bytes`, `stderr limit bytes`, `mutable summary`, `visibility scope`, `public exp create`, repeated `env name`, repeated `secret name`, repeated `secret fingerprint`.
 - Sandbox rule: `sandbox` is `not-os-sandbox` for SkyDiscover Python runners and `not-declared` otherwise.
 - Secret rule: never renders raw secret values.
 - Exit: `0`; `3` on auth failure.

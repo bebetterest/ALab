@@ -692,6 +692,9 @@ function runnerCompactSummary(runner) {
 function configHighlights(config) {
   const runner = config.runner || {};
   const reward = config.reward || {};
+  const referenceMetrics = ((config.metrics || {}).reference || [])
+    .map((metricDef) => `${metricDef.label || metricDef.name} (${metricDef.name}, ${metricDef.direction || "maximize"})`)
+    .join(", ") || statusLabel("none");
   const artifacts = config.artifacts || {};
   const secretEnv = config.secret_env || {};
   const secretSummary = Object.entries(secretEnv)
@@ -701,6 +704,7 @@ function configHighlights(config) {
     [L("runner", "运行器"), valueOrNone(runner.type)],
     [L("runner command", "运行命令"), Array.isArray(runner.command) ? runner.command.join(" ") : valueOrNone(runner.command || runner.program_path)],
     [L("reward", "奖励"), `${valueOrNone(reward.type)} / ${valueOrNone(reward.direction || "maximize")} / ${valueOrNone(reward.primary_metric || "reward")}`],
+    [L("reference metrics", "参考指标"), referenceMetrics],
     [L("artifact globs", "产物匹配"), (artifacts.globs || []).join(", ") || statusLabel("none")],
     [L("env keys", "环境键"), Object.keys(config.env || {}).join(", ") || statusLabel("none")],
     ["secret_env", secretSummary],
@@ -1448,6 +1452,8 @@ function emptyHtml(options = {}) {
   }
   const message = options.unfiltered
     ? L("No records are available for this section.", "此区域暂无可显示记录。")
+    : options.message
+    ? options.message
     : t("empty");
   return `<div class="empty${compact}"><strong>${escapeHtml(L("No records", "没有记录"))}</strong><span>${escapeHtml(message)}</span></div>`;
 }
@@ -2010,6 +2016,172 @@ function renderProjectRewardChart(detail) {
   const summary = document.getElementById("project-reward-summary");
   if (summary) summary.innerHTML = rewardTrendSummaryHtml(detail.runs || [], detail.project.reward_direction);
   renderRewardTrendChart("project-reward-chart", detail.runs || [], detail.project.reward_direction);
+}
+
+function referenceMetricTitle(metricDef) {
+  return metricDef && metricDef.label ? metricDef.label : (metricDef && metricDef.name) || L("metric", "指标");
+}
+
+function referenceMetricUnit(metricDef) {
+  return metricDef && metricDef.unit ? ` ${metricDef.unit}` : "";
+}
+
+function finiteMetricValue(run, metricName) {
+  const raw = run && run.metrics ? run.metrics[metricName] : undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function referenceMetricTrendData(runsInput, metricDef) {
+  const metricName = metricDef && metricDef.name;
+  const runs = [...(runsInput || [])]
+    .map((run) => ({ run, value: metricName ? finiteMetricValue(run, metricName) : null }))
+    .filter((item) => item.value !== null)
+    .sort((a, b) => {
+      const aTime = Date.parse(a.run.ended_at || a.run.started_at || "") || 0;
+      const bTime = Date.parse(b.run.ended_at || b.run.started_at || "") || 0;
+      return aTime - bTime || String(a.run.run_id).localeCompare(String(b.run.run_id));
+    });
+  const direction = metricDef && metricDef.direction === "minimize" ? "minimize" : "maximize";
+  const labels = runs.map((_item, index) => `#${index + 1}`);
+  const values = runs.map((item) => item.value);
+  let bestValue = null;
+  const bestPoints = [];
+  const bestSoFar = values.map((value) => {
+    const improved = bestValue === null || (direction === "minimize" ? value < bestValue : value > bestValue);
+    if (improved) {
+      bestValue = value;
+      bestPoints.push(value);
+    } else {
+      bestPoints.push(null);
+    }
+    return bestValue;
+  });
+  return { labels, values, bestPoints, bestSoFar, direction, runs: runs.map((item) => item.run), metricDef };
+}
+
+function bestMetricRunForData(data) {
+  if (!data.runs.length) return null;
+  const candidates = data.runs.map((run, index) => ({ run, value: data.values[index] }));
+  const factor = data.direction === "minimize" ? 1 : -1;
+  candidates.sort((a, b) => {
+    const valueDiff = (a.value - b.value) * factor;
+    return valueDiff || String(b.run.started_at || b.run.ended_at || "").localeCompare(String(a.run.started_at || a.run.ended_at || ""));
+  });
+  return candidates[0];
+}
+
+function referenceMetricSummaryHtml(metricDef, runs) {
+  const data = referenceMetricTrendData(runs, metricDef);
+  const title = referenceMetricTitle(metricDef);
+  if (!data.runs.length) {
+    return `<div class="trend-summary is-empty">${trendSummaryItem(title, "0", L("no values recorded", "未记录数值"))}</div>`;
+  }
+  const latestRun = data.runs[data.runs.length - 1];
+  const latestValue = data.values[data.values.length - 1];
+  const best = bestMetricRunForData(data);
+  const unit = referenceMetricUnit(metricDef);
+  return `
+    <div class="trend-summary reference-metric-summary">
+      ${trendSummaryItem(L("points", "点数"), String(data.runs.length), L("recorded values", "已记录数值"))}
+      ${trendSummaryItem(L("best", "最佳"), `${valueOrNone(best && best.value)}${unit}`, best ? shortId(best.run.run_id) : statusLabel("none"))}
+      ${trendSummaryItem(L("latest", "最新"), `${valueOrNone(latestValue)}${unit}`, shortId(latestRun.run_id))}
+    </div>
+  `;
+}
+
+function renderReferenceMetricChart(id, runs, metricDef) {
+  const data = referenceMetricTrendData(runs, metricDef);
+  const title = referenceMetricTitle(metricDef);
+  renderChart(id, "line", data.labels, [
+    {
+      label: title,
+      data: data.values,
+      borderColor: "#2f855a",
+      backgroundColor: "rgba(47, 133, 90, 0.12)",
+      pointRadius: 4,
+      tension: 0.25,
+      spanGaps: true,
+    },
+    {
+      label: data.direction === "minimize" ? L("best-so-far low", "累计最低最佳") : L("best-so-far high", "累计最高最佳"),
+      data: data.bestSoFar,
+      borderColor: "#b7791f",
+      backgroundColor: "#b7791f",
+      pointRadius: data.bestPoints.map((value) => value === null ? 0 : 5),
+      pointHoverRadius: data.bestPoints.map((value) => value === null ? 4 : 7),
+      tension: 0,
+      spanGaps: true,
+    },
+  ], {
+    ariaLabel: `${L("Reference metric trend", "参考指标趋势")}: ${title}`,
+    plugins: {
+      tooltip: {
+        mode: "index",
+        intersect: false,
+        callbacks: {
+          title: (items) => {
+            const index = items[0] ? items[0].dataIndex : 0;
+            const run = data.runs[index] || {};
+            return `${data.labels[index]} ${run.exp_name || run.exp_id || run.run_id || ""}`;
+          },
+          afterBody: (items) => {
+            const index = items[0] ? items[0].dataIndex : 0;
+            const run = data.runs[index] || {};
+            return [
+              `${L("metric", "指标")}: ${(metricDef && metricDef.name) || statusLabel("none")}`,
+              `${L("status", "状态")}: ${statusLabel(run.status || "none")}`,
+              `${L("run", "运行")}: ${run.run_id || statusLabel("none")}`,
+              `${L("started", "开始")}: ${formatDate(run.started_at)}`,
+            ];
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        title: { display: true, text: L("metric point order", "指标点序号") },
+        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
+      },
+      y: {
+        title: { display: true, text: `${title}${referenceMetricUnit(metricDef)}` },
+        grace: "12%",
+      },
+    },
+  });
+}
+
+function referenceMetricTrendsHtml(detail, runs) {
+  const metrics = (detail.project && detail.project.reference_metrics) || [];
+  if (!metrics.length) {
+    return `<div class="reference-metric-empty">${emptyHtml({ compact: true, message: L("No reference metrics configured.", "未配置参考指标。") })}</div>`;
+  }
+  return `
+    <div class="reference-metric-grid">
+      ${metrics.map((metricDef, index) => `
+        <article class="reference-metric-card">
+          <div class="reference-metric-head">
+            <div>
+              <h3>${escapeHtml(referenceMetricTitle(metricDef))}</h3>
+              <p>${escapeHtml(metricDef.name)} · ${escapeHtml(metricDef.direction || "maximize")}</p>
+            </div>
+            ${metricDef.unit ? `<span>${escapeHtml(metricDef.unit)}</span>` : ""}
+          </div>
+          <div id="project-reference-metric-summary-${index}"></div>
+          <div class="chart-box reference-metric-chart-box"><canvas id="project-reference-metric-chart-${index}"></canvas></div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderProjectReferenceMetricCharts(detail, runs) {
+  const metrics = (detail.project && detail.project.reference_metrics) || [];
+  metrics.forEach((metricDef, index) => {
+    const summary = document.getElementById(`project-reference-metric-summary-${index}`);
+    if (summary) summary.innerHTML = referenceMetricSummaryHtml(metricDef, runs);
+    renderReferenceMetricChart(`project-reference-metric-chart-${index}`, runs, metricDef);
+  });
 }
 
 function renderRunActivityChart(id, runs) {
@@ -4045,6 +4217,7 @@ function renderProjectDetailTab(detail, tab) {
   if (tab === "runs") {
     body.innerHTML = `
       ${panel(L("Run reward trend", "运行奖励趋势"), '<div id="project-reward-summary"></div><div class="chart-box project-chart-box"><canvas id="project-reward-chart"></canvas></div>')}
+      ${panel(L("Reference metric trends", "参考指标趋势"), '<div id="project-reference-metric-trends"></div>')}
       ${panel(L("Runs", "运行"), `<div id="project-run-controls"></div><div id="project-run-meta"></div><div class="run-card-grid bounded-list" id="project-run-cards"></div>`)}
     `;
     const viewKey = "project_runs";
@@ -4071,6 +4244,8 @@ function renderProjectDetailTab(detail, tab) {
     });
     document.getElementById("project-reward-summary").innerHTML = rewardTrendSummaryHtml(rows, detail.project.reward_direction);
     renderRewardTrendChart("project-reward-chart", rows, detail.project.reward_direction);
+    document.getElementById("project-reference-metric-trends").innerHTML = referenceMetricTrendsHtml(detail, rows);
+    renderProjectReferenceMetricCharts(detail, rows);
     const runCards = document.getElementById("project-run-cards");
     runCards.innerHTML = runCardsHtml(rows);
     wireRunCards(runCards);

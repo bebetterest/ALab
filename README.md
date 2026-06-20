@@ -221,6 +221,7 @@ Project behavior is controlled by TOML config:
 
 - `[runner]`: runner type, command/shell, working directory, timeout, Docker fields, Harbor task refs, SkyDiscover task refs, or `type = "none"` for free evaluation.
 - `[reward]`: reward type and primary metric. Supported reward families include `exit_code`, `file`, `stdout_regex`, `harbor`, `skydiscover`, and `none`. `reward.type = "none"` must be paired with `runner.type = "none"`.
+- `[metrics]`: optional `reference` metric declarations for dashboard trend curves, using numeric values that individual runs may include in their stored `metrics` map.
 - `[artifacts]` and `[logs]`: captured output roots, glob patterns, and byte limits.
 - `[env]` and `[secret_env]`: explicit environment injection. Secret values are local plaintext but are not rendered or exported.
 - `[mutable]`: paths the experiment may change when running or submitting.

@@ -16,6 +16,7 @@ from .errors import AlabError
 from .ids import require_complete_id
 
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+METRIC_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$")
 WINDOWS_ABSOLUTE_RE = re.compile(r"^[A-Za-z]:[\\/]")
 GLOBAL_CONFIG_INT_FIELDS = {
     "output.preview_bytes",
@@ -37,6 +38,7 @@ PROJECT_CONFIG_JSON_KEYS = {
     "public_source_import",
     "mutable",
     "visibility",
+    "metrics",
     "runner",
     "reward",
     "artifacts",
@@ -371,6 +373,39 @@ class RewardSection(BaseModel):
         return self
 
 
+class ReferenceMetric(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    label: str | None = None
+    direction: Literal["maximize", "minimize"] = "maximize"
+    unit: str | None = None
+
+    @model_validator(mode="after")
+    def check_metric(self) -> ReferenceMetric:
+        if not METRIC_NAME_RE.match(self.name):
+            raise ValueError("metrics.reference.name must match ^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$")
+        for field_name, value in (("label", self.label), ("unit", self.unit)):
+            if value is not None and (not value.strip() or "\n" in value or "\0" in value):
+                raise ValueError(f"metrics.reference.{field_name} must be a non-empty single-line string")
+        return self
+
+
+class MetricsSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference: list[ReferenceMetric] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_reference(self) -> MetricsSection:
+        seen: set[str] = set()
+        for metric in self.reference:
+            if metric.name in seen:
+                raise ValueError(f"metrics.reference contains duplicate metric name: {metric.name}")
+            seen.add(metric.name)
+        return self
+
+
 class ArtifactsSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -418,6 +453,7 @@ class ProjectConfig(BaseModel):
     public_source_import: PublicSourceImportSection = Field(default_factory=PublicSourceImportSection)
     mutable: MutableSection = Field(default_factory=MutableSection)
     visibility: VisibilitySection = Field(default_factory=VisibilitySection)
+    metrics: MetricsSection = Field(default_factory=MetricsSection)
     runner: RunnerSection
     reward: RewardSection
     artifacts: ArtifactsSection = Field(default_factory=ArtifactsSection)
@@ -458,7 +494,7 @@ def project_config_json_obj(text: str) -> dict[str, Any]:
         text,
         label="project_config_versions.canonical_config_json",
         allowed_keys=PROJECT_CONFIG_JSON_KEYS,
-        required_keys=PROJECT_CONFIG_JSON_KEYS - {"schema_version"},
+        required_keys=PROJECT_CONFIG_JSON_KEYS - {"schema_version", "metrics"},
     )
     env = config_json["env"]
     if not isinstance(env, dict) or not all(isinstance(name, str) and isinstance(value, str) for name, value in env.items()):
@@ -482,10 +518,10 @@ def project_config_json_obj(text: str) -> dict[str, Any]:
         if not isinstance(marker["fingerprint"], str) or not marker["fingerprint"].startswith("hmac-sha256:"):
             raise AlabError("STORAGE_ERROR", "project_config_versions.canonical_config_json secret_env fingerprint must be an HMAC string")
     try:
-        ProjectConfig.model_validate(config_json)
+        config = ProjectConfig.model_validate(config_json)
     except Exception as exc:
         raise AlabError("STORAGE_ERROR", f"project_config_versions.canonical_config_json is invalid: {exc}") from exc
-    return config_json
+    return config.canonical_dict()
 
 
 def load_project_config(path: Path) -> ProjectConfig:

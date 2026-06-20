@@ -192,6 +192,7 @@ def _apply_project_config(
         if current_row is None:
             raise AlabError("PROJECT_INVALID", "project has no config version")
         current_json = project_config_json_obj(current_row["canonical_config_json"])
+        current_hashes = {current_row["config_hash"], config_hash(current_json)}
         _validate_docker_config_capabilities(tx, next_config)
         _validate_adapter_config_refs(tx, next_config)
         config_json, raw_secrets = _store_secret_values(
@@ -205,7 +206,7 @@ def _apply_project_config(
         new_hash = config_hash(config_json)
         runtime_affecting = _runtime_signature(current_json) != _runtime_signature(config_json)
         free_evaluation = is_free_evaluation_config(next_config)
-        if new_hash == current_row["config_hash"]:
+        if new_hash in current_hashes:
             return [
                 ResultBlock(
                     "project_config",
@@ -406,6 +407,15 @@ def cmd_project_config_show(args: list[str], req: Request) -> list[ResultBlock]:
                     ("reward type", cfg.reward.type),
                     ("reward direction", cfg.reward.direction),
                     ("primary metric", cfg.reward.primary_metric),
+                    (
+                        "reference metric",
+                        [
+                            f"{metric.name} ({metric.direction})"
+                            + (f" [{metric.unit}]" if metric.unit else "")
+                            for metric in cfg.metrics.reference
+                        ]
+                        or None,
+                    ),
                     ("artifact glob count", len(cfg.artifacts.globs)),
                     ("stdout limit bytes", cfg.logs.stdout_limit_bytes),
                     ("stderr limit bytes", cfg.logs.stderr_limit_bytes),

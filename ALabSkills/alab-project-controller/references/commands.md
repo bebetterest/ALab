@@ -56,7 +56,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Project reports require admin/root authority. Experiment reports follow observe visibility. Reports include summaries and safe details, but not raw keys, tokens, raw secrets, hidden-log contents, or artifact bytes.
 - **`project config show`**: Inspect config details.
   Parameters: Optional `--project`; `--version latest-attempted|active-valid|<n>`.
-  Notes: Shows runner/reward/artifact/env/secret fingerprints without raw secret values. Free evaluation projects show `runner type: none` and `reward type: none`.
+  Notes: Shows runner/reward/reference-metric/artifact/env/secret fingerprints without raw secret values. Free evaluation projects show `runner type: none` and `reward type: none`.
 - **`project config export`**: Write a config snapshot to a file.
   Parameters: Required `--out <path>`; optional `--overwrite`, `--project`, `--version`.
   Notes: Use for review or controlled edits; export never writes raw secret values.
@@ -65,7 +65,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
   Notes: Dry-run parses, canonicalizes, diffs, and checks capabilities without saving changes or running an evaluator. A runtime-affecting free evaluation import with paired `runner.type = "none"` and `reward.type = "none"` sets `validation status: not_required` and becomes active valid without running a baseline evaluator.
 - **`project config set`**: Change one non-secret config field.
   Parameters: Required `<field> <toml-literal>`; optional `--project`, `--dry-run`, `--skip-baseline-test`.
-  Notes: Replaces whole array/map fields; secret fields must use `project secret`. Do not use single-field `set` to switch into or out of free evaluation because runner and reward `none` must change atomically.
+  Notes: Replaces whole array/map fields; secret fields must use `project secret`. Use `metrics.reference` to declare optional numeric run metrics for dashboard reference curves; this metadata does not change reward ranking. Do not use single-field `set` to switch into or out of free evaluation because runner and reward `none` must change atomically.
 - **`project env set|unset|list`**: Manage plain environment values in project config.
   Parameters: `set <name> <value>`, `unset <name>`, or `list`; optional `--project`. Names must match environment-variable syntax.
   Notes: Values are rendered by `list`; use secrets for sensitive values.
@@ -75,7 +75,7 @@ Each entry lists the function, purpose, important parameters, and how to use the
 - **`project validate`**: Run the active project baseline validation.
   Parameters: Optional `--project <project_id>`.
   Notes: Produces validation id, status, reward, parse status, warning codes, and project status. Free evaluation configs show `validation status: not_required` without running an evaluator.
-  Notes: For file and Harbor rewards, `reward.json` metrics must be finite numbers. Non-numeric details belong in artifacts or logs, not the reward metrics object.
+  Notes: For file and Harbor rewards, `reward.json` metrics must be finite numbers. Non-numeric details belong in artifacts or logs, not the reward metrics object. Declared `metrics.reference` names are optional per run and are plotted only when a run records a matching numeric metric.
 - **`project validation archive|unarchive|remove`**: Maintain validation entries and their dependent logs/artifacts.
   Parameters: Required `<validation_id>`; remove requires `--dry-run` or `--force --confirm <validation_id>`, optional `--cascade`, `--reason`, `--project`.
   Notes: Archive active validations is blocked; dry-run before remove.

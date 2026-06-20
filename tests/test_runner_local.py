@@ -68,6 +68,57 @@ def test_sanitized_local_runner_creates_temp_home_and_strips_alab_credentials(tm
     assert "internal_project=proj-local" in stdout
 
 
+def test_local_runner_persists_json_reward_metrics(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    run_dir = tmp_path / "run"
+    workspace.mkdir()
+    config = ProjectConfig.model_validate(
+        {
+            "schema_version": 1,
+            "project": {"name": "Reference Metrics", "task": "Record non-primary metrics"},
+            "metrics": {
+                "reference": [
+                    {"name": "latency_ms", "direction": "minimize", "unit": "ms"},
+                    {"name": "coverage", "direction": "maximize"},
+                ]
+            },
+            "runner": {
+                "type": "local",
+                "timeout_seconds": 30,
+                "working_directory": ".",
+                "env_mode": "none",
+                "command": [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import json, os, pathlib\n"
+                        "path = pathlib.Path(os.environ['ALAB_RUN_DIR']) / 'reward.json'\n"
+                        "path.write_text(json.dumps({'score': 2.5, 'latency_ms': 120, 'coverage': 0.95}), encoding='utf-8')\n"
+                    ),
+                ],
+            },
+            "reward": {
+                "type": "file",
+                "direction": "maximize",
+                "primary_metric": "score",
+                "path": "run:reward.json",
+            },
+        }
+    )
+
+    result = run_local_runner(
+        config=config,
+        workspace=workspace,
+        run_dir=run_dir,
+        operation_id="run-local-reference-metrics",
+        secrets={},
+    )
+
+    assert result.status == "passed"
+    assert result.reward == 2.5
+    assert result.metrics == {"score": 2.5, "latency_ms": 120.0, "coverage": 0.95}
+
+
 def test_full_local_runner_strips_alab_credentials_and_internal_env_overrides(tmp_path, monkeypatch) -> None:
     workspace = tmp_path / "workspace"
     run_dir = tmp_path / "run"
@@ -635,6 +686,26 @@ def test_project_config_schema_maps_runner_reward_and_env_edges() -> None:
     )
     assert free.runner.type == "none"
     assert free.reward.type == "none"
+    reference_metrics = ProjectConfig.model_validate(
+        {
+            **base,
+            "metrics": {
+                "reference": [
+                    {
+                        "name": "latency_ms",
+                        "label": "Latency",
+                        "direction": "minimize",
+                        "unit": "ms",
+                    },
+                    {"name": "coverage", "direction": "maximize"},
+                ]
+            },
+        }
+    )
+    assert [metric.name for metric in reference_metrics.metrics.reference] == [
+        "latency_ms",
+        "coverage",
+    ]
 
     cases = [
         ({**base, "schema_version": 2}, "Input should be 1"),
@@ -680,6 +751,18 @@ def test_project_config_schema_maps_runner_reward_and_env_edges() -> None:
         ({**base, "reward": {"type": "stdout_regex", "direction": "maximize", "primary_metric": "reward"}}, "stdout_regex reward requires reward.pattern"),
         ({**base, "artifacts": {"globs": ["workspace:"]}}, "artifacts.globs[0] path is required"),
         ({**base, "artifacts": {"globs": ["bad\0pattern"]}}, "artifacts.globs[0] contains NUL"),
+        (
+            {**base, "metrics": {"reference": [{"name": "bad metric"}]}},
+            "metrics.reference.name must match",
+        ),
+        (
+            {**base, "metrics": {"reference": [{"name": "latency"}, {"name": "latency"}]}},
+            "metrics.reference contains duplicate metric name: latency",
+        ),
+        (
+            {**base, "metrics": {"reference": [{"name": "latency", "unit": "\n"}]}},
+            "metrics.reference.unit must be a non-empty single-line string",
+        ),
         ({**base, "logs": {"stdout_limit_bytes": "1024"}}, "logs.stdout_limit_bytes must be a positive integer"),
         ({**base, "public_source_import": {"max_files": 1, "max_total_bytes": 1, "max_file_bytes": False}}, "public_source_import.max_file_bytes must be a non-negative integer"),
         ({**base, "visibility": {"scope": "explicit", "experiment_ids": []}}, "visibility.experiment_ids is required for explicit scope"),
@@ -835,7 +918,11 @@ def test_stdout_regex_reward_schema_requires_usable_capture_group(tmp_path) -> N
             },
         }
     )
-    assert parse_reward(named, 0, b"score=2.5\n", workspace, run_dir) == (2.5, "parsed")
+    assert parse_reward(named, 0, b"score=2.5\n", workspace, run_dir) == (
+        2.5,
+        "parsed",
+        {"reward": 2.5},
+    )
 
     fallback_capture = ProjectConfig.model_validate(
         {
@@ -848,7 +935,11 @@ def test_stdout_regex_reward_schema_requires_usable_capture_group(tmp_path) -> N
             },
         }
     )
-    assert parse_reward(fallback_capture, 0, b"score=3.5\n", workspace, run_dir) == (3.5, "parsed")
+    assert parse_reward(fallback_capture, 0, b"score=3.5\n", workspace, run_dir) == (
+        3.5,
+        "parsed",
+        {"reward": 3.5},
+    )
 
     cases = [
         ("score=[0-9.", "reward.pattern is invalid"),
@@ -890,8 +981,16 @@ def test_exit_code_reward_parses_zero_and_nonzero_exits(tmp_path) -> None:
         }
     )
 
-    assert parse_reward(config, 0, b"", workspace, run_dir) == (1.0, "parsed")
-    assert parse_reward(config, 7, b"", workspace, run_dir) == (0.0, "parsed")
+    assert parse_reward(config, 0, b"", workspace, run_dir) == (
+        1.0,
+        "parsed",
+        {"reward": 1.0},
+    )
+    assert parse_reward(config, 7, b"", workspace, run_dir) == (
+        0.0,
+        "parsed",
+        {"reward": 0.0},
+    )
 
 
 def test_artifact_capture_ignores_symlink_escape_with_sibling_prefix(tmp_path) -> None:
@@ -1076,14 +1175,18 @@ def test_file_reward_rejects_symlink_escape_at_parse_time(tmp_path) -> None:
     }
 
     valid = ProjectConfig.model_validate(base)
-    assert parse_reward(valid, 0, b"", workspace, run_dir) == (1.0, "parsed")
+    assert parse_reward(valid, 0, b"", workspace, run_dir) == (
+        1.0,
+        "parsed",
+        {"reward": 1.0},
+    )
 
     try:
         (workspace / "linked-reward.txt").symlink_to(outside / "reward.txt")
     except OSError as exc:
         pytest.skip(f"symlinks unavailable: {exc}")
     linked_escape = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "path": "workspace:linked-reward.txt"}})
-    assert parse_reward(linked_escape, 0, b"", workspace, run_dir) == (None, "invalid")
+    assert parse_reward(linked_escape, 0, b"", workspace, run_dir) == (None, "invalid", {})
 
 
 def test_file_reward_parses_json_and_enforces_limit_and_finite_values(tmp_path) -> None:
@@ -1111,19 +1214,27 @@ def test_file_reward_parses_json_and_enforces_limit_and_finite_values(tmp_path) 
     }
 
     json_reward = ProjectConfig.model_validate(base)
-    assert parse_reward(json_reward, 0, b"", workspace, run_dir) == (2.5, "parsed")
+    assert parse_reward(json_reward, 0, b"", workspace, run_dir) == (
+        2.5,
+        "parsed",
+        {"score": 2.5, "other": 1.0},
+    )
 
     bad_extra = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "path": "workspace:bad-extra.json"}})
-    assert parse_reward(bad_extra, 0, b"", workspace, run_dir) == (None, "invalid")
+    assert parse_reward(bad_extra, 0, b"", workspace, run_dir) == (None, "invalid", {})
 
     bad_bool = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "path": "workspace:bad-bool.json"}})
-    assert parse_reward(bad_bool, 0, b"", workspace, run_dir) == (None, "invalid")
+    assert parse_reward(bad_bool, 0, b"", workspace, run_dir) == (None, "invalid", {})
 
     run_reward = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "primary_metric": "reward", "path": "run:score.txt"}})
-    assert parse_reward(run_reward, 0, b"", workspace, run_dir) == (3.25, "parsed")
+    assert parse_reward(run_reward, 0, b"", workspace, run_dir) == (
+        3.25,
+        "parsed",
+        {"reward": 3.25},
+    )
 
     non_finite = ProjectConfig.model_validate({**base, "reward": {**base["reward"], "path": "workspace:nan.txt"}})
-    assert parse_reward(non_finite, 0, b"", workspace, run_dir) == (None, "invalid")
+    assert parse_reward(non_finite, 0, b"", workspace, run_dir) == (None, "invalid", {})
 
     too_large = ProjectConfig.model_validate({**base, "artifacts": {"per_file_limit_bytes": 3}})
-    assert parse_reward(too_large, 0, b"", workspace, run_dir) == (None, "invalid")
+    assert parse_reward(too_large, 0, b"", workspace, run_dir) == (None, "invalid", {})

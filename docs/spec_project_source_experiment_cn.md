@@ -34,6 +34,12 @@ exclude = []
 scope = "same_project"
 experiment_ids = []
 
+[metrics]
+reference = [
+  { name = "latency_ms", label = "Latency", direction = "minimize", unit = "ms" },
+  { name = "coverage", label = "Coverage", direction = "maximize" },
+]
+
 [runner]
 type = "local"
 timeout_seconds = 600
@@ -87,6 +93,9 @@ PYTHONUNBUFFERED = "1"
 - `mutable.include` 默认 `["**"]`，且必须至少包含一个 non-empty single-line pattern；`mutable.exclude` 默认 `[]`，设置时包含 non-empty single-line patterns。
 - `visibility.scope` 是 `none`、`same_project` 或 `explicit`。
 - 只有 `scope = "explicit"` 时，`visibility.experiment_ids` required 且 non-empty；entries 必须是 complete experiment ids，并会 normalized 为 sorted unique list。
+- `metrics.reference` 默认 `[]`，用于声明 dashboard 可作为 reference curves 绘制的 optional numeric run metrics。每个 entry 包含 `name`、可选 `label`、`direction = "maximize"|"minimize"` 和可选 `unit`。
+- `metrics.reference[].name` 必须匹配 `^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$`，且在 project config 内唯一。
+- Reference metrics 只是 display metadata，不改变 reward parsing、best ranking、submit behavior 或 run status。实际数值按 run 可选，来自 run record 的 numeric `metrics` map。
 - `runner.type` 是 `none`、`local`、`docker`、`harbor`、`skydiscover_docker` 或 `skydiscover_python`。
 - `runner.type = "none"` 启用 free evaluation mode，必须与 `reward.type = "none"` 成对使用，并拒绝 command、shell、Docker fields、Harbor refs 和 SkyDiscover refs 等 executable runner fields。
 - `runner.timeout_seconds` 默认 `600`，必须是 `1` 到 `86400` 之间的 integer。
@@ -116,7 +125,7 @@ PYTHONUNBUFFERED = "1"
 Baseline trigger：
 
 - Runtime-affecting fields 触发 baseline：`source.default_source_ref`、所有 `runner.*`、所有 `reward.*`、`artifacts.*`、`logs.*`、`env.*`、`secret_env.*` 和 timeout fields。
-- Policy/metadata fields 本身不触发 baseline：`project.goal`、`project.task`、`project.allow_public_exp_create`、`public_source_import.*`、`mutable.*`、`visibility.*`、tags、Git author metadata。
+- Policy/metadata fields 本身不触发 baseline：`project.goal`、`project.task`、`project.allow_public_exp_create`、`public_source_import.*`、`mutable.*`、`visibility.*`、`metrics.reference.*`、tags、Git author metadata。
 
 Config edit：
 

@@ -8233,3 +8233,40 @@ Validation:
 - Opt-in skipped-test subset: `ALAB_RUN_REAL_DOCKER=1 ALAB_RUN_LIVE_SKYDISCOVER_CATALOG=1 ALAB_RUN_REAL_SKYDISCOVER_PYTHON=1 ALAB_RUN_NETWORKED_SKYDISCOVER_PYTHON=1 ALAB_RUN_NATIVE_SKYDISCOVER_PYTHON=1 UV_CACHE_DIR=.uv-cache UV_DEFAULT_INDEX=https://pypi.org/simple .venv/bin/python -m pytest -q tests/test_real_docker.py tests/test_real_skydiscover_catalog.py tests/test_real_skydiscover_python.py`
 - `git diff --check`
 - In-app Browser verification against `examples/dashboard_showcase/.run/alab-home`: opened `SkyDiscover Circle Packing`, confirmed the minimize best-so-far red line updates at #2 and carries `0.21` forward through #3, measured the project detail tabs sitting flush with the detail header with an opaque background while scrolling, and opened the `Embedding reranker` run detail to confirm KPI cards remain fully visible above the horizontal scrollbar.
+
+## 2026-06-20 Project Reference Metrics And Dashboard Curves
+
+Implemented:
+
+- Added optional `[metrics].reference` project config metadata with validated metric names, labels, units, maximize/minimize direction, duplicate rejection, and legacy missing-section normalization.
+- Added `reference metric` rendering to `project config show` and synchronized the CLI success-field specs.
+- Updated local and Docker reward extraction so simple exit-code/stdout/file rewards persist `{primary_metric: reward}` in `record_json.metrics`, while JSON reward files preserve the full finite numeric metrics map.
+- Exposed configured project `reference_metrics` in the root dashboard read model and added per-reference-metric frontend trend cards alongside the existing reward trend.
+- Updated README, specs, role skill references, changelogs, progress dashboard, pipeline, closed guardrails, completion audit, and this log in English and Chinese.
+
+Validation:
+
+- Focused schema/dashboard/runner/docs check: `.venv/bin/python -m pytest -q tests/test_runner_local.py::test_local_runner_persists_json_reward_metrics tests/test_runner_local.py::test_project_config_schema_maps_runner_reward_and_env_edges tests/test_migrations.py::test_project_config_json_contract_enforces_documented_shape tests/test_dashboard.py::test_dashboard_read_models_redact_raw_secrets tests/test_dashboard.py::test_dashboard_static_frontend_uses_external_scripts_and_translation_pairs tests/test_cli_contract.py::test_project_config_show_export_never_render_raw_secret_values`
+- Focused CLI docs check: `.venv/bin/python -m pytest -q tests/test_cli_contract.py::test_selected_english_and_chinese_success_fields_are_synchronized tests/test_cli_contract.py::test_registered_command_success_field_contracts_are_synchronized tests/test_cli_contract.py::test_registered_commands_have_success_field_contracts_in_cli_specs tests/test_cli_contract.py::test_completion_audit_cli_evidence_rows_are_not_stale`
+- Smoke checks: `.venv/bin/python -m pytest -q tests/test_smoke.py::test_config_source_observe_and_tags tests/test_smoke.py::test_local_project_run_submit_workflow`
+- Full runner suites: `.venv/bin/python -m pytest -q tests/test_runner_local.py tests/test_runner_docker.py tests/test_runner_harbor.py tests/test_runner_skydiscover.py`
+- Relevant ruff: `.venv/bin/ruff check src/alab/configs.py src/alab/project_config.py src/alab/dashboard.py src/alab/runner.py tests/test_runner_local.py tests/test_migrations.py tests/test_dashboard.py tests/test_smoke.py`
+- Compile check: `.venv/bin/python -m compileall -q src/alab`
+- Dashboard JavaScript syntax: `node --check src/alab/dashboard_static/app.js`
+- Full default suite: `.venv/bin/python -m pytest -q`
+- `git diff --check`
+
+## 2026-06-20 Version 0.1.9 Release Prep
+
+Implemented:
+
+- Finalized the project reference metrics and dashboard curves changelog entry as `0.1.9`.
+- Bumped the synchronized package version files: `pyproject.toml`, `uv.lock`, and `src/alab/__init__.py`.
+
+Validation:
+
+- Version synchronization check: `.venv/bin/python .github/scripts/check_version_sync.py`
+- Final full default suite: `.venv/bin/python -m pytest -q`
+- Dashboard JavaScript syntax: `node --check src/alab/dashboard_static/app.js`
+- Compile check: `.venv/bin/python -m compileall -q src tests`
+- `git diff --check`

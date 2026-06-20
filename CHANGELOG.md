@@ -5,6 +5,14 @@ All notable ALab changes are recorded here. Keep this file in sync with
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-20
+
+### Added
+
+- Added project reference metric declarations through `metrics.reference`, allowing
+  dashboard project run views to plot optional numeric run metrics alongside the
+  existing reward trend without changing reward ranking semantics.
+
 ## [0.1.8] - 2026-06-07
 
 ### Added

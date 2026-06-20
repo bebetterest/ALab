@@ -12,12 +12,12 @@
 - 本文只保留当前 queue 和 update policy。不要追加 stale backlog；evidence 关闭时直接改写或删除 queue rows。
 - 英文文档是 canonical。必须在同一个 change 中更新同步的 `*_cn.md` 文件。
 
-## 当前 Active Batch - 2026-06-07
+## 当前 Active Batch - 2026-06-20
 
-- Focus：用户要求的 dashboard static presentation fixes 和 front-of-pipeline CI version synchronization gate 已在当前 worktree 关闭。Dashboard 现在会为每个有分 run 渲染红色 best-so-far reward trend series：当后续 run 没有产生新的最佳值时，继续沿用此前最佳值，同时保留独立 new-best marker/count behavior。Project detail sticky tabs 滚动时也会贴住 detail header，并使用不透明 full-width background；run detail KPI rows 也会为横向滚动条预留足够高度。CI 现在会在 lint、tests、opt-in gates 或 publish jobs 前先检查 package version synchronization。
-- 本 batch 明确 non-goals：不改变 dashboard APIs、CLI command contracts、read-model pagination、storage schema、runner behavior、visibility rules、reward ranking semantics、package publishing semantics 或 release asset upload semantics。本 batch 只改变 static dashboard chart/detail/KPI layout presentation、CI preflight ordering gate 和 focused evidence。
+- Focus：用户要求的 project reference metrics 和 dashboard metric curves 已在当前 worktree 关闭。Project configs 现在支持 optional `[metrics].reference` entries，并校验 metric names、labels、units 与 maximize/minimize direction；缺少 optional metrics section 的 legacy configs 仍会通过 canonical config contract 加载。`project config show` 会渲染 configured reference metrics，local/Docker reward extraction 会把 primary 或完整 JSON numeric metrics 写入 run/validation records，root dashboard read model/frontend 会在 reward trend 旁为每个 configured reference metric 渲染 trend card。
+- 本 batch 明确 non-goals：不做 database migration、不改变 ranking/best-run semantics、不改变 lifecycle/visibility/source policy、不新增 dashboard mutation controls、不改变 hosted/non-loopback dashboard behavior，也不新增 runner type。本 batch 只改变 project-config schema/read output、local/Docker reward metric persistence、dashboard read models/static charts、documentation 和 focused evidence。
 - 重复处理 guardrail：`docs/progress_closed_gaps.md` 负责 do-not-reopen list。只有未来 batch 像已关闭 family 时才打开。
-- 已新增 evidence：focused dashboard static frontend test、version synchronization script 和 CI ordering contract tests、针对当前版本 changelog section 的 dynamic release-note extraction test、针对 touched Python test files 的 focused `ruff`、sandbox full-suite dashboard-bind failure confirmation、elevated full default suite、full-suite skip listing、opt-in skipped-test subset、`git diff --check`，以及使用 `examples/dashboard_showcase/.run/alab-home` 的 in-app Browser verification，确认 `SkyDiscover Circle Packing` 的 #3 会继续沿用 #2 的最佳值，project detail tabs 贴住 header、没有半透明空白间隙，且 `Embedding reranker` run detail KPI cards 在横向滚动条上方完整显示。
+- 已新增 evidence：focused project config schema/migration contract tests、local runner JSON/full-metric persistence tests、dashboard read-model/static frontend tests、CLI success-field/docs synchronization checks、config/run flows smoke tests、local/Docker/Harbor/SkyDiscover full runner suites、相关 `ruff`、强制 `compileall`、dashboard JavaScript 的 `node --check`、full default suite `.venv/bin/python -m pytest -q`、docs/audit consistency checks，以及 `git diff --check`。
 
 ## Active Queue
 

@@ -34,6 +34,12 @@ exclude = []
 scope = "same_project"
 experiment_ids = []
 
+[metrics]
+reference = [
+  { name = "latency_ms", label = "Latency", direction = "minimize", unit = "ms" },
+  { name = "coverage", label = "Coverage", direction = "maximize" },
+]
+
 [runner]
 type = "local"
 timeout_seconds = 600
@@ -87,6 +93,9 @@ Field rules:
 - `mutable.include` defaults to `["**"]` and must contain at least one non-empty single-line pattern; `mutable.exclude` defaults to `[]` and, when set, contains non-empty single-line patterns.
 - `visibility.scope` is `none`, `same_project`, or `explicit`.
 - `visibility.experiment_ids` is required and non-empty only when `scope = "explicit"`; entries must be complete experiment ids and are normalized to a sorted unique list.
+- `metrics.reference` defaults to `[]` and declares optional numeric run metrics that the dashboard may plot as reference curves. Each entry has `name`, optional `label`, `direction = "maximize"|"minimize"`, and optional `unit`.
+- `metrics.reference[].name` must match `^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$` and must be unique within the project config.
+- Reference metrics are display metadata only. They do not change reward parsing, best ranking, submit behavior, or run status. Actual values are optional per run and come from the run record's numeric `metrics` map.
 - `runner.type` is `none`, `local`, `docker`, `harbor`, `skydiscover_docker`, or `skydiscover_python`.
 - `runner.type = "none"` enables free evaluation mode and must be paired with `reward.type = "none"`. It rejects executable runner fields such as commands, shell, Docker fields, Harbor refs, and SkyDiscover refs.
 - `runner.timeout_seconds` defaults to `600` and must be an integer between `1` and `86400`.
@@ -116,7 +125,7 @@ Field rules:
 Baseline trigger rule:
 
 - Runtime-affecting fields trigger baseline: `source.default_source_ref`, all `runner.*`, all `reward.*`, `artifacts.*`, `logs.*`, `env.*`, `secret_env.*`, and timeout fields.
-- Policy and metadata fields do not trigger baseline by themselves: `project.goal`, `project.task`, `project.allow_public_exp_create`, `public_source_import.*`, `mutable.*`, `visibility.*`, tags, and Git author metadata.
+- Policy and metadata fields do not trigger baseline by themselves: `project.goal`, `project.task`, `project.allow_public_exp_create`, `public_source_import.*`, `mutable.*`, `visibility.*`, `metrics.reference.*`, tags, and Git author metadata.
 
 Config edit rule:
 

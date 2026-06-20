@@ -5,6 +5,14 @@ ALab 的重要变更记录在这里。每次发布改变用户可见行为时，
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-20
+
+### 新增
+
+- 新增通过 `metrics.reference` 声明 project reference metrics 的能力，
+  dashboard project run views 可在现有 reward trend 之外绘制可选 numeric run
+  metrics 曲线，同时不改变 reward ranking 语义。
+
 ## [0.1.8] - 2026-06-07
 
 ### 新增

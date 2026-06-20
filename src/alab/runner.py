@@ -208,7 +208,7 @@ def run_local_runner(
         returncode = proc.returncode
         if returncode is None:
             returncode = 1
-        reward, parse_status = parse_reward(config, returncode, stdout, workspace, run_dir)
+        reward, parse_status, metrics = parse_reward(config, returncode, stdout, workspace, run_dir)
         if returncode == 0 and parse_status == "parsed":
             status = "passed"
         elif returncode == 0:
@@ -218,7 +218,18 @@ def run_local_runner(
         warnings = ["ENV_MODE_FULL_UNREDACTED_HOST_ENV"] if config.runner.env_mode == "full" else []
         if secrets and config.artifacts.globs:
             warnings.append("ARTIFACT_BYTES_NOT_REDACTED")
-        return RunnerResult(status, returncode, reward, parse_status, stdout, stderr, started, ended, warning_codes=warnings)
+        return RunnerResult(
+            status,
+            returncode,
+            reward,
+            parse_status,
+            stdout,
+            stderr,
+            started,
+            ended,
+            warning_codes=warnings,
+            metrics=metrics,
+        )
     except subprocess.TimeoutExpired as exc:
         stdout_bytes, stderr_bytes = _terminate_local_process_group(proc)
         stdout = _redact(stdout_bytes or exc.stdout or b"", list(secrets.values()))
@@ -1229,7 +1240,9 @@ def run_docker_runner(
 
     stdout = _redact(completed.stdout, list(secrets.values()))
     stderr = _redact(completed.stderr, list(secrets.values()))
-    reward, parse_status = parse_reward(config, completed.returncode, stdout, workspace, run_dir)
+    reward, parse_status, metrics = parse_reward(
+        config, completed.returncode, stdout, workspace, run_dir
+    )
     if completed.returncode == 0 and parse_status == "parsed":
         status = "passed"
     elif completed.returncode == 0:
@@ -1258,6 +1271,7 @@ def run_docker_runner(
         failure,
         warnings,
         cache_metadata,
+        metrics=metrics,
         hidden_stdout=_redact(_setup_stdout, list(secrets.values())),
         hidden_stderr=_redact(_setup_stderr, list(secrets.values())),
     )
@@ -2142,47 +2156,57 @@ def run_skydiscover_python_runner(
     )
 
 
-def parse_reward(config: ProjectConfig, exit_code: int, stdout: bytes, workspace: Path, run_dir: Path) -> tuple[float | None, str]:
+def parse_reward(
+    config: ProjectConfig,
+    exit_code: int,
+    stdout: bytes,
+    workspace: Path,
+    run_dir: Path,
+) -> tuple[float | None, str, dict[str, float]]:
     reward = config.reward
+    primary = reward.primary_metric or "reward"
     try:
         if reward.type == "exit_code":
-            return (1.0 if exit_code == 0 else 0.0), "parsed"
+            value = 1.0 if exit_code == 0 else 0.0
+            return value, "parsed", {primary: value}
         if reward.type == "stdout_regex" and reward.pattern:
             text = stdout[: config.logs.stdout_limit_bytes].decode("utf-8", errors="replace")
             match = re.search(reward.pattern, text)
             if not match:
-                return None, "missing"
+                return None, "missing", {}
             value = match.groupdict().get("reward") if "reward" in match.groupdict() else match.group(1)
-            return _parse_text_reward_number(value), "parsed"
+            parsed = _parse_text_reward_number(value)
+            return parsed, "parsed", {primary: parsed}
         if reward.type == "file" and reward.path:
             prefix, sep, rel = reward.path.partition(":")
             if sep != ":" or prefix not in {"workspace", "run"} or not rel:
-                return None, "invalid"
+                return None, "invalid", {}
             root = run_dir if prefix == "run" else workspace
             root_resolved = root.resolve()
             path = (root / rel).resolve()
             if path != root_resolved and root_resolved not in path.parents:
-                return None, "invalid"
+                return None, "invalid", {}
             limit = config.artifacts.per_file_limit_bytes
             if limit < 1:
-                return None, "invalid"
+                return None, "invalid", {}
             with path.open("rb") as fh:
                 data = fh.read(limit + 1)
             if len(data) > limit:
-                return None, "invalid"
+                return None, "invalid", {}
             text = data.decode("utf-8").strip()
             if path.suffix.lower() == ".json":
                 value = json.loads(text)
                 metrics = _reward_metric_map(value)
                 if metrics is None:
-                    return None, "invalid"
-                if reward.primary_metric not in metrics:
-                    return None, "missing"
-                return metrics[reward.primary_metric], "parsed"
-            return _parse_text_reward_number(text), "parsed"
+                    return None, "invalid", {}
+                if primary not in metrics:
+                    return None, "missing", metrics
+                return metrics[primary], "parsed", metrics
+            parsed = _parse_text_reward_number(text)
+            return parsed, "parsed", {primary: parsed}
     except Exception:
-        return None, "invalid"
-    return None, "missing"
+        return None, "invalid", {}
+    return None, "missing", {}
 
 
 def store_log_file(

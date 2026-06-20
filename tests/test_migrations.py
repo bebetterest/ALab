@@ -767,12 +767,31 @@ def test_project_config_json_contract_enforces_documented_shape() -> None:
             "fingerprint": "hmac-sha256:" + "a" * 64,
         }
     }
+    config["metrics"] = {
+        "reference": [
+            {
+                "name": "latency_ms",
+                "label": "Latency",
+                "direction": "minimize",
+                "unit": "ms",
+            }
+        ]
+    }
 
     assert services.project_config_json_obj(canonical_json(config)) == config
+    legacy_without_metrics = {key: value for key, value in config.items() if key != "metrics"}
+    assert services.project_config_json_obj(canonical_json(legacy_without_metrics)) == {
+        **config,
+        "metrics": {"reference": []},
+    }
 
     invalid_cases = [
         ({**config, "raw_secret": "x"}, "contains unknown JSON keys: raw_secret"),
         ({key: value for key, value in config.items() if key != "git"}, "missing JSON keys: git"),
+        (
+            {**config, "metrics": {"reference": [{"name": "latency_ms"}, {"name": "latency_ms"}]}},
+            "duplicate metric name: latency_ms",
+        ),
         ({**config, "env": {"VISIBLE_ENV": 1}}, "env must be a string map"),
         ({**config, "secret_env": {"API_TOKEN": "raw-secret"}}, "secret_env entries must be stored secret marker objects"),
         (

@@ -2633,6 +2633,67 @@ pre,
   height: clamp(240px, 30vh, 340px);
 }
 
+.reference-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 12px;
+}
+
+.reference-metric-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.reference-metric-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reference-metric-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.reference-metric-head p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.reference-metric-head span {
+  flex: 0 0 auto;
+  max-width: 116px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid #d8e2ef;
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reference-metric-chart-box {
+  height: 220px;
+}
+
+.reference-metric-empty {
+  min-width: 0;
+}
+
 .project-overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.75fr) minmax(280px, 0.95fr);

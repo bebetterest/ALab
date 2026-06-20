@@ -152,6 +152,7 @@ printf '%s\n' "$ALAB_ROOT_KEY" | alab --key-stdin project init skydiscover \
 
 `project init` prints the generated project admin key exactly once after the project is created. Capture it into an ignored local secret file, such as an example `.run/secrets/project.env`, or an approved secret store. Pass only the project admin key to the delegated project-level session, never to experiment workers.
 Configs with paired `runner.type = "none"` and `reward.type = "none"` create free evaluation projects for direct submit without baseline evaluator runs; use them only with `local`, `git`, or `empty` project init modes, not Harbor or SkyDiscover adapter init.
+Configs may also declare `metrics.reference` entries for optional numeric run metrics that the dashboard plots as reference curves; these declarations do not affect reward ranking or baseline execution.
 
 ## Catalog Rules
 

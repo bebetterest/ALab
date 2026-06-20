@@ -2936,6 +2936,93 @@ primary_metric = "reward"
     assert "secret_env changes must use project secret" in secret_env_err
 
 
+def test_project_config_no_op_accepts_legacy_rows_without_metrics(tmp_path, capsys) -> None:
+    home = tmp_path / "home"
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+    config = tmp_path / "alab.project.toml"
+    config.write_text(
+        f"""
+schema_version = 1
+
+[project]
+name = "Legacy Config Project"
+task = "Keep legacy config stable"
+
+[runner]
+type = "local"
+timeout_seconds = 30
+working_directory = "."
+env_mode = "none"
+command = [{json.dumps(sys.executable)}, "main.py"]
+
+[reward]
+type = "exit_code"
+direction = "maximize"
+primary_metric = "reward"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert run(["--home", str(home), "auth", "init"]) == 0
+    root_key = _field(capsys.readouterr().out, "root key")
+    assert run(["--home", str(home), "--key", root_key, "project", "init", "local", "--config", str(config), "--source-path", str(source)]) == 0
+    project_out = capsys.readouterr().out
+    project_id = _field(project_out, "project id")
+    admin_key = _field(project_out, "admin key")
+
+    with sqlite3.connect(home / "alab.db") as conn:
+        row = conn.execute(
+            "SELECT canonical_config_json FROM project_config_versions WHERE project_id = ? AND version = 1",
+            (project_id,),
+        ).fetchone()
+        legacy_json = services.project_config_json_obj(row[0])
+        legacy_json.pop("metrics")
+        conn.execute(
+            """
+            UPDATE project_config_versions
+            SET canonical_config_json = ?, config_hash = ?
+            WHERE project_id = ? AND version = 1
+            """,
+            (services.canonical_json(legacy_json), services.config_hash(legacy_json), project_id),
+        )
+        config_count = conn.execute(
+            "SELECT COUNT(*) FROM project_config_versions WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()[0]
+
+    assert (
+        run(
+            [
+                "--home",
+                str(home),
+                "--key",
+                admin_key,
+                "project",
+                "config",
+                "set",
+                "project.task",
+                '"Keep legacy config stable"',
+                "--project",
+                project_id,
+            ]
+        )
+        == 0
+    )
+    no_op_out = capsys.readouterr().out
+    assert _field_labels(no_op_out) == _project_config_set_field_labels()
+    assert "latest attempted config version: 1" in no_op_out
+    assert "runtime affecting: false" in no_op_out
+    assert "next: none" in no_op_out
+    with sqlite3.connect(home / "alab.db") as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM project_config_versions WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()[0] == config_count
+
+
 def test_invalid_runtime_config_preserves_previous_active_valid_config(tmp_path, monkeypatch, capsys) -> None:
     home = tmp_path / "home"
     source = tmp_path / "source"
@@ -11181,6 +11268,7 @@ globs = ["run:artifact.txt"]
         "reward type",
         "reward direction",
         "primary metric",
+        "reference metric",
         "artifact glob count",
         "stdout limit bytes",
         "stderr limit bytes",
@@ -11190,7 +11278,34 @@ globs = ["run:artifact.txt"]
     ]
     assert "task:\n  Capture logs and artifacts" in config_show_out
     assert "goal:\n  Observe everything" in config_show_out
+    assert "reference metric: none" in config_show_out
     assert "sandbox: not-declared" in config_show_out
+
+    assert (
+        run(
+            [
+                "--home",
+                str(home),
+                "--key",
+                admin_key,
+                "project",
+                "config",
+                "set",
+                "metrics.reference",
+                '[{name = "latency_ms", label = "Latency", direction = "minimize", unit = "ms"}]',
+                "--project",
+                project_id,
+            ]
+        )
+        == 0
+    )
+    metric_config_out = capsys.readouterr().out
+    assert _field_labels(metric_config_out) == _project_config_set_field_labels()
+    assert "runtime affecting: false" in metric_config_out
+    assert "validation status: inherited" in metric_config_out
+    assert run(["--home", str(home), "--key", admin_key, "project", "config", "show", "--project", project_id]) == 0
+    metric_config_show_out = capsys.readouterr().out
+    assert "reference metric: latency_ms (minimize) [ms]" in metric_config_show_out
 
     secret_gc_audits_before_unsupported = _audit_type_count(home, "gc", "secret_value")
     assert run(["--home", str(home), "--key", admin_key, "project", "secret", "gc", "--project", project_id, "--apply", "--reason", "ignored"]) == 2
